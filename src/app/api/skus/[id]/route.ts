@@ -26,8 +26,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const sku = await prisma.sKU.findUnique({
-      where: { id },
+    const sku = await prisma.sKU.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
       include: {
         createdBy: { select: { id: true, name: true } },
         updatedBy: { select: { id: true, name: true } },
@@ -126,9 +131,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const data = bodyResult.data
 
-    // Check SKU exists
-    const existing = await prisma.sKU.findUnique({
-      where: { id },
+    // Check SKU exists and belongs to user's company
+    const existing = await prisma.sKU.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!existing) {
@@ -216,9 +226,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Check SKU exists
-    const existing = await prisma.sKU.findUnique({
-      where: { id },
+    // Check SKU exists and belongs to user's company
+    const existing = await prisma.sKU.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!existing) {

@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/db'
 import {
   created,
   unauthorized,
+  notFound,
   serverError,
   parseBody,
 } from '@/lib/api-response'
@@ -27,6 +29,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (bodyResult.error) return bodyResult.error
 
     const { versionName } = bodyResult.data
+
+    // Verify BOM version exists and belongs to user's company
+    const existingBom = await prisma.bOMVersion.findFirst({
+      where: {
+        id,
+        sku: {
+          brand: {
+            companyId: session.user.companyId,
+          },
+        },
+      },
+    })
+
+    if (!existingBom) {
+      return notFound('BOM version')
+    }
 
     const newBomVersion = await cloneBOMVersion({
       bomVersionId: id,
@@ -68,10 +86,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       createdBy: newBomVersion.createdBy,
     })
   } catch (error) {
-    if (error instanceof Error && error.message === 'BOM version not found') {
-      const { notFound } = await import('@/lib/api-response')
-      return notFound('BOM version')
-    }
     console.error('Error cloning BOM version:', error)
     return serverError()
   }

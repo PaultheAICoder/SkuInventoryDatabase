@@ -31,8 +31,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const component = await prisma.component.findUnique({
-      where: { id },
+    const component = await prisma.component.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
       include: {
         createdBy: { select: { id: true, name: true } },
         updatedBy: { select: { id: true, name: true } },
@@ -146,9 +151,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const data = bodyResult.data
 
-    // Check component exists
-    const existing = await prisma.component.findUnique({
-      where: { id },
+    // Check component exists and belongs to user's company
+    const existing = await prisma.component.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!existing) {
@@ -232,9 +242,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Check component exists
-    const existing = await prisma.component.findUnique({
-      where: { id },
+    // Check component exists and belongs to user's company
+    const existing = await prisma.component.findFirst({
+      where: {
+        id,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!existing) {

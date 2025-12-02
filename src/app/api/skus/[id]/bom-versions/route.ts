@@ -32,9 +32,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { includeInactive } = queryResult.data
 
-    // Check SKU exists
-    const sku = await prisma.sKU.findUnique({
-      where: { id: skuId },
+    // Check SKU exists and belongs to user's company
+    const sku = await prisma.sKU.findFirst({
+      where: {
+        id: skuId,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!sku) {
@@ -131,21 +136,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const data = bodyResult.data
 
-    // Check SKU exists
-    const sku = await prisma.sKU.findUnique({
-      where: { id: skuId },
+    // Check SKU exists and belongs to user's company
+    const sku = await prisma.sKU.findFirst({
+      where: {
+        id: skuId,
+        brand: {
+          companyId: session.user.companyId,
+        },
+      },
     })
 
     if (!sku) {
       return notFound('SKU')
     }
 
-    // Verify all components exist and are active
+    // Verify all components exist, are active, and belong to user's company
     const componentIds = data.lines.map((l) => l.componentId)
     const components = await prisma.component.findMany({
       where: {
         id: { in: componentIds },
         isActive: true,
+        brand: {
+          companyId: session.user.companyId,
+        },
       },
     })
 

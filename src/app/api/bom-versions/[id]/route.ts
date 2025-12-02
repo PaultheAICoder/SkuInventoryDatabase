@@ -22,8 +22,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    const bomVersion = await prisma.bOMVersion.findUnique({
-      where: { id },
+    const bomVersion = await prisma.bOMVersion.findFirst({
+      where: {
+        id,
+        sku: {
+          brand: {
+            companyId: session.user.companyId,
+          },
+        },
+      },
       include: {
         sku: {
           select: {
