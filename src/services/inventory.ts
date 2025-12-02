@@ -1,6 +1,28 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import type { ReorderStatus } from '@/types'
+import {
+  companySettingsSchema,
+  DEFAULT_SETTINGS,
+  type CompanySettings,
+} from '@/types/settings'
+
+/**
+ * Fetch and merge company settings with defaults
+ * Returns validated settings or defaults if validation fails
+ */
+export async function getCompanySettings(companyId: string): Promise<CompanySettings> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { settings: true },
+  })
+
+  const storedSettings = (company?.settings as Record<string, unknown>) || {}
+  const merged = { ...DEFAULT_SETTINGS, ...storedSettings }
+  const validated = companySettingsSchema.safeParse(merged)
+
+  return validated.success ? validated.data : DEFAULT_SETTINGS
+}
 
 /**
  * Calculate the on-hand quantity for a component by summing all transaction lines
@@ -43,12 +65,13 @@ export async function getComponentQuantities(
 /**
  * Calculate reorder status based on quantity and reorder point
  * Critical: quantity <= reorderPoint
- * Warning: quantity <= reorderPoint * 1.5
- * OK: quantity > reorderPoint * 1.5
+ * Warning: quantity <= reorderPoint * reorderWarningMultiplier
+ * OK: quantity > reorderPoint * reorderWarningMultiplier
  */
 export function calculateReorderStatus(
   quantityOnHand: number,
-  reorderPoint: number
+  reorderPoint: number,
+  reorderWarningMultiplier: number = 1.5
 ): ReorderStatus {
   if (reorderPoint === 0) {
     return 'ok'
@@ -56,7 +79,7 @@ export function calculateReorderStatus(
   if (quantityOnHand <= reorderPoint) {
     return 'critical'
   }
-  if (quantityOnHand <= reorderPoint * 1.5) {
+  if (quantityOnHand <= reorderPoint * reorderWarningMultiplier) {
     return 'warning'
   }
   return 'ok'

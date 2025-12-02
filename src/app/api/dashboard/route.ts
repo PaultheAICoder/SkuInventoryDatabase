@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, serverError } from '@/lib/api-response'
-import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
+import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
 import { calculateMaxBuildableUnitsForSKUs, calculateBOMUnitCosts } from '@/services/bom'
 import type { ReorderStatus } from '@/types'
 
@@ -67,6 +67,9 @@ export async function GET(_request: NextRequest) {
 
     const brandId = user.company.brands[0].id
 
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
+
     // Get all active components
     const components = await prisma.component.findMany({
       where: { brandId, isActive: true },
@@ -89,7 +92,7 @@ export async function GET(_request: NextRequest) {
 
     const componentsWithStatus = components.map((component) => {
       const quantityOnHand = quantities.get(component.id) ?? 0
-      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
       switch (status) {
         case 'critical':

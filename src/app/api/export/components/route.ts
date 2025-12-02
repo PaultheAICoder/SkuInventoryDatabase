@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { unauthorized, serverError } from '@/lib/api-response'
-import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
+import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
 import {
   toCSV,
   componentExportColumns,
@@ -38,6 +38,9 @@ export async function GET() {
 
     const brandId = user.company.brands[0].id
 
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
+
     // Get all components for the brand
     const components = await prisma.component.findMany({
       where: { brandId },
@@ -51,7 +54,7 @@ export async function GET() {
     // Transform to export format
     const exportData: ComponentExportData[] = components.map((component) => {
       const quantityOnHand = quantities.get(component.id) ?? 0
-      const reorderStatus = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+      const reorderStatus = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
       return {
         id: component.id,

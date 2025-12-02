@@ -14,7 +14,7 @@ import {
   parseQuery,
 } from '@/lib/api-response'
 import { createComponentSchema, componentListQuerySchema } from '@/types/component'
-import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
+import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
 
 // GET /api/components - List components with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -42,6 +42,9 @@ export async function GET(request: NextRequest) {
     }
 
     const brandId = user.company.brands[0].id
+
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
 
     // Build where clause
     const where: Prisma.ComponentWhereInput = {
@@ -78,7 +81,7 @@ export async function GET(request: NextRequest) {
       // Transform and compute reorder status for ALL
       const allWithStatus = allComponents.map((component) => {
         const quantityOnHand = quantities.get(component.id) ?? 0
-        const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+        const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
         return {
           id: component.id,
@@ -129,7 +132,7 @@ export async function GET(request: NextRequest) {
     // Transform response with computed fields
     const data = components.map((component) => {
       const quantityOnHand = quantities.get(component.id) ?? 0
-      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
       return {
         id: component.id,
@@ -182,6 +185,9 @@ export async function POST(request: NextRequest) {
 
     const brandId = user.company.brands[0].id
 
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
+
     // Check for duplicate name or skuCode
     const existing = await prisma.component.findFirst({
       where: {
@@ -206,7 +212,8 @@ export async function POST(request: NextRequest) {
         unitOfMeasure: data.unitOfMeasure,
         costPerUnit: new Prisma.Decimal(data.costPerUnit),
         reorderPoint: data.reorderPoint,
-        leadTimeDays: data.leadTimeDays,
+        // Use settings default if leadTimeDays not provided (0 or undefined)
+        leadTimeDays: data.leadTimeDays || settings.defaultLeadTimeDays,
         notes: data.notes,
         createdById: session.user.id,
         updatedById: session.user.id,
@@ -228,7 +235,7 @@ export async function POST(request: NextRequest) {
       notes: component.notes,
       isActive: component.isActive,
       quantityOnHand: 0,
-      reorderStatus: calculateReorderStatus(0, component.reorderPoint),
+      reorderStatus: calculateReorderStatus(0, component.reorderPoint, settings.reorderWarningMultiplier),
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
       createdBy: component.createdBy,

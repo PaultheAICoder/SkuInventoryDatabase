@@ -16,6 +16,7 @@ import {
   getComponentQuantity,
   calculateReorderStatus,
   canDeleteComponent,
+  getCompanySettings,
 } from '@/services/inventory'
 import { calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
 
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
+
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
 
     const component = await prisma.component.findFirst({
       where: {
@@ -110,7 +114,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       notes: component.notes,
       isActive: component.isActive,
       quantityOnHand,
-      reorderStatus: calculateReorderStatus(quantityOnHand, component.reorderPoint),
+      reorderStatus: calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier),
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
       createdBy: component.createdBy,
@@ -145,6 +149,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
+
+    // Get company settings
+    const settings = await getCompanySettings(session.user.companyId)
 
     const bodyResult = await parseBody(request, updateComponentSchema)
     if (bodyResult.error) return bodyResult.error
@@ -221,7 +228,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       notes: component.notes,
       isActive: component.isActive,
       quantityOnHand,
-      reorderStatus: calculateReorderStatus(quantityOnHand, component.reorderPoint),
+      reorderStatus: calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier),
       createdAt: component.createdAt.toISOString(),
       updatedAt: component.updatedAt.toISOString(),
       createdBy: component.createdBy,

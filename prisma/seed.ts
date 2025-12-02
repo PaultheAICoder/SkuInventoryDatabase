@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import { hash } from 'bcryptjs'
+import { DEFAULT_SETTINGS } from '../src/types/settings'
 
 const connectionString = process.env.DATABASE_URL ?? ''
 const pool = new Pool({ connectionString })
@@ -17,9 +18,7 @@ async function main() {
     update: {},
     create: {
       name: 'Tonsil Tech',
-      settings: {
-        blockNegativeInventory: false,
-      },
+      settings: DEFAULT_SETTINGS,
     },
   })
   console.log('Created company:', company.name)

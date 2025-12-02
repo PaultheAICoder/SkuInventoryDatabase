@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Button } from '@/components/ui/button'
 import { ComponentTable } from '@/components/features/ComponentTable'
-import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
+import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
 import { Plus } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
 import type { ComponentResponse } from '@/types/component'
@@ -25,6 +25,7 @@ interface PageProps {
 
 async function getComponents(
   brandId: string,
+  companyId: string,
   params: {
     page: number
     pageSize: number
@@ -35,6 +36,9 @@ async function getComponents(
     sortOrder: 'asc' | 'desc'
   }
 ) {
+  // Get company settings
+  const settings = await getCompanySettings(companyId)
+
   const where = {
     brandId,
     isActive: true,
@@ -69,7 +73,7 @@ async function getComponents(
     // Transform and compute reorder status for ALL
     const allWithStatus: ComponentResponse[] = allComponents.map((component) => {
       const quantityOnHand = quantities.get(component.id) ?? 0
-      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
       return {
         id: component.id,
@@ -124,7 +128,7 @@ async function getComponents(
   // Transform response with computed fields
   const data: ComponentResponse[] = components.map((component) => {
     const quantityOnHand = quantities.get(component.id) ?? 0
-    const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+    const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
 
     return {
       id: component.id,
@@ -179,7 +183,7 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
   const page = parseInt(params.page ?? '1', 10)
   const pageSize = parseInt(params.pageSize ?? '50', 10)
 
-  const { components, total } = await getComponents(brandId, {
+  const { components, total } = await getComponents(brandId, session.user.companyId, {
     page,
     pageSize,
     search: params.search,
