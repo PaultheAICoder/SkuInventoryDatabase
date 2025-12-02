@@ -1,0 +1,203 @@
+import { NextRequest } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/db'
+import {
+  success,
+  created,
+  unauthorized,
+  notFound,
+  serverError,
+  parseBody,
+  parseQuery,
+} from '@/lib/api-response'
+import { createBOMVersionSchema, bomVersionListQuerySchema } from '@/types/bom'
+import { createBOMVersion, calculateBOMUnitCost } from '@/services/bom'
+import { getComponentQuantities } from '@/services/inventory'
+
+type RouteParams = { params: Promise<{ id: string }> }
+
+// GET /api/skus/:id/bom-versions - List BOM versions for a SKU
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return unauthorized()
+    }
+
+    const { id: skuId } = await params
+    const { searchParams } = new URL(request.url)
+    const queryResult = parseQuery(searchParams, bomVersionListQuerySchema)
+    if (queryResult.error) return queryResult.error
+
+    const { includeInactive } = queryResult.data
+
+    // Check SKU exists
+    const sku = await prisma.sKU.findUnique({
+      where: { id: skuId },
+    })
+
+    if (!sku) {
+      return notFound('SKU')
+    }
+
+    // Get BOM versions
+    const bomVersions = await prisma.bOMVersion.findMany({
+      where: {
+        skuId,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        lines: {
+          include: {
+            component: {
+              select: {
+                id: true,
+                name: true,
+                skuCode: true,
+                costPerUnit: true,
+                unitOfMeasure: true,
+              },
+            },
+          },
+        },
+        createdBy: { select: { id: true, name: true } },
+      },
+    })
+
+    // Get component quantities for all components in all versions
+    const allComponentIds = new Set<string>()
+    for (const version of bomVersions) {
+      for (const line of version.lines) {
+        allComponentIds.add(line.componentId)
+      }
+    }
+    const quantities = await getComponentQuantities(Array.from(allComponentIds))
+
+    // Transform response
+    const data = bomVersions.map((version) => {
+      const unitCost = version.lines.reduce((sum, line) => {
+        return sum + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
+      }, 0)
+
+      return {
+        id: version.id,
+        skuId: version.skuId,
+        versionName: version.versionName,
+        effectiveStartDate: version.effectiveStartDate.toISOString().split('T')[0],
+        effectiveEndDate: version.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+        isActive: version.isActive,
+        notes: version.notes,
+        unitCost: unitCost.toFixed(4),
+        lines: version.lines.map((line) => ({
+          id: line.id,
+          component: {
+            id: line.component.id,
+            name: line.component.name,
+            skuCode: line.component.skuCode,
+            costPerUnit: line.component.costPerUnit.toString(),
+            unitOfMeasure: line.component.unitOfMeasure,
+            quantityOnHand: quantities.get(line.componentId) ?? 0,
+          },
+          quantityPerUnit: line.quantityPerUnit.toString(),
+          lineCost: (line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()).toFixed(4),
+          notes: line.notes,
+        })),
+        createdAt: version.createdAt.toISOString(),
+        createdBy: version.createdBy,
+      }
+    })
+
+    return success(data)
+  } catch (error) {
+    console.error('Error listing BOM versions:', error)
+    return serverError()
+  }
+}
+
+// POST /api/skus/:id/bom-versions - Create a new BOM version
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return unauthorized()
+    }
+
+    const { id: skuId } = await params
+
+    const bodyResult = await parseBody(request, createBOMVersionSchema)
+    if (bodyResult.error) return bodyResult.error
+
+    const data = bodyResult.data
+
+    // Check SKU exists
+    const sku = await prisma.sKU.findUnique({
+      where: { id: skuId },
+    })
+
+    if (!sku) {
+      return notFound('SKU')
+    }
+
+    // Verify all components exist and are active
+    const componentIds = data.lines.map((l) => l.componentId)
+    const components = await prisma.component.findMany({
+      where: {
+        id: { in: componentIds },
+        isActive: true,
+      },
+    })
+
+    if (components.length !== componentIds.length) {
+      return serverError('One or more components not found or inactive')
+    }
+
+    // Create BOM version with lines
+    const bomVersion = await createBOMVersion({
+      skuId,
+      versionName: data.versionName,
+      effectiveStartDate: data.effectiveStartDate,
+      isActive: data.isActive,
+      notes: data.notes,
+      lines: data.lines,
+      createdById: session.user.id,
+    })
+
+    // Calculate unit cost
+    const unitCost = await calculateBOMUnitCost(bomVersion.id)
+
+    // Get component quantities
+    const quantities = await getComponentQuantities(componentIds)
+
+    return created({
+      id: bomVersion.id,
+      skuId: bomVersion.skuId,
+      versionName: bomVersion.versionName,
+      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
+      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      isActive: bomVersion.isActive,
+      notes: bomVersion.notes,
+      unitCost: unitCost.toFixed(4),
+      lines: bomVersion.lines.map((line) => ({
+        id: line.id,
+        component: {
+          id: line.component.id,
+          name: line.component.name,
+          skuCode: line.component.skuCode,
+          costPerUnit: line.component.costPerUnit.toString(),
+          unitOfMeasure: line.component.unitOfMeasure,
+          quantityOnHand: quantities.get(line.componentId) ?? 0,
+        },
+        quantityPerUnit: line.quantityPerUnit.toString(),
+        lineCost: (line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()).toFixed(4),
+        notes: line.notes,
+      })),
+      createdAt: bomVersion.createdAt.toISOString(),
+      createdBy: bomVersion.createdBy,
+    })
+  } catch (error) {
+    console.error('Error creating BOM version:', error)
+    return serverError()
+  }
+}

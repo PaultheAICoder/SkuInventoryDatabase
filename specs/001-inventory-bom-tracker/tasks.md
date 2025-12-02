@@ -108,7 +108,7 @@
 
 ---
 
-## Phase 5: User Story 3 - Manage SKUs and BOMs (Priority: P3)
+## Phase 5: User Story 3 - Manage SKUs and BOMs (Priority: P3) ✅ COMPLETE
 
 **Goal**: Create SKUs, define BOM versions with component quantities, calculate BOM cost, support versioning
 
@@ -116,26 +116,26 @@
 
 ### Implementation for User Story 3
 
-- [ ] T054 [P] [US3] Create SKU entity in prisma/schema.prisma with all fields from data-model.md
-- [ ] T055 [P] [US3] Create BOMVersion entity in prisma/schema.prisma with unique partial index for single active BOM
-- [ ] T056 [P] [US3] Create BOMLine entity in prisma/schema.prisma with componentId FK, quantityPerUnit
-- [ ] T057 [US3] Run Prisma migration for SKU, BOMVersion, BOMLine entities
-- [ ] T058 [P] [US3] Create SKU Zod validation schemas in src/types/sku.ts
-- [ ] T059 [P] [US3] Create BOMVersion Zod validation schemas in src/types/bom.ts
-- [ ] T060 [US3] Implement BOM cost calculation service in src/services/bom.ts
-- [ ] T061 [US3] Implement SKU CRUD API route GET/POST in src/app/api/skus/route.ts
-- [ ] T062 [US3] Implement SKU detail API route GET/PATCH/DELETE in src/app/api/skus/[id]/route.ts
-- [ ] T063 [US3] Implement BOM versions list API route GET/POST in src/app/api/skus/[skuId]/bom-versions/route.ts
-- [ ] T064 [US3] Implement BOM version detail API route GET in src/app/api/bom-versions/[id]/route.ts
-- [ ] T065 [US3] Implement BOM version clone API route POST in src/app/api/bom-versions/[id]/clone/route.ts
-- [ ] T066 [US3] Implement BOM version activate API route POST in src/app/api/bom-versions/[id]/activate/route.ts
-- [ ] T067 [P] [US3] Create SKUForm component in src/components/features/SKUForm.tsx
-- [ ] T068 [P] [US3] Create SKUTable component in src/components/features/SKUTable.tsx
-- [ ] T069 [P] [US3] Create BOMVersionForm component with component line editor in src/components/features/BOMVersionForm.tsx
-- [ ] T070 [P] [US3] Create BOMVersionList component in src/components/features/BOMVersionList.tsx
-- [ ] T071 [US3] Create SKU list page in src/app/(dashboard)/skus/page.tsx
-- [ ] T072 [US3] Create SKU detail page with BOM management in src/app/(dashboard)/skus/[id]/page.tsx
-- [ ] T073 [US3] Create new SKU page in src/app/(dashboard)/skus/new/page.tsx
+- [x] T054 [P] [US3] Create SKU entity in prisma/schema.prisma with all fields from data-model.md
+- [x] T055 [P] [US3] Create BOMVersion entity in prisma/schema.prisma with unique partial index for single active BOM
+- [x] T056 [P] [US3] Create BOMLine entity in prisma/schema.prisma with componentId FK, quantityPerUnit
+- [x] T057 [US3] Run Prisma migration for SKU, BOMVersion, BOMLine entities
+- [x] T058 [P] [US3] Create SKU Zod validation schemas in src/types/sku.ts
+- [x] T059 [P] [US3] Create BOMVersion Zod validation schemas in src/types/bom.ts
+- [x] T060 [US3] Implement BOM cost calculation service in src/services/bom.ts
+- [x] T061 [US3] Implement SKU CRUD API route GET/POST in src/app/api/skus/route.ts
+- [x] T062 [US3] Implement SKU detail API route GET/PATCH/DELETE in src/app/api/skus/[id]/route.ts
+- [x] T063 [US3] Implement BOM versions list API route GET/POST in src/app/api/skus/[id]/bom-versions/route.ts
+- [x] T064 [US3] Implement BOM version detail API route GET in src/app/api/bom-versions/[id]/route.ts
+- [x] T065 [US3] Implement BOM version clone API route POST in src/app/api/bom-versions/[id]/clone/route.ts
+- [x] T066 [US3] Implement BOM version activate API route POST in src/app/api/bom-versions/[id]/activate/route.ts
+- [x] T067 [P] [US3] Create SKUForm component in src/components/features/SKUForm.tsx
+- [x] T068 [P] [US3] Create SKUTable component in src/components/features/SKUTable.tsx
+- [x] T069 [P] [US3] Create BOMVersionForm component with component line editor in src/components/features/BOMVersionForm.tsx
+- [x] T070 [P] [US3] Create BOMVersionList component in src/components/features/BOMVersionList.tsx
+- [x] T071 [US3] Create SKU list page in src/app/(dashboard)/skus/page.tsx
+- [x] T072 [US3] Create SKU detail page with BOM management in src/app/(dashboard)/skus/[id]/page.tsx
+- [x] T073 [US3] Create new SKU page in src/app/(dashboard)/skus/new/page.tsx
 
 **Checkpoint**: User Story 3 complete - SKUs and BOMs fully manageable with versioning and cost calculations
 
