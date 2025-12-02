@@ -2,6 +2,7 @@
 *.m4a
 *.mp3
 audio_chunks/
+audio_cache/
 
 # Transcripts (can be regenerated)
 *_transcript.txt
@@ -12,5 +13,39 @@ audio_chunks/
 # OS files
 .DS_Store
 
+# Environment variables (secrets)
+.env
+.env.local
+.env.production
+
 # Claude credentials (per SpecKit security recommendation)
 .claude/settings.local.json
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+
+# IDE
+.idea/
+.vscode/
+
+# Testing
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Misc
+*.tmp
+*.swp
+Thumbs.db
