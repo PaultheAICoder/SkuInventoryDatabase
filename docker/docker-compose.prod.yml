@@ -19,9 +19,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: inventory-app
     restart: unless-stopped
-    # No external port - only accessible via nginx
-    expose:
-      - '4500'
+    ports:
+      - '4545:4500'
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory?schema=public
