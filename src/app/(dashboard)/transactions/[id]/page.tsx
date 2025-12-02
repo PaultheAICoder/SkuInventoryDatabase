@@ -1,18 +1,16 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { TransactionDetail } from '@/components/features/TransactionDetail'
 import type { TransactionResponse } from '@/types/transaction'
 
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function TransactionDetailPage({ params }: PageProps) {
-  const { id } = use(params)
+export default function TransactionDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const [transaction, setTransaction] = useState<TransactionResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

@@ -10,7 +10,7 @@ Execute the complete 5-agent workflow for implementing features, fixing bugs, or
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## ⚠️ CRITICAL: ORCHESTRATION ONLY ⚠️
 
@@ -102,7 +102,7 @@ EOF
 **Your Role**:
 1. Return to project root directory:
    ```bash
-   cd /Users/paulbrown/Desktop/coding-projects/trevor-inventory
+   cd /home/pbrown/SkuInventory
    ```
 
 2. Capture start timestamp:

@@ -10,7 +10,7 @@ Conduct comprehensive investigation of GitHub issues to determine completion sta
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Usage
 

@@ -13,7 +13,7 @@ color: pink
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Step 0: Task Classification (CHECK FIRST)
 
@@ -28,7 +28,7 @@ Read Build/Plan outputs and classify:
 ### FAST_PATH for Refactoring (5-10 min max)
 
 ```bash
-cd /Users/paulbrown/Desktop/coding-projects/trevor-inventory
+cd /home/pbrown/SkuInventory
 
 # 1. TypeScript check (30s)
 npx tsc --noEmit
@@ -49,7 +49,7 @@ npm test -- --testPathPattern="basic|smoke" --passWithNoTests
 
 ### Step 1: Pre-flight Validation
 ```bash
-cd /Users/paulbrown/Desktop/coding-projects/trevor-inventory
+cd /home/pbrown/SkuInventory
 
 # TypeScript check
 npx tsc --noEmit
@@ -107,7 +107,7 @@ npm test  # All tests = potentially long
 
 ## Output Format
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/.agents/outputs/test-[ISSUE]-[MMDDYY].md`:
+Write to `/home/pbrown/SkuInventory/.agents/outputs/test-[ISSUE]-[MMDDYY].md`:
 
 ```markdown
 # Test Agent Report

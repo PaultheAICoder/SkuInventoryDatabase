@@ -10,7 +10,7 @@ Process every open GitHub issue using the 5-agent workflow until ALL are either 
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## 🚨 CRITICAL: DO NOT STOP FOR PERMISSION 🚨
 

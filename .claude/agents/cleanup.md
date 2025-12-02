@@ -14,7 +14,7 @@ color: blue
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Process
 
@@ -87,7 +87,7 @@ gh issue close <number> --comment "Issue resolved."
 
 ### 6. Create Completion Report
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/completion-docs/YYYY-MM-DD-issue-XXX-description.md`:
+Write to `/home/pbrown/SkuInventory/completion-docs/YYYY-MM-DD-issue-XXX-description.md`:
 
 ```markdown
 # Task [ID] - [Name] - Completion Report
@@ -188,7 +188,7 @@ git push
 
 ## Output Format
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/.agents/outputs/cleanup-[ISSUE]-[MMDDYY].md`:
+Write to `/home/pbrown/SkuInventory/.agents/outputs/cleanup-[ISSUE]-[MMDDYY].md`:
 
 ```markdown
 # Cleanup Agent Report

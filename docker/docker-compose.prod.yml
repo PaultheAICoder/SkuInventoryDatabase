@@ -23,9 +23,10 @@ services:
       - '4545:4500'
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory?schema=public
+      - DATABASE_URL=${DATABASE_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:4545}
+      - INTERNAL_API_URL=http://127.0.0.1:4500
     depends_on:
       db:
         condition: service_healthy

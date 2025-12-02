@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -14,14 +14,11 @@ import { BuildableUnitsDisplay } from '@/components/features/BuildableUnitsDispl
 import type { SKUDetailResponse } from '@/types/sku'
 import type { BOMVersionResponse } from '@/types/bom'
 
-interface SKUDetailPageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function SKUDetailPage({ params }: SKUDetailPageProps) {
+export default function SKUDetailPage() {
   const router = useRouter()
+  const params = useParams()
+  const skuId = params.id as string
   const { data: session } = useSession()
-  const [skuId, setSkuId] = useState<string | null>(null)
   const [sku, setSku] = useState<SKUDetailResponse | null>(null)
   const [bomVersions, setBomVersions] = useState<BOMVersionResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -29,10 +26,6 @@ export default function SKUDetailPage({ params }: SKUDetailPageProps) {
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
 
   const canEdit = session?.user?.role !== 'viewer'
-
-  useEffect(() => {
-    params.then((p) => setSkuId(p.id))
-  }, [params])
 
   const fetchData = useCallback(async () => {
     if (!skuId) return

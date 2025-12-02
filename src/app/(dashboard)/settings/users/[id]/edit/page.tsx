@@ -1,18 +1,16 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { UserForm } from '@/components/features/UserForm'
 import type { UserResponse } from '@/types/user'
 
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function EditUserPage({ params }: PageProps) {
-  const { id } = use(params)
+export default function EditUserPage() {
+  const params = useParams()
+  const id = params.id as string
   const [user, setUser] = useState<UserResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

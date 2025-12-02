@@ -13,12 +13,12 @@ color: orange
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Pre-Build Verification (MANDATORY)
 
 ```bash
-cd /Users/paulbrown/Desktop/coding-projects/trevor-inventory
+cd /home/pbrown/SkuInventory
 
 # Verify dependencies installed
 npm list next react typescript prisma
@@ -143,7 +143,7 @@ Before marking complete, verify new code actually runs:
 
 ## Output Format
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/.agents/outputs/build-[ISSUE]-[MMDDYY].md`:
+Write to `/home/pbrown/SkuInventory/.agents/outputs/build-[ISSUE]-[MMDDYY].md`:
 
 ```markdown
 # Build Agent Report

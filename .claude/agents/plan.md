@@ -14,7 +14,7 @@ color: yellow
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Process
 
@@ -120,7 +120,7 @@ npm test -- --testPathPattern="path/to/test"
 
 ## Output Format
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/.agents/outputs/plan-[ISSUE]-[MMDDYY].md`:
+Write to `/home/pbrown/SkuInventory/.agents/outputs/plan-[ISSUE]-[MMDDYY].md`:
 
 ```markdown
 # Implementation Plan

@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SKUTable } from '@/components/features/SKUTable'
 import { ExportButton } from '@/components/features/ExportButton'
+import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
+import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
 
 interface SearchParams {
   page?: string
@@ -17,31 +20,99 @@ interface SearchParams {
   sortOrder?: string
 }
 
-async function getSKUs(searchParams: SearchParams) {
-  const session = await getServerSession(authOptions)
-  if (!session) return { data: [], meta: { total: 0, page: 1, pageSize: 50 } }
+async function getSKUs(searchParams: SearchParams, userId: string) {
+  const page = parseInt(searchParams.page || '1', 10)
+  const pageSize = parseInt(searchParams.pageSize || '50', 10)
+  const search = searchParams.search
+  const salesChannel = searchParams.salesChannel
+  const sortBy = (searchParams.sortBy || 'createdAt') as keyof Prisma.SKUOrderByWithRelationInput
+  const sortOrder = (searchParams.sortOrder || 'desc') as 'asc' | 'desc'
 
-  const params = new URLSearchParams()
-  if (searchParams.page) params.set('page', searchParams.page)
-  if (searchParams.pageSize) params.set('pageSize', searchParams.pageSize)
-  if (searchParams.search) params.set('search', searchParams.search)
-  if (searchParams.salesChannel) params.set('salesChannel', searchParams.salesChannel)
-  if (searchParams.sortBy) params.set('sortBy', searchParams.sortBy)
-  if (searchParams.sortOrder) params.set('sortOrder', searchParams.sortOrder)
-
-  const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  const res = await fetch(`${baseUrl}/api/skus?${params.toString()}`, {
-    headers: {
-      cookie: `next-auth.session-token=${session.user.id}`,
-    },
-    cache: 'no-store',
+  // Get user's brand
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
   })
 
-  if (!res.ok) {
+  if (!user?.company.brands[0]) {
     return { data: [], meta: { total: 0, page: 1, pageSize: 50 } }
   }
 
-  return res.json()
+  const brandId = user.company.brands[0].id
+
+  // Build where clause
+  const where: Prisma.SKUWhereInput = {
+    brandId,
+    ...(salesChannel && { salesChannel }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' } },
+        { internalCode: { contains: search, mode: 'insensitive' } },
+      ],
+    }),
+  }
+
+  // Get total count
+  const total = await prisma.sKU.count({ where })
+
+  // Get SKUs with active BOM
+  const skus = await prisma.sKU.findMany({
+    where,
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+    orderBy: { [sortBy]: sortOrder },
+    include: {
+      createdBy: { select: { id: true, name: true } },
+      bomVersions: {
+        where: { isActive: true },
+        take: 1,
+        select: {
+          id: true,
+          versionName: true,
+        },
+      },
+    },
+  })
+
+  // Get BOM costs and buildable units
+  const skuIds = skus.map((s) => s.id)
+  const activeBomIds = skus
+    .filter((s) => s.bomVersions[0])
+    .map((s) => s.bomVersions[0].id)
+
+  const [bomCosts, buildableUnits] = await Promise.all([
+    activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
+    skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds) : new Map<string, number | null>(),
+  ])
+
+  // Transform response
+  const data = skus.map((sku) => {
+    const activeBom = sku.bomVersions[0]
+    const unitCost = activeBom ? bomCosts.get(activeBom.id) ?? 0 : null
+
+    return {
+      id: sku.id,
+      name: sku.name,
+      internalCode: sku.internalCode,
+      salesChannel: sku.salesChannel,
+      externalIds: sku.externalIds as Record<string, string>,
+      notes: sku.notes,
+      isActive: sku.isActive,
+      createdAt: sku.createdAt.toISOString(),
+      updatedAt: sku.updatedAt.toISOString(),
+      createdBy: sku.createdBy,
+      activeBom: activeBom
+        ? {
+            id: activeBom.id,
+            versionName: activeBom.versionName,
+            unitCost: unitCost?.toFixed(4) ?? '0.0000',
+          }
+        : null,
+      maxBuildableUnits: buildableUnits.get(sku.id) ?? null,
+    }
+  })
+
+  return { data, meta: { total, page, pageSize } }
 }
 
 export default async function SKUsPage({
@@ -55,7 +126,7 @@ export default async function SKUsPage({
   }
 
   const params = await searchParams
-  const { data: skus, meta } = await getSKUs(params)
+  const { data: skus, meta } = await getSKUs(params, session.user.id)
 
   return (
     <div className="space-y-6">

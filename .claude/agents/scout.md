@@ -12,7 +12,7 @@ color: purple
 
 **Project**: Trevor Inventory - Next.js 14 (App Router) + Prisma ORM + PostgreSQL + NextAuth
 
-**Project Root**: `/Users/paulbrown/Desktop/coding-projects/trevor-inventory`
+**Project Root**: `/home/pbrown/SkuInventory`
 
 ## Issue Classification Checklist
 
@@ -163,7 +163,7 @@ TOTAL FILES AFFECTED: X
 
 ## Output Format
 
-Write to `/Users/paulbrown/Desktop/coding-projects/trevor-inventory/.agents/outputs/scout-[ISSUE]-[MMDDYY].md`:
+Write to `/home/pbrown/SkuInventory/.agents/outputs/scout-[ISSUE]-[MMDDYY].md`:
 
 ```markdown
 # Scout Report: [Name]

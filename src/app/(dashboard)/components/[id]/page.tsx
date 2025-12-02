@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, use } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,12 +20,9 @@ import { AdjustmentDialog } from '@/components/features/AdjustmentDialog'
 import { ArrowLeft, Edit, Package, Plus, Minus } from 'lucide-react'
 import type { ComponentDetailResponse } from '@/types/component'
 
-interface PageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function ComponentDetailPage({ params }: PageProps) {
-  const { id } = use(params)
+export default function ComponentDetailPage() {
+  const params = useParams()
+  const id = params.id as string
   const { data: session } = useSession()
   const [component, setComponent] = useState<ComponentDetailResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
