@@ -1,0 +1,16 @@
+# Audio files (large binary files)
+*.m4a
+*.mp3
+audio_chunks/
+
+# Transcripts (can be regenerated)
+*_transcript.txt
+
+# Original Word doc (we have the markdown version)
+*.docx
+
+# OS files
+.DS_Store
+
+# Claude credentials (per SpecKit security recommendation)
+.claude/settings.local.json
