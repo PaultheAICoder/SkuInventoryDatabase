@@ -1,6 +1,93 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DashboardStats } from '@/components/features/DashboardStats'
+import { CriticalComponentsList } from '@/components/features/CriticalComponentsList'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import type { ReorderStatus } from '@/types'
+
+interface DashboardData {
+  componentStats: {
+    total: number
+    critical: number
+    warning: number
+    ok: number
+  }
+  criticalComponents: Array<{
+    id: string
+    name: string
+    skuCode: string
+    quantityOnHand: number
+    reorderPoint: number
+    reorderStatus: ReorderStatus
+  }>
+  recentTransactions: Array<{
+    id: string
+    type: string
+    date: string
+    createdAt: string
+    createdBy: { id: string; name: string }
+    lines: Array<{
+      component: { id: string; name: string }
+      quantityChange: string
+    }>
+  }>
+}
 
 export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchDashboard() {
+      try {
+        const res = await fetch('/api/dashboard')
+        if (!res.ok) {
+          throw new Error('Failed to load dashboard')
+        }
+        const result = await res.json()
+        setData(result.data)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchDashboard()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-red-500">{error || 'Failed to load data'}</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -8,66 +95,81 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Welcome to the Inventory & BOM Tracker</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Components</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">Active components in inventory</p>
-          </CardContent>
-        </Card>
+      <DashboardStats stats={data.componentStats} />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Critical Reorder</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">--</div>
-            <p className="text-xs text-muted-foreground">Components below reorder point</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active SKUs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">Sellable products with BOMs</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground">Transactions this week</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Critical Components</CardTitle>
-            <CardDescription>Components that need immediate reordering</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">No critical components</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <CriticalComponentsList components={data.criticalComponents} />
 
         <Card>
           <CardHeader>
-            <CardTitle>Top Buildable SKUs</CardTitle>
-            <CardDescription>SKUs with highest buildable quantities</CardDescription>
+            <CardTitle>Recent Transactions</CardTitle>
+            <CardDescription>Latest inventory activity</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">No SKUs configured</p>
+            {data.recentTransactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recent transactions</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Component</TableHead>
+                    <TableHead className="text-right">Change</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.recentTransactions.slice(0, 5).map((tx) => (
+                    <TableRow key={tx.id}>
+                      <TableCell className="font-mono text-sm">
+                        {new Date(tx.date).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="capitalize">{tx.type}</TableCell>
+                      <TableCell>
+                        {tx.lines[0] && (
+                          <Link
+                            href={`/components/${tx.lines[0].component.id}`}
+                            className="hover:underline"
+                          >
+                            {tx.lines[0].component.name}
+                          </Link>
+                        )}
+                        {tx.lines.length > 1 && (
+                          <span className="text-muted-foreground">
+                            {' '}
+                            +{tx.lines.length - 1} more
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {tx.lines[0] && (
+                          <span
+                            className={`font-mono ${
+                              parseFloat(tx.lines[0].quantityChange) >= 0
+                                ? 'text-green-600'
+                                : 'text-red-600'
+                            }`}
+                          >
+                            {parseFloat(tx.lines[0].quantityChange) >= 0 ? '+' : ''}
+                            {parseFloat(tx.lines[0].quantityChange).toLocaleString()}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {data.recentTransactions.length > 0 && (
+              <div className="mt-4">
+                <Link
+                  href="/transactions"
+                  className="text-sm text-muted-foreground hover:underline"
+                >
+                  View all transactions
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

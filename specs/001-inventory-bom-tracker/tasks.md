@@ -87,7 +87,7 @@
 
 ---
 
-## Phase 4: User Story 2 - View Reorder Status (Priority: P2)
+## Phase 4: User Story 2 - View Reorder Status (Priority: P2) ✅ COMPLETE
 
 **Goal**: Display Critical/Warning/OK status indicators and reorder summary on dashboard
 
@@ -95,14 +95,14 @@
 
 ### Implementation for User Story 2
 
-- [ ] T046 [US2] Implement reorder status calculation in src/services/inventory.ts (critical/warning/ok thresholds)
-- [ ] T047 [US2] Add reorderStatus computed field to component list API response in src/app/api/components/route.ts
-- [ ] T048 [US2] Implement dashboard API route with component stats in src/app/api/dashboard/route.ts
-- [ ] T049 [P] [US2] Create ReorderStatusBadge component in src/components/features/ReorderStatusBadge.tsx
-- [ ] T050 [P] [US2] Create DashboardStats component in src/components/features/DashboardStats.tsx
-- [ ] T051 [P] [US2] Create CriticalComponentsList component in src/components/features/CriticalComponentsList.tsx
-- [ ] T052 [US2] Update ComponentTable to display reorder status badges in src/components/features/ComponentTable.tsx
-- [ ] T053 [US2] Create dashboard home page with reorder summary in src/app/(dashboard)/page.tsx
+- [x] T046 [US2] Implement reorder status calculation in src/services/inventory.ts (critical/warning/ok thresholds)
+- [x] T047 [US2] Add reorderStatus computed field to component list API response in src/app/api/components/route.ts
+- [x] T048 [US2] Implement dashboard API route with component stats in src/app/api/dashboard/route.ts
+- [x] T049 [P] [US2] Create ReorderStatusBadge component in src/components/features/ReorderStatusBadge.tsx
+- [x] T050 [P] [US2] Create DashboardStats component in src/components/features/DashboardStats.tsx
+- [x] T051 [P] [US2] Create CriticalComponentsList component in src/components/features/CriticalComponentsList.tsx
+- [x] T052 [US2] Update ComponentTable to display reorder status badges in src/components/features/ComponentTable.tsx
+- [x] T053 [US2] Create dashboard home page with reorder summary in src/app/(dashboard)/page.tsx
 
 **Checkpoint**: User Story 2 complete - reorder status visible on component list and dashboard
 
