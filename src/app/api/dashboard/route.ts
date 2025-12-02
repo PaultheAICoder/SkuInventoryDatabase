@@ -43,7 +43,7 @@ interface DashboardResponse {
 }
 
 // GET /api/dashboard - Get dashboard data
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
       .filter((sku) => sku.hasBom && sku.maxBuildableUnits > 0)
       .sort((a, b) => b.maxBuildableUnits - a.maxBuildableUnits)
       .slice(0, 10)
-      .map(({ hasBom, ...sku }) => sku)
+      .map(({ hasBom: _hasBom, ...sku }) => sku)
 
     // Get recent transactions
     const recentTransactions = await prisma.transaction.findMany({

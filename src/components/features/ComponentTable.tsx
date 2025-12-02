@@ -32,7 +32,7 @@ interface ComponentTableProps {
 }
 
 const CATEGORIES = [
-  { value: '', label: 'All Categories' },
+  { value: 'all', label: 'All Categories' },
   { value: 'packaging', label: 'Packaging' },
   { value: 'tool', label: 'Tool' },
   { value: 'documentation', label: 'Documentation' },
@@ -41,7 +41,7 @@ const CATEGORIES = [
 ]
 
 const REORDER_STATUSES = [
-  { value: '', label: 'All Status' },
+  { value: 'all', label: 'All Status' },
   { value: 'critical', label: 'Critical' },
   { value: 'warning', label: 'Warning' },
   { value: 'ok', label: 'OK' },
@@ -120,8 +120,8 @@ export function ComponentTable({ components, total, page, pageSize }: ComponentT
 
         <div className="flex gap-2">
           <Select
-            value={searchParams.get('category') ?? ''}
-            onValueChange={(value) => updateFilters({ category: value })}
+            value={searchParams.get('category') || 'all'}
+            onValueChange={(value) => updateFilters({ category: value === 'all' ? '' : value })}
           >
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Category" />
@@ -136,8 +136,8 @@ export function ComponentTable({ components, total, page, pageSize }: ComponentT
           </Select>
 
           <Select
-            value={searchParams.get('reorderStatus') ?? ''}
-            onValueChange={(value) => updateFilters({ reorderStatus: value })}
+            value={searchParams.get('reorderStatus') || 'all'}
+            onValueChange={(value) => updateFilters({ reorderStatus: value === 'all' ? '' : value })}
           >
             <SelectTrigger className="w-[130px]">
               <SelectValue placeholder="Status" />

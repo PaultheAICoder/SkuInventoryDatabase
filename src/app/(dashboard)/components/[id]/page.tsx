@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, use } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -26,7 +25,6 @@ interface PageProps {
 
 export default function ComponentDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const router = useRouter()
   const { data: session } = useSession()
   const [component, setComponent] = useState<ComponentDetailResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -34,7 +32,7 @@ export default function ComponentDetailPage({ params }: PageProps) {
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
 
-  const fetchComponent = async () => {
+  const fetchComponent = useCallback(async () => {
     try {
       const res = await fetch(`/api/components/${id}`)
       if (!res.ok) {
@@ -50,11 +48,11 @@ export default function ComponentDetailPage({ params }: PageProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
     fetchComponent()
-  }, [id])
+  }, [fetchComponent])
 
   const getReorderBadgeVariant = (status: string) => {
     switch (status) {

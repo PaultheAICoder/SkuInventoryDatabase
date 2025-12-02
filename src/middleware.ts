@@ -36,12 +36,14 @@ const WRITE_RESTRICTED_API_ROUTES = [
 
 /**
  * Check if a path matches a route pattern
+ * Patterns use [^/]+ for dynamic segments (already regex-ready)
  */
 function matchRoute(path: string, pattern: string): boolean {
-  // Convert route pattern to regex
-  const regexPattern = pattern
-    .replace(/\[.*?\]/g, '[^/]+') // Handle Next.js dynamic segments
-    .replace(/\//g, '\\/') // Escape forward slashes
+  // Escape forward slashes for regex, but preserve the [^/]+ pattern
+  // Split by [^/]+, escape each part, then rejoin with [^/]+
+  const parts = pattern.split('[^/]+')
+  const escapedParts = parts.map(part => part.replace(/\//g, '\\/'))
+  const regexPattern = escapedParts.join('[^/]+')
   const regex = new RegExp(`^${regexPattern}`)
   return regex.test(path)
 }

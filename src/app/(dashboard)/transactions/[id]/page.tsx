@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { TransactionDetail } from '@/components/features/TransactionDetail'
+import type { TransactionResponse } from '@/types/transaction'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -13,8 +13,7 @@ interface PageProps {
 
 export default function TransactionDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const router = useRouter()
-  const [transaction, setTransaction] = useState<any>(null)
+  const [transaction, setTransaction] = useState<TransactionResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

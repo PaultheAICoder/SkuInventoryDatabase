@@ -92,14 +92,14 @@ export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
 
         <div className="flex gap-2">
           <Select
-            value={searchParams.get('salesChannel') ?? ''}
-            onValueChange={(value) => updateFilters({ salesChannel: value })}
+            value={searchParams.get('salesChannel') || 'all'}
+            onValueChange={(value) => updateFilters({ salesChannel: value === 'all' ? '' : value })}
           >
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="All Channels" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Channels</SelectItem>
+              <SelectItem value="all">All Channels</SelectItem>
               {salesChannels.map((channel) => (
                 <SelectItem key={channel} value={channel}>
                   {channel}

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,7 +39,6 @@ interface UserTableProps {
 }
 
 export function UserTable({ users, currentUserId, onRefresh }: UserTableProps) {
-  const router = useRouter()
   const [userToDelete, setUserToDelete] = useState<UserResponse | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 

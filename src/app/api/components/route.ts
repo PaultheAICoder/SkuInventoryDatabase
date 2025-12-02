@@ -8,7 +8,6 @@ import {
   created,
   paginated,
   unauthorized,
-  validationError,
   conflict,
   serverError,
   parseBody,

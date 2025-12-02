@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,7 @@ import { ExportButton } from '@/components/features/ExportButton'
 import type { TransactionResponse } from '@/types/transaction'
 
 const TRANSACTION_TYPES = [
-  { value: '', label: 'All Types' },
+  { value: 'all', label: 'All Types' },
   { value: 'receipt', label: 'Receipt' },
   { value: 'adjustment', label: 'Adjustment' },
   { value: 'build', label: 'Build' },
@@ -69,7 +69,7 @@ function TransactionLogContent() {
     router.push(`/transactions?${newParams.toString()}`)
   }
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
@@ -95,11 +95,11 @@ function TransactionLogContent() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [page, pageSize, filters])
 
   useEffect(() => {
     fetchTransactions()
-  }, [searchParams])
+  }, [fetchTransactions])
 
   const handleApplyFilters = () => {
     updateFilters(filters)
@@ -175,8 +175,8 @@ function TransactionLogContent() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Type</label>
               <Select
-                value={filters.type}
-                onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value }))}
+                value={filters.type || 'all'}
+                onValueChange={(value) => setFilters((prev) => ({ ...prev, type: value === 'all' ? '' : value }))}
               >
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="All Types" />

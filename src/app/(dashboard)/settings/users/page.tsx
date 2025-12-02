@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>('')
   const [activeFilter, setActiveFilter] = useState<string>('')
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -46,11 +46,11 @@ export default function UsersPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [search, roleFilter, activeFilter])
 
   useEffect(() => {
     fetchUsers()
-  }, [roleFilter, activeFilter])
+  }, [fetchUsers])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,24 +90,24 @@ export default function UsersPage() {
           </Button>
         </form>
 
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
+        <Select value={roleFilter || 'all'} onValueChange={(v) => setRoleFilter(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Roles</SelectItem>
+            <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="ops">Operations</SelectItem>
             <SelectItem value="viewer">Viewer</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={activeFilter} onValueChange={setActiveFilter}>
+        <Select value={activeFilter || 'all'} onValueChange={(v) => setActiveFilter(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="true">Active</SelectItem>
             <SelectItem value="false">Inactive</SelectItem>
           </SelectContent>
