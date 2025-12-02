@@ -1,50 +1,185 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: 0.0.0 → 1.0.0 (MAJOR - initial ratification)
+
+Modified principles: N/A (initial version)
+
+Added sections:
+- Core Principles (5 principles)
+  - I. Data Integrity & Auditability
+  - II. Simplicity First
+  - III. Extensibility by Design
+  - IV. Security & Authorization
+  - V. User-Centric Design
+- Additional Constraints
+- Development Workflow
+- Governance
+
+Removed sections: None
+
+Templates requiring updates:
+- .specify/templates/plan-template.md ✅ (no changes needed - Constitution Check section compatible)
+- .specify/templates/spec-template.md ✅ (no changes needed - structure aligns with principles)
+- .specify/templates/tasks-template.md ✅ (no changes needed - phase structure compatible)
+
+Follow-up TODOs: None
+==================
+-->
+
+# Trevor Inventory Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Data Integrity & Auditability
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Every inventory change MUST be captured as an immutable transaction record. The system
+serves as the single source of truth for component inventory, BOM configurations, and
+cost history.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Non-negotiable rules:**
+- All inventory mutations (receipts, builds, adjustments) MUST create transaction records
+- Transaction records MUST NOT be deleted or modified after creation
+- Cost snapshots MUST be captured at transaction time for historical accuracy
+- Every entity MUST have created_at/updated_at timestamps and user attribution
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Rationale:** Trevor's team needs reliable historical data for cost analysis, BOM
+version comparison, and inventory reconciliation. The current Excel + ChatGPT workflow
+fails precisely because state is not properly tracked.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Simplicity First
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Start with the simplest solution that meets V1 requirements. Avoid abstractions,
+patterns, or features that serve hypothetical future needs rather than current,
+documented requirements.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+**Non-negotiable rules:**
+- MUST NOT implement features explicitly listed as "Non-Goals" in the PRD
+- MUST NOT add configuration options unless the PRD specifies variability
+- Code SHOULD be obvious to read; prefer explicit over clever
+- Database schema SHOULD be normalized but MUST NOT over-engineer for unknown futures
+- UI MUST be non-cluttered and accessible to non-technical ops staff
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Rationale:** V1 is an internal tool for 5-10 users replacing spreadsheets. Over-
+engineering increases development time, maintenance burden, and user confusion without
+delivering proportional value.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Extensibility by Design
+
+While keeping V1 simple, data models and architecture MUST accommodate documented
+future phases (V2: multi-location, Shopify integration; V3: lot tracking, multi-brand)
+without requiring data migration or schema redesign.
+
+**Non-negotiable rules:**
+- Company/Brand entities MUST exist in the data model even if V1 UI hides them
+- Foreign keys and relationships MUST be designed to support future entities (locations,
+  lots) even if those tables don't exist yet
+- API endpoints SHOULD accept optional parameters that V1 ignores but V2/V3 will use
+- Configuration SHOULD be per-company/brand even if V1 has only one
+
+**Rationale:** The PRD explicitly states the design must support Mela Vitamins and
+future brands. Proper entity modeling now prevents costly migrations later.
+
+### IV. Security & Authorization
+
+The system MUST implement proper authentication and role-based access control from day
+one, even though V1's user base is small and trusted.
+
+**Non-negotiable rules:**
+- All endpoints MUST require authentication
+- Role checks (Admin/Ops/Viewer) MUST be enforced at the API layer
+- Passwords MUST be properly hashed; sessions MUST be secure
+- All data MUST be encrypted in transit (HTTPS) and at rest
+- Security events (login, role changes, failed attempts) MUST be logged
+
+**Rationale:** Inventory and cost data are business-sensitive. Adding security
+retroactively is harder than building it in. The PRD lists security as a non-functional
+requirement.
+
+### V. User-Centric Design
+
+Every feature MUST serve a documented user need from the PRD. UI decisions SHOULD
+prioritize the daily workflow of ops staff over administrative convenience.
+
+**Non-negotiable rules:**
+- Primary views (Dashboard, Components, SKUs) MUST surface actionable information first
+- Reorder status (Critical/Warning/OK) MUST be immediately visible without navigation
+- "Max buildable units" MUST be calculable and displayed for capacity planning
+- CSV export MUST be available for components, SKUs, and transactions
+- Error messages MUST be understandable by non-technical users
+
+**Rationale:** The system replaces a manual process. If users can't quickly answer
+"what do I need to reorder?" and "how many units can we build?", the tool has failed.
+
+## Additional Constraints
+
+### Technology & Integration
+
+- V1 has NO external integrations (Shopify, Amazon, etc.) - all data entry is manual
+- Tech stack is implementer's choice but MUST support web frontend + API backend
+- Performance targets: UI operations feel instant for V1 scale (tens of thousands of
+  transactions)
+
+### Data Model Boundaries
+
+- Single location only (no FBA vs warehouse tracking)
+- Components only (no finished goods inventory state)
+- Pooled inventory (no lot/expiry tracking)
+- One active BOM version per SKU at any time
+
+### Out of Scope (V1)
+
+These are explicitly prohibited in V1 implementation:
+- Multi-location inventory tracking
+- Finished goods / WIP bin tracking
+- Lot numbers and expiry dates
+- Automated notifications (email/Slack)
+- Demand forecasting or ROAS analytics
+- External marketplace integrations
+
+## Development Workflow
+
+### Code Review Requirements
+
+All pull requests SHOULD be reviewed against this constitution. Reviewers SHOULD flag:
+- Features that violate "Out of Scope" constraints
+- Over-engineering that conflicts with Simplicity First
+- Missing audit trails for inventory mutations
+- Security gaps or missing authorization checks
+
+### Quality Gates
+
+Before merging, code SHOULD pass:
+- Automated tests covering core business logic
+- Manual verification of audit trail completeness
+- Security review for authentication/authorization code
+
+### Documentation
+
+- API endpoints SHOULD be documented with request/response examples
+- Database schema changes MUST include migration scripts
+- User-facing features SHOULD include brief usage notes
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution provides advisory guidance for the Trevor Inventory project. It
+documents the principles derived from the PRD and serves as a reference for design
+decisions.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Amendment Process:**
+1. Propose changes via pull request to this document
+2. Document rationale for principle additions, modifications, or removals
+3. Update version number according to semantic versioning
+4. Ensure dependent templates remain consistent
+
+**Compliance Approach:**
+- Violations SHOULD be flagged in code review with reference to specific principle
+- Deviations SHOULD be justified in PR description or code comments
+- Team discretion is allowed when principles conflict; document the trade-off
+
+**Version Policy:**
+- MAJOR: Principle removal or fundamental redefinition
+- MINOR: New principle added or significant guidance expansion
+- PATCH: Clarifications, wording improvements, typo fixes
+
+**Version**: 1.0.0 | **Ratified**: 2025-12-01 | **Last Amended**: 2025-12-01
