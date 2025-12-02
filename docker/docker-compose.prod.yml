@@ -10,10 +10,10 @@ services:
     ports:
       - '3000:3000'
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/inventory?schema=public
-      - NEXTAUTH_URL=http://localhost:3000
-    env_file:
-      - ../.env
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory?schema=public
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
     depends_on:
       db:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: inventory
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
