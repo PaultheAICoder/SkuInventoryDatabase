@@ -19,6 +19,8 @@ import {
   X,
 } from 'lucide-react'
 import { useState } from 'react'
+import { FeedbackButton } from '@/components/features/FeedbackButton'
+import { FeedbackDialog } from '@/components/features/FeedbackDialog'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -34,6 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname()
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   const filteredNavigation = navigation.filter(
     (item) => !item.adminOnly || session?.user?.role === 'admin'
@@ -111,16 +114,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main content */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Mobile header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 lg:hidden">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <span className="font-semibold">Inventory Tracker</span>
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background px-4 lg:hidden">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </Button>
+            <span className="font-semibold">Inventory Tracker</span>
+          </div>
+          <FeedbackButton onClick={() => setFeedbackOpen(true)} />
         </header>
 
         <main className="flex-1 p-4 lg:p-8">{children}</main>
         <BuildFooter />
       </div>
+
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </div>
   )
 }
