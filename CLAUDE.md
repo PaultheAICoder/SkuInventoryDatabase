@@ -26,4 +26,14 @@ TypeScript 5.x (full-stack): Follow standard conventions
 - 001-inventory-bom-tracker: Added TypeScript 5.x (full-stack) + Next.js 14 (App Router), Prisma ORM, TailwindCSS, shadcn/ui
 
 <!-- MANUAL ADDITIONS START -->
+
+## Code Quality Standards
+
+We do not tolerate errors or warnings in our code, as we have written all of the code from scratch. If at any point there are errors or warnings or typecheck or linter or compiler errors or warnings, they must be fixed before moving on. They should never be ignored or coded around, they should be debugged and fixed, even if they are just warnings.
+
+### Pre-commit Checklist
+- `npm run build` must complete without errors
+- `npx tsc --noEmit` must complete without errors
+- All warnings should be resolved, not suppressed
+
 <!-- MANUAL ADDITIONS END -->

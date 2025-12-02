@@ -62,9 +62,9 @@ export function conflict(message: string): NextResponse<ApiError> {
 }
 
 export function validationError(zodError: ZodError): NextResponse<ApiError> {
-  const details = zodError.errors.map((err) => ({
-    field: err.path.join('.'),
-    message: err.message,
+  const details = zodError.issues.map((issue) => ({
+    field: issue.path.join('.'),
+    message: issue.message,
   }))
 
   return NextResponse.json(

@@ -54,7 +54,7 @@
 
 ---
 
-## Phase 3: User Story 1 - Track Component Inventory (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Track Component Inventory (Priority: P1) 🎯 MVP ✅ COMPLETE
 
 **Goal**: Allow Ops users to create components, record receipts/adjustments, and view current stock levels
 
@@ -71,17 +71,17 @@
 - [x] T032 [US1] Implement inventory service with quantity calculation in src/services/inventory.ts
 - [x] T033 [US1] Implement component CRUD API route GET/POST in src/app/api/components/route.ts
 - [x] T034 [US1] Implement component detail API route GET/PATCH/DELETE in src/app/api/components/[id]/route.ts
-- [ ] T035 [US1] Implement receipt transaction API route POST in src/app/api/transactions/receipt/route.ts
-- [ ] T036 [US1] Implement adjustment transaction API route POST in src/app/api/transactions/adjustment/route.ts
-- [ ] T037 [US1] Implement transaction list API route GET in src/app/api/transactions/route.ts
-- [ ] T038 [P] [US1] Create ComponentForm component in src/components/features/ComponentForm.tsx
-- [ ] T039 [P] [US1] Create ComponentTable component with sorting/filtering in src/components/features/ComponentTable.tsx
-- [ ] T040 [P] [US1] Create ReceiptDialog component in src/components/features/ReceiptDialog.tsx
-- [ ] T041 [P] [US1] Create AdjustmentDialog component in src/components/features/AdjustmentDialog.tsx
-- [ ] T042 [US1] Create component list page in src/app/(dashboard)/components/page.tsx
-- [ ] T043 [US1] Create component detail page in src/app/(dashboard)/components/[id]/page.tsx
-- [ ] T044 [US1] Create new component page in src/app/(dashboard)/components/new/page.tsx
-- [ ] T045 [US1] Create transaction log page in src/app/(dashboard)/transactions/page.tsx
+- [x] T035 [US1] Implement receipt transaction API route POST in src/app/api/transactions/receipt/route.ts
+- [x] T036 [US1] Implement adjustment transaction API route POST in src/app/api/transactions/adjustment/route.ts
+- [x] T037 [US1] Implement transaction list API route GET in src/app/api/transactions/route.ts
+- [x] T038 [P] [US1] Create ComponentForm component in src/components/features/ComponentForm.tsx
+- [x] T039 [P] [US1] Create ComponentTable component with sorting/filtering in src/components/features/ComponentTable.tsx
+- [x] T040 [P] [US1] Create ReceiptDialog component in src/components/features/ReceiptDialog.tsx
+- [x] T041 [P] [US1] Create AdjustmentDialog component in src/components/features/AdjustmentDialog.tsx
+- [x] T042 [US1] Create component list page in src/app/(dashboard)/components/page.tsx
+- [x] T043 [US1] Create component detail page in src/app/(dashboard)/components/[id]/page.tsx
+- [x] T044 [US1] Create new component page in src/app/(dashboard)/components/new/page.tsx
+- [x] T045 [US1] Create transaction log page in src/app/(dashboard)/transactions/page.tsx
 
 **Checkpoint**: User Story 1 complete - can add components, record receipts/adjustments, view stock levels and transaction history
 
