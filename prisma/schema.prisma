@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Core Entities (Company, Brand, User)
+// ============================================
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique @db.VarChar(100)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  brands         Brand[]
+  users          User[]
+  transactions   Transaction[]
+  securityEvents SecurityEvent[]
+}
+
+model Brand {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  components Component[]
+  skus       SKU[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
+enum UserRole {
+  admin
+  ops
+  viewer
+}
+
+model User {
+  id           String    @id @default(uuid())
+  companyId    String
+  company      Company   @relation(fields: [companyId], references: [id])
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @db.VarChar(255)
+  name         String    @db.VarChar(100)
+  role         UserRole  @default(ops)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Audit relations
+  componentsCreated Component[] @relation("ComponentCreatedBy")
+  componentsUpdated Component[] @relation("ComponentUpdatedBy")
+  skusCreated       SKU[]       @relation("SKUCreatedBy")
+  skusUpdated       SKU[]       @relation("SKUUpdatedBy")
+  bomVersions       BOMVersion[]
+  transactions      Transaction[]
+  securityEvents    SecurityEvent[]
+
+  @@index([companyId, isActive])
+}
+
+model SecurityEvent {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  eventType String   @db.VarChar(50)
+  ipAddress String?  @db.VarChar(45)
+  userAgent String?  @db.VarChar(500)
+  details   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+// ============================================
+// Inventory Entities (Component, Transaction)
+// ============================================
+
+model Component {
+  id            String   @id @default(uuid())
+  brandId       String
+  brand         Brand    @relation(fields: [brandId], references: [id])
+  name          String   @db.VarChar(100)
+  skuCode       String   @db.VarChar(50)
+  category      String?  @db.VarChar(50)
+  unitOfMeasure String   @default("each") @db.VarChar(20)
+  costPerUnit   Decimal  @default(0) @db.Decimal(10, 4)
+  reorderPoint  Int      @default(0)
+  leadTimeDays  Int      @default(0)
+  notes         String?  @db.Text
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   String
+  createdBy     User     @relation("ComponentCreatedBy", fields: [createdById], references: [id])
+  updatedById   String
+  updatedBy     User     @relation("ComponentUpdatedBy", fields: [updatedById], references: [id])
+
+  bomLines         BOMLine[]
+  transactionLines TransactionLine[]
+
+  @@unique([brandId, name])
+  @@unique([brandId, skuCode])
+  @@index([brandId, isActive])
+}
+
+enum TransactionType {
+  receipt
+  build
+  adjustment
+  initial
+}
+
+model Transaction {
+  id           String          @id @default(uuid())
+  companyId    String
+  company      Company         @relation(fields: [companyId], references: [id])
+  type         TransactionType
+  date         DateTime        @db.Date
+  skuId        String?
+  sku          SKU?            @relation(fields: [skuId], references: [id])
+  bomVersionId String?
+  bomVersion   BOMVersion?     @relation(fields: [bomVersionId], references: [id])
+  salesChannel String?         @db.VarChar(50)
+  unitsBuild   Int?
+  unitBomCost  Decimal?        @db.Decimal(10, 4)
+  totalBomCost Decimal?        @db.Decimal(10, 4)
+  supplier     String?         @db.VarChar(100)
+  reason       String?         @db.VarChar(200)
+  notes        String?         @db.Text
+  createdAt    DateTime        @default(now())
+  createdById  String
+  createdBy    User            @relation(fields: [createdById], references: [id])
+
+  lines TransactionLine[]
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@index([skuId])
+  @@index([type])
+}
+
+model TransactionLine {
+  id             String      @id @default(uuid())
+  transactionId  String
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  componentId    String
+  component      Component   @relation(fields: [componentId], references: [id])
+  quantityChange Decimal     @db.Decimal(10, 4)
+  costPerUnit    Decimal?    @db.Decimal(10, 4)
+
+  @@index([componentId])
+}
+
+// ============================================
+// SKU & BOM Entities
+// ============================================
+
+model SKU {
+  id           String   @id @default(uuid())
+  brandId      String
+  brand        Brand    @relation(fields: [brandId], references: [id])
+  name         String   @db.VarChar(100)
+  internalCode String   @db.VarChar(50)
+  salesChannel String   @db.VarChar(50)
+  externalIds  Json     @default("{}")
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  String
+  createdBy    User     @relation("SKUCreatedBy", fields: [createdById], references: [id])
+  updatedById  String
+  updatedBy    User     @relation("SKUUpdatedBy", fields: [updatedById], references: [id])
+
+  bomVersions  BOMVersion[]
+  transactions Transaction[]
+
+  @@unique([brandId, internalCode])
+  @@index([brandId, isActive])
+}
+
+model BOMVersion {
+  id                 String    @id @default(uuid())
+  skuId              String
+  sku                SKU       @relation(fields: [skuId], references: [id])
+  versionName        String    @db.VarChar(50)
+  effectiveStartDate DateTime  @db.Date
+  effectiveEndDate   DateTime? @db.Date
+  isActive           Boolean   @default(false)
+  notes              String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  createdById        String
+  createdBy          User      @relation(fields: [createdById], references: [id])
+
+  lines        BOMLine[]
+  transactions Transaction[]
+
+  @@index([skuId, isActive])
+}
+
+model BOMLine {
+  id              String     @id @default(uuid())
+  bomVersionId    String
+  bomVersion      BOMVersion @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+  componentId     String
+  component       Component  @relation(fields: [componentId], references: [id])
+  quantityPerUnit Decimal    @db.Decimal(10, 4)
+  notes           String?    @db.Text
+
+  @@unique([bomVersionId, componentId])
+}

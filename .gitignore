@@ -49,3 +49,5 @@ prisma/*.db-journal
 *.tmp
 *.swp
 Thumbs.db
+
+/src/generated/prisma
