@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Download, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface ExportButtonProps {
   /**
@@ -81,10 +82,14 @@ export function ExportButton({
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(downloadUrl)
+      toast.success('Export complete', {
+        description: `Your ${exportType} data has been downloaded.`,
+      })
     } catch (error) {
       console.error('Export error:', error)
-      // In a real app, we'd show a toast notification here
-      alert('Failed to export data. Please try again.')
+      toast.error('Export failed', {
+        description: 'Please try again.',
+      })
     } finally {
       setIsExporting(false)
     }

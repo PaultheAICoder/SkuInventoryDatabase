@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Upload, Download, FileSpreadsheet, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 export interface ImportResult {
   total: number
@@ -111,6 +112,18 @@ export function ImportForm({
       const result = await response.json()
       onImportComplete(result.data)
 
+      // Show success toast
+      const importData = result.data
+      if (importData.imported > 0) {
+        toast.success('Import complete', {
+          description: `Successfully imported ${importData.imported} of ${importData.total} records.`,
+        })
+      } else if (importData.total > 0) {
+        toast.warning('Import completed with errors', {
+          description: `No records were imported. Check the results for details.`,
+        })
+      }
+
       // Reset form
       setFile(null)
       if (fileInputRef.current) {
@@ -118,7 +131,11 @@ export function ImportForm({
       }
     } catch (error) {
       console.error('Upload error:', error)
-      setUploadError(error instanceof Error ? error.message : 'Import failed. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.'
+      setUploadError(errorMessage)
+      toast.error('Import failed', {
+        description: errorMessage,
+      })
     } finally {
       setIsUploading(false)
     }
