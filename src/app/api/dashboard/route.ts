@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, serverError } from '@/lib/api-response'
 import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
+import { calculateMaxBuildableUnitsForSKUs, calculateBOMUnitCosts } from '@/services/bom'
 import type { ReorderStatus } from '@/types'
 
 interface DashboardResponse {
@@ -20,6 +21,13 @@ interface DashboardResponse {
     quantityOnHand: number
     reorderPoint: number
     reorderStatus: ReorderStatus
+  }>
+  topBuildableSkus: Array<{
+    id: string
+    name: string
+    internalCode: string
+    maxBuildableUnits: number
+    unitCost: string
   }>
   recentTransactions: Array<{
     id: string
@@ -52,6 +60,7 @@ export async function GET(request: NextRequest) {
       return success<DashboardResponse>({
         componentStats: { total: 0, critical: 0, warning: 0, ok: 0 },
         criticalComponents: [],
+        topBuildableSkus: [],
         recentTransactions: [],
       })
     }
@@ -111,6 +120,49 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 10)
 
+    // Get active SKUs with their active BOMs
+    const skus = await prisma.sKU.findMany({
+      where: { brandId, isActive: true },
+      include: {
+        bomVersions: {
+          where: { isActive: true },
+          take: 1,
+        },
+      },
+    })
+
+    // Calculate buildable units and costs
+    const skuIds = skus.map((s) => s.id)
+    const activeBomIds = skus
+      .filter((s) => s.bomVersions[0])
+      .map((s) => s.bomVersions[0].id)
+
+    const [buildableUnits, bomCosts] = await Promise.all([
+      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds) : new Map<string, number | null>(),
+      activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
+    ])
+
+    // Get top buildable SKUs (sorted by buildable units descending)
+    const topBuildableSkus = skus
+      .map((sku) => {
+        const activeBom = sku.bomVersions[0]
+        const maxBuildable = buildableUnits.get(sku.id)
+        const unitCost = activeBom ? bomCosts.get(activeBom.id) ?? 0 : 0
+
+        return {
+          id: sku.id,
+          name: sku.name,
+          internalCode: sku.internalCode,
+          maxBuildableUnits: maxBuildable ?? 0,
+          unitCost: unitCost.toFixed(4),
+          hasBom: !!activeBom,
+        }
+      })
+      .filter((sku) => sku.hasBom && sku.maxBuildableUnits > 0)
+      .sort((a, b) => b.maxBuildableUnits - a.maxBuildableUnits)
+      .slice(0, 10)
+      .map(({ hasBom, ...sku }) => sku)
+
     // Get recent transactions
     const recentTransactions = await prisma.transaction.findMany({
       where: { companyId: session.user.companyId },
@@ -134,6 +186,7 @@ export async function GET(request: NextRequest) {
         ok,
       },
       criticalComponents,
+      topBuildableSkus,
       recentTransactions: recentTransactions.map((tx) => ({
         id: tx.id,
         type: tx.type,

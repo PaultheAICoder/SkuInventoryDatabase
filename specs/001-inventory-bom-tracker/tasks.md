@@ -149,15 +149,15 @@
 
 ### Implementation for User Story 4
 
-- [ ] T074 [US4] Implement maxBuildableUnits calculation in src/services/inventory.ts
-- [ ] T075 [US4] Add maxBuildableUnits computed field to SKU list API response in src/app/api/skus/route.ts
-- [ ] T076 [US4] Add component-constrained SKUs to component detail API in src/app/api/components/[id]/route.ts
-- [ ] T077 [US4] Add topBuildableSkus to dashboard API in src/app/api/dashboard/route.ts
-- [ ] T078 [P] [US4] Create BuildableUnitsDisplay component in src/components/features/BuildableUnitsDisplay.tsx
-- [ ] T079 [P] [US4] Create TopBuildableSkusList component in src/components/features/TopBuildableSkusList.tsx
-- [ ] T080 [US4] Update SKUTable to display buildable units in src/components/features/SKUTable.tsx
-- [ ] T081 [US4] Update dashboard to show top buildable SKUs in src/app/(dashboard)/page.tsx
-- [ ] T082 [US4] Update component detail to show constrained SKUs in src/app/(dashboard)/components/[id]/page.tsx
+- [x] T074 [US4] Implement maxBuildableUnits calculation in src/services/bom.ts (moved to bom.ts)
+- [x] T075 [US4] Add maxBuildableUnits computed field to SKU list API response in src/app/api/skus/route.ts
+- [x] T076 [US4] Add component-constrained SKUs to component detail API in src/app/api/components/[id]/route.ts
+- [x] T077 [US4] Add topBuildableSkus to dashboard API in src/app/api/dashboard/route.ts
+- [x] T078 [P] [US4] Create BuildableUnitsDisplay component in src/components/features/BuildableUnitsDisplay.tsx
+- [x] T079 [P] [US4] Create TopBuildableSkusList component in src/components/features/TopBuildableSkusList.tsx
+- [x] T080 [US4] Update SKUTable to display buildable units in src/components/features/SKUTable.tsx
+- [x] T081 [US4] Update dashboard to show top buildable SKUs in src/app/(dashboard)/page.tsx
+- [x] T082 [US4] Update component detail to show constrained SKUs in src/app/(dashboard)/components/[id]/page.tsx
 
 **Checkpoint**: User Story 4 complete - buildable units visible on SKU list, dashboard, and component detail
 

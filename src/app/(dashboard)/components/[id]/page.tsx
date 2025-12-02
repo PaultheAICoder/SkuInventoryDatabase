@@ -229,7 +229,8 @@ export default function ComponentDetailPage({ params }: PageProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>SKU Name</TableHead>
-                  <TableHead className="text-right">Quantity per Unit</TableHead>
+                  <TableHead className="text-right">Qty per Unit</TableHead>
+                  <TableHead className="text-right">Buildable Units</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -242,6 +243,57 @@ export default function ComponentDetailPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {parseFloat(sku.quantityPerUnit).toFixed(4)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {sku.maxBuildableUnits != null ? (
+                        <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''}>
+                          {sku.maxBuildableUnits.toLocaleString()}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Constrained SKUs */}
+      {component.constrainedSkus && component.constrainedSkus.length > 0 && (
+        <Card className="border-yellow-200 bg-yellow-50/50">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Constrained SKUs</CardTitle>
+            <CardDescription>
+              This component is limiting production capacity for these SKUs
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU Name</TableHead>
+                  <TableHead className="text-right">Qty per Unit</TableHead>
+                  <TableHead className="text-right">Max Buildable</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {component.constrainedSkus.map((sku) => (
+                  <TableRow key={sku.id}>
+                    <TableCell>
+                      <Link href={`/skus/${sku.id}`} className="hover:underline">
+                        {sku.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {parseFloat(sku.quantityPerUnit).toFixed(4)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-yellow-700'}>
+                        {sku.maxBuildableUnits.toLocaleString()}
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))}

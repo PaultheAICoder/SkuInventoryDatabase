@@ -17,6 +17,7 @@ import {
   calculateReorderStatus,
   canDeleteComponent,
 } from '@/services/inventory'
+import { calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -68,6 +69,30 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const quantityOnHand = await getComponentQuantity(id)
 
+    // Get SKU IDs that use this component
+    const skuIds = component.bomLines.map((line) => line.bomVersion.sku.id)
+
+    // Calculate max buildable units for these SKUs
+    const buildableUnits = skuIds.length > 0
+      ? await calculateMaxBuildableUnitsForSKUs(skuIds)
+      : new Map<string, number | null>()
+
+    // Find constrained SKUs (ones where this component limits buildable units)
+    const constrainedSkus = component.bomLines
+      .filter((line) => {
+        const maxBuildable = buildableUnits.get(line.bomVersion.sku.id)
+        if (maxBuildable == null) return false
+        // This component constrains the SKU if buildable units is limited
+        const componentCanBuild = Math.floor(quantityOnHand / line.quantityPerUnit.toNumber())
+        return componentCanBuild <= maxBuildable
+      })
+      .map((line) => ({
+        id: line.bomVersion.sku.id,
+        name: line.bomVersion.sku.name,
+        quantityPerUnit: line.quantityPerUnit.toString(),
+        maxBuildableUnits: buildableUnits.get(line.bomVersion.sku.id) ?? 0,
+      }))
+
     return success({
       id: component.id,
       name: component.name,
@@ -89,7 +114,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         id: line.bomVersion.sku.id,
         name: line.bomVersion.sku.name,
         quantityPerUnit: line.quantityPerUnit.toString(),
+        maxBuildableUnits: buildableUnits.get(line.bomVersion.sku.id) ?? null,
       })),
+      constrainedSkus,
       recentTransactions: component.transactionLines.map((line) => ({
         id: line.transaction.id,
         type: line.transaction.type,

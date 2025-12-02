@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardStats } from '@/components/features/DashboardStats'
 import { CriticalComponentsList } from '@/components/features/CriticalComponentsList'
+import { TopBuildableSkusList } from '@/components/features/TopBuildableSkusList'
 import {
   Table,
   TableBody,
@@ -29,6 +30,13 @@ interface DashboardData {
     quantityOnHand: number
     reorderPoint: number
     reorderStatus: ReorderStatus
+  }>
+  topBuildableSkus: Array<{
+    id: string
+    name: string
+    internalCode: string
+    maxBuildableUnits: number
+    unitCost: string
   }>
   recentTransactions: Array<{
     id: string
@@ -99,7 +107,10 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <CriticalComponentsList components={data.criticalComponents} />
+        <TopBuildableSkusList skus={data.topBuildableSkus} />
+      </div>
 
+      <div className="grid gap-6 lg:grid-cols-1">
         <Card>
           <CardHeader>
             <CardTitle>Recent Transactions</CardTitle>

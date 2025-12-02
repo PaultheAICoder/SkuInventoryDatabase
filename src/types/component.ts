@@ -67,6 +67,13 @@ export interface ComponentDetailResponse extends ComponentResponse {
     id: string
     name: string
     quantityPerUnit: string
+    maxBuildableUnits: number | null
+  }>
+  constrainedSkus: Array<{
+    id: string
+    name: string
+    quantityPerUnit: string
+    maxBuildableUnits: number
   }>
   recentTransactions: Array<{
     id: string
