@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { BuildFooter } from '@/components/ui/BuildFooter'
 import {
   LayoutDashboard,
   Package,
@@ -108,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Mobile header */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 lg:hidden">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
@@ -117,7 +118,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <span className="font-semibold">Inventory Tracker</span>
         </header>
 
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        <BuildFooter />
       </div>
     </div>
   )

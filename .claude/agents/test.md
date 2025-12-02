@@ -84,14 +84,41 @@ npm test  # All tests = potentially long
 
 **If >15 min**: STOP, narrow filter, reassess scope.
 
-### Step 5: Manual Verification (if UI changes)
-- Start dev server: `npm run dev`
-- Test at http://localhost:3000
+### Step 5: E2E Testing with Playwright (REQUIRED for UI changes)
+
+**For any task involving UI components, run Playwright E2E tests:**
+
+```bash
+cd /home/pbrown/SkuInventory
+
+# Run all E2E tests against production Docker deployment
+npm run test:e2e
+
+# Run specific E2E test file
+npm run test:e2e -- tests/e2e/specific.spec.ts
+
+# Run with headed browser for debugging
+npm run test:e2e -- --headed
+```
+
+**E2E Test Requirements**:
+- Tests run against the Docker production deployment (https://172.16.20.50:4543)
+- Tests must login using test credentials before accessing dashboard pages
+- Create new E2E tests in `tests/e2e/` for new UI features
+- Take screenshots on failure for debugging
+
+**If E2E tests fail**:
+1. Check Docker container is running: `docker ps | grep inventory-app`
+2. Rebuild if needed: `cd docker && docker compose -f docker-compose.prod.yml build app && docker compose -f docker-compose.prod.yml up -d app`
+3. Wait for container to be healthy before re-running tests
+
+### Step 6: Manual Verification (if E2E tests insufficient)
+- Access app at https://172.16.20.50:4543
 - Login flow works
 - CRUD operations work
 - Check for JS console errors
 
-### Step 6: Fix Issues
+### Step 7: Fix Issues
 - Diagnose: Missing auth? Type mismatch? Schema error?
 - Fix code, re-test, verify no regression
 - Document resolution
@@ -154,8 +181,14 @@ Write to `/home/pbrown/SkuInventory/.agents/outputs/test-[ISSUE]-[MMDDYY].md`:
 ```bash
 $ npx tsc --noEmit → ✅
 $ npm run build → ✅
-$ npm test → ✅ [X] passed
+$ npm test → ✅ [X] unit tests passed
+$ npm run test:e2e → ✅ [X] E2E tests passed
 ```
+
+## E2E Tests Created (if any)
+**File**: [path]
+**Tests**: [list with ✅]
+**Screenshots**: [path to failure screenshots if any]
 
 ## Quality Checklist
 - [ ] Schema consistency

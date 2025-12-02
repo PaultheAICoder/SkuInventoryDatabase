@@ -102,7 +102,7 @@ async function main() {
       })
 
       // Create initial transaction
-      const transaction = await tx.transaction.create({
+      await tx.transaction.create({
         data: {
           companyId: company.id,
           type: 'initial',
