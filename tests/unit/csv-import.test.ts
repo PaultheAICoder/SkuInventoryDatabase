@@ -1,9 +1,9 @@
 /**
  * Unit tests for CSV import functions
- * Tests parseCSV, processComponentImport, and processSKUImport
+ * Tests parseCSV, processComponentImport, processSKUImport, and processInitialInventoryImport
  */
 import { describe, it, expect } from 'vitest'
-import { parseCSV, processComponentImport, processSKUImport } from '@/services/import'
+import { parseCSV, processComponentImport, processSKUImport, processInitialInventoryImport } from '@/services/import'
 
 describe('parseCSV', () => {
   it('parses simple CSV correctly', () => {
@@ -267,6 +267,140 @@ Product X,PROD-X,Amazon,"Important note with, comma"`
 Product X,PROD-X,Amazon`
 
     const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.notes).toBeNull()
+  })
+})
+
+describe('processInitialInventoryImport', () => {
+  it('processes valid initial inventory CSV', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit,Date,Notes
+COMP-001,100,10.50,2025-01-01,Opening balance`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.total).toBe(1)
+    expect(result.successful).toBe(1)
+    expect(result.failed).toBe(0)
+    expect(result.results[0].success).toBe(true)
+    expect(result.results[0].data).toMatchObject({
+      componentSkuCode: 'COMP-001',
+      quantity: 100,
+      costPerUnit: 10.5,
+    })
+  })
+
+  it('reports validation errors for missing quantity', () => {
+    const csv = `Component SKU Code,Quantity
+COMP-001,`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.failed).toBe(1)
+    expect(result.results[0].success).toBe(false)
+  })
+
+  it('reports validation errors for negative quantity', () => {
+    const csv = `Component SKU Code,Quantity
+COMP-001,-50`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.failed).toBe(1)
+    expect(result.results[0].success).toBe(false)
+  })
+
+  it('returns empty result for CSV with only headers', () => {
+    const csv = 'Component SKU Code,Quantity'
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.total).toBe(0)
+    expect(result.results).toEqual([])
+  })
+
+  it('handles optional cost per unit field', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit
+COMP-001,100,`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.costPerUnit).toBeUndefined()
+  })
+
+  it('handles optional date field with default to today', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit,Date
+COMP-001,100,10.50,`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.date).toBeInstanceOf(Date)
+  })
+
+  it('handles decimal quantity values', () => {
+    const csv = `Component SKU Code,Quantity
+COMP-001,99.5`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.quantity).toBe(99.5)
+  })
+
+  it('reports row numbers correctly', () => {
+    const csv = `Component SKU Code,Quantity
+COMP-001,100
+COMP-002,50`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.results[0].rowNumber).toBe(2)
+    expect(result.results[1].rowNumber).toBe(3)
+  })
+
+  it('handles mixed valid and invalid rows', () => {
+    const csv = `Component SKU Code,Quantity
+COMP-001,100
+,50
+COMP-002,75`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.total).toBe(3)
+    expect(result.successful).toBe(2)
+    expect(result.failed).toBe(1)
+  })
+
+  it('handles valid date format', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit,Date
+COMP-001,100,10.50,2025-06-15`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.successful).toBe(1)
+    const parsedDate = result.results[0].data?.date
+    expect(parsedDate).toBeInstanceOf(Date)
+    expect(parsedDate?.getFullYear()).toBe(2025)
+  })
+
+  it('handles optional notes field', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit,Date,Notes
+COMP-001,100,10.50,2025-01-01,Opening balance from warehouse`
+
+    const result = processInitialInventoryImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.notes).toBe('Opening balance from warehouse')
+  })
+
+  it('handles empty notes field', () => {
+    const csv = `Component SKU Code,Quantity,Cost Per Unit,Date,Notes
+COMP-001,100,10.50,2025-01-01,`
+
+    const result = processInitialInventoryImport(csv)
 
     expect(result.successful).toBe(1)
     expect(result.results[0].data?.notes).toBeNull()

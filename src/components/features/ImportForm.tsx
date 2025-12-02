@@ -21,9 +21,9 @@ export interface ImportResult {
 
 interface ImportFormProps {
   /**
-   * Type of import (components or skus)
+   * Type of import (components, skus, or initial-inventory)
    */
-  importType: 'components' | 'skus'
+  importType: 'components' | 'skus' | 'initial-inventory'
   /**
    * Title for the import card
    */

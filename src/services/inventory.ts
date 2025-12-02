@@ -224,6 +224,87 @@ export async function createAdjustmentTransaction(params: {
 }
 
 /**
+ * Create an initial transaction (sets opening balance for a component)
+ */
+export async function createInitialTransaction(params: {
+  companyId: string
+  componentId: string
+  quantity: number
+  date: Date
+  costPerUnit?: number
+  updateComponentCost: boolean
+  notes?: string | null
+  createdById: string
+}) {
+  const {
+    companyId,
+    componentId,
+    quantity,
+    date,
+    costPerUnit,
+    updateComponentCost,
+    notes,
+    createdById,
+  } = params
+
+  return prisma.$transaction(async (tx) => {
+    // Get component for cost snapshot
+    const component = await tx.component.findUnique({
+      where: { id: componentId },
+    })
+
+    if (!component) {
+      throw new Error('Component not found')
+    }
+
+    const lineCostPerUnit = costPerUnit ?? component.costPerUnit.toNumber()
+
+    // Create transaction with line
+    const transaction = await tx.transaction.create({
+      data: {
+        companyId,
+        type: 'initial',
+        date,
+        notes,
+        createdById,
+        lines: {
+          create: {
+            componentId,
+            quantityChange: new Prisma.Decimal(quantity),
+            costPerUnit: new Prisma.Decimal(lineCostPerUnit),
+          },
+        },
+      },
+      include: {
+        lines: {
+          include: {
+            component: {
+              select: { id: true, name: true, skuCode: true },
+            },
+          },
+        },
+        createdBy: {
+          select: { id: true, name: true },
+        },
+      },
+    })
+
+    // Update component cost if requested
+    if (updateComponentCost && costPerUnit !== undefined) {
+      await tx.component.update({
+        where: { id: componentId },
+        data: {
+          costPerUnit: new Prisma.Decimal(costPerUnit),
+          updatedById: createdById,
+        },
+      })
+    }
+
+    return transaction
+  })
+}
+
+/**
  * Check if a component can be deleted (not used in active BOMs)
  */
 export async function canDeleteComponent(componentId: string): Promise<boolean> {

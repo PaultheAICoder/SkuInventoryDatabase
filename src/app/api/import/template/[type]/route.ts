@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { unauthorized, notFound } from '@/lib/api-response'
-import { generateComponentTemplate, generateSKUTemplate } from '@/services/import'
+import {
+  generateComponentTemplate,
+  generateSKUTemplate,
+  generateInitialInventoryTemplate,
+} from '@/services/import'
 
 interface RouteParams {
   params: Promise<{
@@ -35,6 +39,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     case 'skus':
       csvContent = generateSKUTemplate()
       filename = 'sku-import-template.csv'
+      break
+    case 'initial-inventory':
+      csvContent = generateInitialInventoryTemplate()
+      filename = 'initial-inventory-import-template.csv'
       break
     default:
       return notFound('Template type')

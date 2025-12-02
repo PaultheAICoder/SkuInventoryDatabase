@@ -113,6 +113,35 @@ const skuImportSchema = z.object({
   notes: z.string().optional().transform((v) => v || null),
 })
 
+// Initial inventory import schema with CSV field mappings
+const initialInventoryImportSchema = z.object({
+  component_sku_code: z.string().min(1, 'Component SKU code is required'),
+  quantity: z.string().min(1, 'Quantity is required').transform((v) => {
+    const num = parseFloat(v)
+    if (isNaN(num) || num <= 0) {
+      throw new Error('Quantity must be a positive number')
+    }
+    return num
+  }),
+  cost_per_unit: z.string().optional().transform((v) => {
+    if (!v || v.trim() === '') return undefined
+    const num = parseFloat(v)
+    if (isNaN(num) || num < 0) {
+      throw new Error('Cost per unit must be a non-negative number')
+    }
+    return num
+  }),
+  date: z.string().optional().transform((v) => {
+    if (!v || v.trim() === '') return new Date()
+    const date = new Date(v)
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date format')
+    }
+    return date
+  }),
+  notes: z.string().optional().transform((v) => v || null),
+})
+
 /**
  * Import component from CSV row
  */
@@ -210,6 +239,56 @@ function importSKURow(
   }
 }
 
+export interface InitialInventoryRowData {
+  componentSkuCode: string
+  quantity: number
+  costPerUnit?: number
+  date: Date
+  notes: string | null
+}
+
+/**
+ * Import initial inventory row from CSV
+ */
+function importInitialInventoryRow(
+  record: Record<string, string>,
+  rowNumber: number
+): ImportResult<InitialInventoryRowData> {
+  try {
+    const csvParsed = initialInventoryImportSchema.parse(record)
+
+    const rowData: InitialInventoryRowData = {
+      componentSkuCode: csvParsed.component_sku_code,
+      quantity: csvParsed.quantity,
+      costPerUnit: csvParsed.cost_per_unit,
+      date: csvParsed.date,
+      notes: csvParsed.notes,
+    }
+
+    return {
+      success: true,
+      rowNumber,
+      data: rowData,
+      errors: [],
+    }
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return {
+        success: false,
+        rowNumber,
+        data: null,
+        errors: err.issues.map((e) => `${e.path.join('.')}: ${e.message}`),
+      }
+    }
+    return {
+      success: false,
+      rowNumber,
+      data: null,
+      errors: [err instanceof Error ? err.message : 'Unknown error'],
+    }
+  }
+}
+
 /**
  * Process CSV content for component import
  */
@@ -277,6 +356,39 @@ export function processSKUImport(
 }
 
 /**
+ * Process CSV content for initial inventory import
+ */
+export function processInitialInventoryImport(
+  csvContent: string
+): ImportSummary<InitialInventoryRowData> {
+  const rows = parseCSV(csvContent)
+
+  if (rows.length < 2) {
+    return {
+      total: 0,
+      successful: 0,
+      failed: 0,
+      results: [],
+    }
+  }
+
+  const headers = rows[0]
+  const dataRows = rows.slice(1)
+
+  const results = dataRows.map((row, index) => {
+    const record = rowToRecord(headers, row)
+    return importInitialInventoryRow(record, index + 2) // +2 because 1-indexed and skip header
+  })
+
+  return {
+    total: results.length,
+    successful: results.filter((r) => r.success).length,
+    failed: results.filter((r) => !r.success).length,
+    results,
+  }
+}
+
+/**
  * Generate CSV template for components
  */
 export function generateComponentTemplate(): string {
@@ -312,6 +424,29 @@ export function generateSKUTemplate(): string {
   const headers = ['Name', 'Internal Code', 'Sales Channel', 'Notes']
 
   const exampleRow = ['Example SKU', 'SKU-001', 'Amazon', 'Sample SKU for import']
+
+  return [headers.join(','), exampleRow.join(',')].join('\n')
+}
+
+/**
+ * Generate CSV template for initial inventory import
+ */
+export function generateInitialInventoryTemplate(): string {
+  const headers = [
+    'Component SKU Code',
+    'Quantity',
+    'Cost Per Unit',
+    'Date',
+    'Notes',
+  ]
+
+  const exampleRow = [
+    'COMP-001',
+    '100',
+    '10.50',
+    '2025-01-01',
+    'Opening balance',
+  ]
 
   return [headers.join(','), exampleRow.join(',')].join('\n')
 }

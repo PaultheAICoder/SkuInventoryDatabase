@@ -10,8 +10,10 @@ export default function ImportPage() {
   const { data: session, status } = useSession()
   const [componentResult, setComponentResult] = useState<ImportResult | null>(null)
   const [skuResult, setSKUResult] = useState<ImportResult | null>(null)
+  const [initialInventoryResult, setInitialInventoryResult] = useState<ImportResult | null>(null)
   const [showComponentResult, setShowComponentResult] = useState(false)
   const [showSKUResult, setShowSKUResult] = useState(false)
+  const [showInitialInventoryResult, setShowInitialInventoryResult] = useState(false)
 
   // Redirect if not authenticated or viewer role
   if (status === 'loading') {
@@ -31,7 +33,7 @@ export default function ImportPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Import Data</h1>
-          <p className="text-muted-foreground">Import components and SKUs from CSV files</p>
+          <p className="text-muted-foreground">Import components, SKUs, and initial inventory from CSV files</p>
         </div>
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-800">
           You do not have permission to import data. Please contact an administrator.
@@ -50,11 +52,16 @@ export default function ImportPage() {
     setShowSKUResult(true)
   }
 
+  const handleInitialInventoryImport = (result: ImportResult) => {
+    setInitialInventoryResult(result)
+    setShowInitialInventoryResult(true)
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Import Data</h1>
-        <p className="text-muted-foreground">Import components and SKUs from CSV files</p>
+        <p className="text-muted-foreground">Import components, SKUs, and initial inventory from CSV files</p>
       </div>
 
       {/* Instructions */}
@@ -69,7 +76,7 @@ export default function ImportPage() {
       </div>
 
       {/* Import Forms */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <ImportForm
           importType="components"
           title="Components"
@@ -81,6 +88,12 @@ export default function ImportPage() {
           title="SKUs"
           description="Import sellable SKUs with sales channel information"
           onImportComplete={handleSKUImport}
+        />
+        <ImportForm
+          importType="initial-inventory"
+          title="Initial Inventory"
+          description="Set opening balances for existing components with quantities and optional costs"
+          onImportComplete={handleInitialInventoryImport}
         />
       </div>
 
@@ -96,6 +109,12 @@ export default function ImportPage() {
         onClose={() => setShowSKUResult(false)}
         result={skuResult}
         importType="skus"
+      />
+      <ImportResultDialog
+        open={showInitialInventoryResult}
+        onClose={() => setShowInitialInventoryResult(false)}
+        result={initialInventoryResult}
+        importType="initial-inventory"
       />
     </div>
   )

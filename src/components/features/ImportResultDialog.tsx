@@ -40,7 +40,7 @@ interface ImportResultDialogProps {
   /**
    * Type of import for display purposes
    */
-  importType: 'components' | 'skus'
+  importType: 'components' | 'skus' | 'initial-inventory'
 }
 
 export function ImportResultDialog({
@@ -67,8 +67,18 @@ export function ImportResultDialog({
     return 'Import Partially Complete'
   }
 
-  const typeLabel = importType === 'components' ? 'component' : 'SKU'
-  const typeLabelPlural = importType === 'components' ? 'components' : 'SKUs'
+  const getTypeLabels = () => {
+    switch (importType) {
+      case 'components':
+        return { singular: 'component', plural: 'components' }
+      case 'skus':
+        return { singular: 'SKU', plural: 'SKUs' }
+      case 'initial-inventory':
+        return { singular: 'inventory record', plural: 'inventory records' }
+    }
+  }
+
+  const { singular: typeLabel, plural: typeLabelPlural } = getTypeLabels()
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

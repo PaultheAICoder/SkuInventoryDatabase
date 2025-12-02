@@ -24,6 +24,18 @@ export const createAdjustmentSchema = z.object({
 
 export type CreateAdjustmentInput = z.infer<typeof createAdjustmentSchema>
 
+// Initial transaction schema (opening balance)
+export const createInitialSchema = z.object({
+  date: z.coerce.date(),
+  componentId: z.string().uuid('Invalid component ID'),
+  quantity: z.coerce.number().positive('Quantity must be positive'),
+  costPerUnit: z.coerce.number().nonnegative().optional(),
+  updateComponentCost: z.boolean().default(false),
+  notes: z.string().optional().nullable(),
+})
+
+export type CreateInitialInput = z.infer<typeof createInitialSchema>
+
 // Build transaction schema
 export const createBuildSchema = z.object({
   date: z.coerce.date(),
