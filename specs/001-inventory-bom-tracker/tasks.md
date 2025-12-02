@@ -232,7 +232,7 @@
 
 ---
 
-## Phase 10: CSV Import (FR-027, FR-028)
+## Phase 10: CSV Import (FR-027, FR-028) ✅ COMPLETE
 
 **Goal**: Support bulk import of components and SKUs via CSV with downloadable templates
 
@@ -240,13 +240,13 @@
 
 ### Implementation for CSV Import
 
-- [ ] T113 Implement CSV import service with validation in src/services/import.ts
-- [ ] T114 Implement import template download API route GET in src/app/api/import/template/[type]/route.ts
-- [ ] T115 Implement component import API route POST in src/app/api/import/components/route.ts
-- [ ] T116 Implement SKU import API route POST in src/app/api/import/skus/route.ts
-- [ ] T117 [P] Create ImportForm component with file upload in src/components/features/ImportForm.tsx
-- [ ] T118 [P] Create ImportResultDialog component in src/components/features/ImportResultDialog.tsx
-- [ ] T119 Create import page in src/app/(dashboard)/import/page.tsx
+- [x] T113 Implement CSV import service with validation in src/services/import.ts
+- [x] T114 Implement import template download API route GET in src/app/api/import/template/[type]/route.ts
+- [x] T115 Implement component import API route POST in src/app/api/import/components/route.ts
+- [x] T116 Implement SKU import API route POST in src/app/api/import/skus/route.ts
+- [x] T117 [P] Create ImportForm component with file upload in src/components/features/ImportForm.tsx
+- [x] T118 [P] Create ImportResultDialog component in src/components/features/ImportResultDialog.tsx
+- [x] T119 Create import page in src/app/(dashboard)/import/page.tsx
 
 **Checkpoint**: CSV import working with templates and error handling
 
