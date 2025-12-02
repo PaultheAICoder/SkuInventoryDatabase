@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { ExportButton } from '@/components/features/ExportButton'
 import type { TransactionResponse } from '@/types/transaction'
 
 const TRANSACTION_TYPES = [
@@ -145,11 +146,21 @@ function TransactionLogContent() {
     }
   }
 
+  // Build export query params from current filters
+  const exportQueryParams = {
+    type: filters.type,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Transactions</h1>
-        <p className="text-muted-foreground">View all inventory transactions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Transactions</h1>
+          <p className="text-muted-foreground">View all inventory transactions</p>
+        </div>
+        <ExportButton exportType="transactions" queryParams={exportQueryParams} />
       </div>
 
       {/* Filters */}

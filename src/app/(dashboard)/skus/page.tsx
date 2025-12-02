@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SKUTable } from '@/components/features/SKUTable'
+import { ExportButton } from '@/components/features/ExportButton'
 
 interface SearchParams {
   page?: string
@@ -63,12 +64,15 @@ export default async function SKUsPage({
           <h1 className="text-3xl font-bold tracking-tight">SKUs</h1>
           <p className="text-muted-foreground">Manage sellable product configurations</p>
         </div>
-        <Button asChild>
-          <Link href="/skus/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New SKU
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportButton exportType="skus" />
+          <Button asChild>
+            <Link href="/skus/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New SKU
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Suspense fallback={<div>Loading...</div>}>

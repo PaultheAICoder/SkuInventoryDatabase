@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { ComponentTable } from '@/components/features/ComponentTable'
 import { getComponentQuantities, calculateReorderStatus } from '@/services/inventory'
 import { Plus } from 'lucide-react'
+import { ExportButton } from '@/components/features/ExportButton'
 import type { ComponentResponse } from '@/types/component'
 
 interface PageProps {
@@ -145,14 +146,17 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
           <h1 className="text-3xl font-bold">Components</h1>
           <p className="text-muted-foreground">Manage your component inventory</p>
         </div>
-        {canCreate && (
-          <Link href="/components/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Component
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButton exportType="components" />
+          {canCreate && (
+            <Link href="/components/new">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Component
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       <Suspense fallback={<div>Loading...</div>}>
