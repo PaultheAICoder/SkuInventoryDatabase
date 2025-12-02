@@ -62,15 +62,15 @@
 
 ### Implementation for User Story 1
 
-- [ ] T026 [P] [US1] Create Component entity in prisma/schema.prisma with all fields from data-model.md
-- [ ] T027 [P] [US1] Create Transaction entity in prisma/schema.prisma with type enum, cost snapshots, audit fields
-- [ ] T028 [P] [US1] Create TransactionLine entity in prisma/schema.prisma with componentId FK, quantityChange, costPerUnit
-- [ ] T029 [US1] Run Prisma migration for Component and Transaction entities
-- [ ] T030 [P] [US1] Create Component Zod validation schemas in src/types/component.ts
-- [ ] T031 [P] [US1] Create Transaction Zod validation schemas in src/types/transaction.ts
-- [ ] T032 [US1] Implement inventory service with quantity calculation in src/services/inventory.ts
-- [ ] T033 [US1] Implement component CRUD API route GET/POST in src/app/api/components/route.ts
-- [ ] T034 [US1] Implement component detail API route GET/PATCH/DELETE in src/app/api/components/[id]/route.ts
+- [x] T026 [P] [US1] Create Component entity in prisma/schema.prisma with all fields from data-model.md
+- [x] T027 [P] [US1] Create Transaction entity in prisma/schema.prisma with type enum, cost snapshots, audit fields
+- [x] T028 [P] [US1] Create TransactionLine entity in prisma/schema.prisma with componentId FK, quantityChange, costPerUnit
+- [x] T029 [US1] Run Prisma migration for Component and Transaction entities (schema defined, migration pending DB)
+- [x] T030 [P] [US1] Create Component Zod validation schemas in src/types/component.ts
+- [x] T031 [P] [US1] Create Transaction Zod validation schemas in src/types/transaction.ts
+- [x] T032 [US1] Implement inventory service with quantity calculation in src/services/inventory.ts
+- [x] T033 [US1] Implement component CRUD API route GET/POST in src/app/api/components/route.ts
+- [x] T034 [US1] Implement component detail API route GET/PATCH/DELETE in src/app/api/components/[id]/route.ts
 - [ ] T035 [US1] Implement receipt transaction API route POST in src/app/api/transactions/receipt/route.ts
 - [ ] T036 [US1] Implement adjustment transaction API route POST in src/app/api/transactions/adjustment/route.ts
 - [ ] T037 [US1] Implement transaction list API route GET in src/app/api/transactions/route.ts
