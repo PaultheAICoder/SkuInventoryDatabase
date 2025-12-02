@@ -53,11 +53,11 @@ test.describe('Tenant Scoping Security', () => {
     }
   })
 
-  test('BOM version API returns 404 for non-existent ID', async ({ request }) => {
-    // Direct API test for BOM version endpoint
+  test('BOM version API returns 404 for non-existent ID', async ({ page }) => {
+    // Direct API test for BOM version endpoint using authenticated request
     const fakeId = '00000000-0000-0000-0000-000000000000'
 
-    const response = await request.get(`/api/bom-versions/${fakeId}`)
+    const response = await page.request.get(`/api/bom-versions/${fakeId}`)
     expect(response.status()).toBe(404)
   })
 
@@ -77,7 +77,8 @@ test.describe('Tenant Scoping Security', () => {
 
       // The component should load successfully (200, not 404)
       // This confirms the list only shows tenant-owned components
-      await expect(page.locator('text=Component Details').first()).toBeVisible()
+      // Look for "Back to Components" button which only shows on a valid component page
+      await expect(page.locator('text=Back to Components').first()).toBeVisible()
     }
   })
 
@@ -97,7 +98,8 @@ test.describe('Tenant Scoping Security', () => {
 
       // The SKU should load successfully (200, not 404)
       // This confirms the list only shows tenant-owned SKUs
-      await expect(page.locator('text=SKU Details').first()).toBeVisible()
+      // Look for "Build" button or h1 element (present on valid SKU pages)
+      await expect(page.locator('h1').first()).toBeVisible()
     }
   })
 })

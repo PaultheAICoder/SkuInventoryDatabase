@@ -34,7 +34,8 @@ test('test feedback API submission', async ({ browser }) => {
   console.log('Response body:', JSON.stringify(body, null, 2));
 
   expect(response.status()).toBe(200);
-  expect(body.success).toBe(true);
+  // API returns { data: { issueUrl, issueNumber } } format
+  expect(body.data).toBeDefined();
   expect(body.data.issueUrl).toContain('github.com');
   expect(body.data.issueNumber).toBeGreaterThan(0);
 

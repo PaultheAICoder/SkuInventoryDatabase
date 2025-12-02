@@ -56,10 +56,62 @@ export async function GET(request: NextRequest) {
       }),
     }
 
-    // Get total count
+    // When filtering by reorderStatus, we need to:
+    // 1. Fetch ALL matching components (without pagination)
+    // 2. Compute reorder status for ALL
+    // 3. Filter by reorderStatus
+    // 4. Apply pagination to filtered set
+    if (reorderStatus) {
+      // Fetch all components matching other filters (no pagination)
+      const allComponents = await prisma.component.findMany({
+        where,
+        orderBy: { [sortBy]: sortOrder },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+        },
+      })
+
+      // Get quantities for ALL components
+      const componentIds = allComponents.map((c) => c.id)
+      const quantities = await getComponentQuantities(componentIds)
+
+      // Transform and compute reorder status for ALL
+      const allWithStatus = allComponents.map((component) => {
+        const quantityOnHand = quantities.get(component.id) ?? 0
+        const status = calculateReorderStatus(quantityOnHand, component.reorderPoint)
+
+        return {
+          id: component.id,
+          name: component.name,
+          skuCode: component.skuCode,
+          category: component.category,
+          unitOfMeasure: component.unitOfMeasure,
+          costPerUnit: component.costPerUnit.toString(),
+          reorderPoint: component.reorderPoint,
+          leadTimeDays: component.leadTimeDays,
+          notes: component.notes,
+          isActive: component.isActive,
+          quantityOnHand,
+          reorderStatus: status,
+          createdAt: component.createdAt.toISOString(),
+          updatedAt: component.updatedAt.toISOString(),
+          createdBy: component.createdBy,
+        }
+      })
+
+      // Filter by reorderStatus BEFORE pagination
+      const filtered = allWithStatus.filter((c) => c.reorderStatus === reorderStatus)
+
+      // Apply pagination to filtered set
+      const start = (page - 1) * pageSize
+      const paginatedData = filtered.slice(start, start + pageSize)
+
+      return paginated(paginatedData, filtered.length, page, pageSize)
+    }
+
+    // Original logic for non-reorderStatus queries
     const total = await prisma.component.count({ where })
 
-    // Get components
     const components = await prisma.component.findMany({
       where,
       skip: (page - 1) * pageSize,
@@ -98,12 +150,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Filter by reorder status if specified (post-query filter since it's computed)
-    const filteredData = reorderStatus
-      ? data.filter((c) => c.reorderStatus === reorderStatus)
-      : data
-
-    return paginated(filteredData, reorderStatus ? filteredData.length : total, page, pageSize)
+    return paginated(data, total, page, pageSize)
   } catch (error) {
     console.error('Error listing components:', error)
     return serverError()
