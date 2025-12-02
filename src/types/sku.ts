@@ -62,6 +62,13 @@ export interface SKUResponse {
 // SKU detail response (includes related data)
 export interface SKUDetailResponse extends SKUResponse {
   bomVersions: BOMVersionSummary[]
+  recentTransactions: Array<{
+    id: string
+    type: string
+    date: string
+    unitsBuild: number | null
+    createdAt: string
+  }>
 }
 
 // BOM version summary for SKU detail

@@ -5,8 +5,16 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { ArrowLeft, Edit, Package, Hammer } from 'lucide-react'
 import { BOMVersionList } from '@/components/features/BOMVersionList'
 import { BuildDialog } from '@/components/features/BuildDialog'
@@ -208,6 +216,49 @@ export default function SKUDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Recent Transactions */}
+      {sku.recentTransactions && sku.recentTransactions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Transactions</CardTitle>
+            <CardDescription>Last 10 build transactions for this SKU</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Units Built</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sku.recentTransactions.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize">
+                        {tx.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-green-600">
+                      {tx.unitsBuild !== null ? `+${tx.unitsBuild.toLocaleString()}` : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="mt-4">
+              <Link href={`/transactions?skuId=${sku.id}`}>
+                <Button variant="outline" size="sm">
+                  View All Transactions
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Build Dialog */}
       {skuId && (

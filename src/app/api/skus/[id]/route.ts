@@ -38,6 +38,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             createdBy: { select: { id: true, name: true } },
           },
         },
+        transactions: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            type: true,
+            date: true,
+            unitsBuild: true,
+            createdAt: true,
+          },
+        },
       },
     })
 
@@ -85,6 +96,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         unitCost: (bomCosts.get(v.id) ?? 0).toFixed(4),
         lineCount: v.lines.length,
         createdAt: v.createdAt.toISOString(),
+      })),
+      recentTransactions: sku.transactions.map((tx) => ({
+        id: tx.id,
+        type: tx.type,
+        date: tx.date.toISOString(),
+        unitsBuild: tx.unitsBuild,
+        createdAt: tx.createdAt.toISOString(),
       })),
     })
   } catch (error) {
