@@ -84,6 +84,48 @@ For each API call: Props/types match between component and route response.
 ### 6. Handle Uncertainty First (Phase 0)
 If Scout flagged complex code, create Phase 0 subtask: "Untangle [filename] logic" - read, document, pseudocode before proceeding.
 
+### 6.5. UI Placement Requirements (REQUIRED for UI issues)
+
+**For ANY issue involving UI components:**
+
+1. **Verify Scout's UI Visibility Requirements section** - Did Scout specify where the element should appear?
+
+2. **Explicit placement in plan**:
+   - Specify EXACT location in layout (header, sidebar, main content, etc.)
+   - Confirm element will be visible on ALL devices (no `lg:hidden` unless explicitly desktop-only)
+   - Include CSS classes that ensure visibility
+
+3. **Add acceptance criteria**:
+   ```markdown
+   ## UI Acceptance Criteria
+   - [ ] Element visible in header on desktop (1024px+)
+   - [ ] Element visible in header on tablet (768px-1023px)
+   - [ ] Element visible in header on mobile (<768px)
+   - [ ] Element is interactive (clickable)
+   ```
+
+**IMPORTANT**: We are NOT building mobile-specific functionality. All UI elements should be visible and functional on ALL screen sizes.
+
+### 6.6. Environment Pre-flight Check (REQUIRED for features with external dependencies)
+
+**For features requiring API keys, CLI tools, or external services:**
+
+1. **List all required environment variables**:
+   ```markdown
+   ## Required Environment Configuration
+   - `ANTHROPIC_API_KEY` - Required for AI features (or specify fallback behavior)
+   - `GITHUB_TOKEN` - Required for GitHub integration
+   ```
+
+2. **Include verification subtask in Phase 0**:
+   ```markdown
+   ### Subtask 0.1: Verify Environment Dependencies
+   **Instructions**:
+   1. Check if required env vars are set
+   2. Verify external tools are available (gh CLI, etc.)
+   3. Document fallback behavior if dependencies unavailable
+   ```
+
 ### 7. Break Down Multi-File Changes
 Don't say "update Prisma queries" - list each explicitly:
 - Subtask 1.1: Update getComponents query in src/services/inventory.ts

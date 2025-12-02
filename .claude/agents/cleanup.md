@@ -232,6 +232,26 @@ Write to `/home/pbrown/SkuInventory/.agents/outputs/cleanup-[ISSUE]-[MMDDYY].md`
 - Work is partial
 - Deferred work is untracked
 - Blockers remain
+- **UI issue without visual verification** - If the issue involves UI components, the Test Agent MUST have run Playwright E2E tests with visual verification. Check Test Agent report for "Visual Verification Checklist" completion.
+
+### UI Issue Closure Requirements (MANDATORY)
+
+**For ANY issue involving UI components, buttons, dialogs, or visual elements:**
+
+1. **Verify Test Agent ran Playwright E2E tests** - Check test-[ISSUE]-[MMDDYY].md for:
+   - `npm run test:e2e` execution
+   - Visual Verification Checklist completed
+   - Screenshot evidence (if applicable)
+
+2. **If Test Agent skipped E2E tests for a UI issue**:
+   - DO NOT close the issue
+   - Add comment: "⚠️ UI issue requires visual verification via Playwright E2E tests before closure"
+   - Document in completion report as incomplete
+
+3. **Verify UI element visibility**:
+   - Element appears on ALL screen sizes (not hidden by responsive classes)
+   - Element is in the correct location (header, sidebar, etc.)
+   - Element is interactive (clickable, focusable)
 
 **Tools**: Read (agent outputs), Write (reports), Bash (git, gh)
 **Don't Use**: TodoWrite

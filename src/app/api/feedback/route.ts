@@ -3,10 +3,11 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { success, unauthorized, serverError, error, parseBody } from '@/lib/api-response'
 import { submitFeedbackSchema, type SubmitFeedbackResponse } from '@/types/feedback'
-import { exec } from 'child_process'
-import { promisify } from 'util'
+import { Octokit } from '@octokit/rest'
 
-const execAsync = promisify(exec)
+// GitHub repo configuration
+const GITHUB_OWNER = 'PaultheAICoder'
+const GITHUB_REPO = 'SkuInventoryDatabase'
 
 // Simple in-memory rate limiting (resets on server restart)
 const rateLimitMap = new Map<string, { count: number; resetAt: Date }>()
@@ -176,26 +177,25 @@ export async function POST(request: NextRequest) {
     // Label based on type
     const label = type === 'bug' ? 'bug' : 'enhancement'
 
-    // Create GitHub issue using gh CLI
-    // Escape quotes and newlines in the body for shell safety
-    const escapedBody = issueBody.replace(/"/g, '\\"').replace(/\n/g, '\\n')
-    const escapedTitle = title.replace(/"/g, '\\"')
-
-    const command = `gh issue create --title "${escapedTitle}" --body "${escapedBody}" --label "${label}"`
-
-    const { stdout, stderr } = await execAsync(command, {
-      cwd: process.cwd(),
-      timeout: 30000, // 30 second timeout
-    })
-
-    if (stderr && !stderr.includes('Creating issue')) {
-      console.error('gh issue create stderr:', stderr)
+    // Create GitHub issue using Octokit REST API
+    const githubToken = process.env.GITHUB_TOKEN
+    if (!githubToken) {
+      console.error('GITHUB_TOKEN environment variable not set')
+      return error('GitHub integration not configured', 500, 'ServiceUnavailable')
     }
 
-    // Parse issue URL from stdout (gh outputs the URL)
-    const issueUrl = stdout.trim()
-    const issueNumberMatch = issueUrl.match(/\/issues\/(\d+)$/)
-    const issueNumber = issueNumberMatch ? parseInt(issueNumberMatch[1], 10) : 0
+    const octokit = new Octokit({ auth: githubToken })
+
+    const { data: issue } = await octokit.issues.create({
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+      title,
+      body: issueBody,
+      labels: [label],
+    })
+
+    const issueUrl = issue.html_url
+    const issueNumber = issue.number
 
     const response: SubmitFeedbackResponse = {
       issueUrl,
@@ -206,9 +206,14 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('Error creating GitHub issue:', err)
 
-    // Handle specific errors
-    if (err instanceof Error && err.message.includes('gh: command not found')) {
-      return error('GitHub CLI not available on server', 500, 'ServiceUnavailable')
+    // Handle specific Octokit errors
+    if (err instanceof Error) {
+      if (err.message.includes('Bad credentials')) {
+        return error('GitHub token invalid or expired', 500, 'ServiceUnavailable')
+      }
+      if (err.message.includes('Not Found')) {
+        return error('GitHub repository not found', 500, 'ServiceUnavailable')
+      }
     }
 
     return serverError('Failed to create GitHub issue. Please try again.')

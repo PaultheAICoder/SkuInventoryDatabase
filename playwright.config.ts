@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -8,10 +8,9 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: process.env.BASE_URL || 'https://172.16.20.50:4543',
+    baseURL: 'http://172.16.20.50:4545',
     trace: 'on-first-retry',
-    ignoreHTTPSErrors: true, // Self-signed SSL cert
-    screenshot: 'only-on-failure',
+    ignoreHTTPSErrors: true,
   },
   projects: [
     {
@@ -19,5 +18,4 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // Don't start a server - use existing Docker deployment
-})
+});

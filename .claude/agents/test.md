@@ -84,9 +84,14 @@ npm test  # All tests = potentially long
 
 **If >15 min**: STOP, narrow filter, reassess scope.
 
-### Step 5: E2E Testing with Playwright (REQUIRED for UI changes)
+### Step 5: E2E Testing with Playwright (MANDATORY for UI-visible issues)
 
-**For any task involving UI components, run Playwright E2E tests:**
+**⚠️ MANDATORY: For ANY GitHub issue involving UI components, visual changes, or user-facing features, you MUST run Playwright E2E tests. DO NOT skip this step. DO NOT mark the issue complete without visual verification.**
+
+**UI-Visible Issue Indicators**:
+- Issue mentions: button, dialog, modal, page, form, layout, header, sidebar, component
+- Issue involves: new routes/pages, modified components, CSS/styling changes
+- Issue type: feature with user-facing elements, UI bug fix
 
 ```bash
 cd /home/pbrown/SkuInventory
@@ -106,6 +111,13 @@ npm run test:e2e -- --headed
 - Tests must login using test credentials before accessing dashboard pages
 - Create new E2E tests in `tests/e2e/` for new UI features
 - Take screenshots on failure for debugging
+- **Verify UI elements are visible and interactive** - don't just check they exist in DOM
+
+**Visual Verification Checklist (MANDATORY for UI issues)**:
+- [ ] Component renders correctly in browser
+- [ ] Component is visible (not hidden by CSS like `lg:hidden`)
+- [ ] Component is interactive (clickable, focusable)
+- [ ] Screenshot captured as proof of visual verification
 
 **If E2E tests fail**:
 1. Check Docker container is running: `docker ps | grep inventory-app`

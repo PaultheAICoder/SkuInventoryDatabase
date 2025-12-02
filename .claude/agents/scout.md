@@ -79,6 +79,32 @@ npx tsc --noEmit
 | Moderate | Multiple components, some new patterns | 4-12 hours |
 | Complex | Architectural changes, extensive refactoring | 12+ hours |
 
+### 4.5. UI Feature Analysis (REQUIRED for UI issues)
+
+**For ANY issue involving UI components, buttons, dialogs, pages, or visual elements:**
+
+1. **Identify ALL render locations** - Where should this element appear?
+   - Header (always visible)
+   - Sidebar (desktop only by default)
+   - Main content area
+   - Footer
+
+2. **Document visibility requirements**:
+   - Is this element visible on ALL screen sizes?
+   - Are there any `lg:hidden`, `md:hidden`, `sm:hidden` classes that could hide it?
+   - Should this be desktop-only, mobile-only, or universal?
+
+3. **Include in report**:
+   ```markdown
+   ## UI Visibility Requirements
+   **Element**: [name]
+   **Location**: [where in layout]
+   **Visibility**: ALL devices | Desktop only | Mobile only
+   **CSS classes to avoid**: `lg:hidden` (hides on desktop), `hidden lg:block` (hides on mobile)
+   ```
+
+**IMPORTANT**: We are NOT building mobile-specific functionality. All UI elements should be visible on ALL devices unless explicitly specified otherwise.
+
 ### 5. Find Existing Patterns
 
 Identify similar implementations to follow. Document primary and secondary reference files with paths.
