@@ -214,3 +214,219 @@ export async function canDeleteComponent(componentId: string): Promise<boolean> 
   })
   return activeBomLineCount === 0
 }
+
+/**
+ * Result type for insufficient inventory check
+ */
+export interface InsufficientInventoryItem {
+  componentId: string
+  componentName: string
+  skuCode: string
+  required: number
+  available: number
+  shortage: number
+}
+
+/**
+ * Check if there's sufficient inventory to build a SKU
+ * Returns list of components with insufficient inventory, or empty array if sufficient
+ */
+export async function checkInsufficientInventory(params: {
+  bomVersionId: string
+  unitsToBuild: number
+}): Promise<InsufficientInventoryItem[]> {
+  const { bomVersionId, unitsToBuild } = params
+
+  // Get BOM lines with components
+  const bomLines = await prisma.bOMLine.findMany({
+    where: { bomVersionId },
+    include: {
+      component: {
+        select: {
+          id: true,
+          name: true,
+          skuCode: true,
+        },
+      },
+    },
+  })
+
+  if (bomLines.length === 0) {
+    return []
+  }
+
+  // Get component quantities
+  const componentIds = bomLines.map((line) => line.componentId)
+  const quantities = await getComponentQuantities(componentIds)
+
+  const insufficientItems: InsufficientInventoryItem[] = []
+
+  for (const line of bomLines) {
+    const available = quantities.get(line.componentId) ?? 0
+    const required = line.quantityPerUnit.toNumber() * unitsToBuild
+
+    if (available < required) {
+      insufficientItems.push({
+        componentId: line.component.id,
+        componentName: line.component.name,
+        skuCode: line.component.skuCode,
+        required,
+        available,
+        shortage: required - available,
+      })
+    }
+  }
+
+  return insufficientItems
+}
+
+/**
+ * Build transaction result type
+ */
+export interface BuildTransactionResult {
+  id: string
+  type: 'build'
+  date: Date
+  sku: { id: string; name: string; internalCode: string } | null
+  bomVersion: { id: string; versionName: string } | null
+  salesChannel: string | null
+  unitsBuild: number | null
+  unitBomCost: { toString(): string } | null
+  totalBomCost: { toString(): string } | null
+  notes: string | null
+  createdAt: Date
+  createdBy: { id: string; name: string }
+  lines: Array<{
+    id: string
+    component: { id: string; name: string; skuCode: string }
+    quantityChange: { toString(): string }
+    costPerUnit: { toString(): string } | null
+  }>
+}
+
+/**
+ * Create a build transaction that consumes components per BOM
+ * Optionally allows proceeding with insufficient inventory (with warning)
+ */
+export async function createBuildTransaction(params: {
+  companyId: string
+  skuId: string
+  bomVersionId: string
+  unitsToBuild: number
+  salesChannel?: string
+  date: Date
+  notes?: string | null
+  createdById: string
+  allowInsufficientInventory?: boolean
+}): Promise<{
+  transaction: BuildTransactionResult
+  insufficientItems: InsufficientInventoryItem[]
+  warning: boolean
+}> {
+  const {
+    companyId,
+    skuId,
+    bomVersionId,
+    unitsToBuild,
+    salesChannel,
+    date,
+    notes,
+    createdById,
+    allowInsufficientInventory = false,
+  } = params
+
+  // Check for insufficient inventory
+  const insufficientItems = await checkInsufficientInventory({
+    bomVersionId,
+    unitsToBuild,
+  })
+
+  if (insufficientItems.length > 0 && !allowInsufficientInventory) {
+    throw new Error(
+      `Insufficient inventory for ${insufficientItems.length} component(s). ` +
+        `Use allowInsufficientInventory option to proceed anyway.`
+    )
+  }
+
+  // Get BOM lines with component costs for snapshot
+  const bomLines = await prisma.bOMLine.findMany({
+    where: { bomVersionId },
+    include: {
+      component: {
+        select: {
+          id: true,
+          costPerUnit: true,
+        },
+      },
+    },
+  })
+
+  // Calculate unit BOM cost (snapshot at time of build)
+  const unitBomCost = bomLines.reduce((total, line) => {
+    return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
+  }, 0)
+
+  const totalBomCost = unitBomCost * unitsToBuild
+
+  // Create build transaction with consumption lines
+  const transaction = await prisma.transaction.create({
+    data: {
+      companyId,
+      type: 'build',
+      date,
+      skuId,
+      bomVersionId,
+      salesChannel,
+      unitsBuild: unitsToBuild,
+      unitBomCost: new Prisma.Decimal(unitBomCost),
+      totalBomCost: new Prisma.Decimal(totalBomCost),
+      notes,
+      createdById,
+      lines: {
+        create: bomLines.map((line) => ({
+          componentId: line.componentId,
+          // Negative quantity (consuming inventory)
+          quantityChange: new Prisma.Decimal(
+            -1 * line.quantityPerUnit.toNumber() * unitsToBuild
+          ),
+          costPerUnit: line.component.costPerUnit,
+        })),
+      },
+    },
+    include: {
+      sku: {
+        select: {
+          id: true,
+          name: true,
+          internalCode: true,
+        },
+      },
+      bomVersion: {
+        select: {
+          id: true,
+          versionName: true,
+        },
+      },
+      lines: {
+        include: {
+          component: {
+            select: {
+              id: true,
+              name: true,
+              skuCode: true,
+            },
+          },
+        },
+      },
+      createdBy: {
+        select: { id: true, name: true },
+      },
+    },
+  })
+
+  return {
+    transaction: transaction as unknown as BuildTransactionResult,
+    insufficientItems,
+    warning: insufficientItems.length > 0,
+  }
+}

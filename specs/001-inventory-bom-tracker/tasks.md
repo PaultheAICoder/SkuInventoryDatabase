@@ -171,16 +171,16 @@
 
 ### Implementation for User Story 5
 
-- [ ] T083 [US5] Implement build transaction with BOM consumption in src/services/inventory.ts
-- [ ] T084 [US5] Add insufficient inventory check with configurable blocking in src/services/inventory.ts
-- [ ] T085 [US5] Implement build transaction API route POST in src/app/api/transactions/build/route.ts
-- [ ] T086 [US5] Implement transaction detail API route GET in src/app/api/transactions/[id]/route.ts
-- [ ] T087 [P] [US5] Create BuildDialog component with SKU selector in src/components/features/BuildDialog.tsx
-- [ ] T088 [P] [US5] Create TransactionDetail component with cost breakdown in src/components/features/TransactionDetail.tsx
-- [ ] T089 [P] [US5] Create InsufficientInventoryWarning component in src/components/features/InsufficientInventoryWarning.tsx
-- [ ] T090 [US5] Update SKU detail page with build action in src/app/(dashboard)/skus/[id]/page.tsx
-- [ ] T091 [US5] Create transaction detail page in src/app/(dashboard)/transactions/[id]/page.tsx
-- [ ] T092 [US5] Add transaction filtering by type, component, SKU, date range in src/app/(dashboard)/transactions/page.tsx
+- [x] T083 [US5] Implement build transaction with BOM consumption in src/services/inventory.ts
+- [x] T084 [US5] Add insufficient inventory check with configurable blocking in src/services/inventory.ts
+- [x] T085 [US5] Implement build transaction API route POST in src/app/api/transactions/build/route.ts
+- [x] T086 [US5] Implement transaction detail API route GET in src/app/api/transactions/[id]/route.ts
+- [x] T087 [P] [US5] Create BuildDialog component with SKU selector in src/components/features/BuildDialog.tsx
+- [x] T088 [P] [US5] Create TransactionDetail component with cost breakdown in src/components/features/TransactionDetail.tsx
+- [x] T089 [P] [US5] Create InsufficientInventoryWarning component in src/components/features/InsufficientInventoryWarning.tsx
+- [x] T090 [US5] Update SKU detail page with build action in src/app/(dashboard)/skus/[id]/page.tsx
+- [x] T091 [US5] Create transaction detail page in src/app/(dashboard)/transactions/[id]/page.tsx
+- [x] T092 [US5] Add transaction filtering by type, component, SKU, date range in src/app/(dashboard)/transactions/page.tsx
 
 **Checkpoint**: User Story 5 complete - build transactions work with BOM consumption, cost snapshots preserved
 

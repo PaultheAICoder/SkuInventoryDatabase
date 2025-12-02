@@ -249,7 +249,11 @@ function TransactionLogContent() {
                   </TableRow>
                 ) : (
                   transactions.map((tx) => (
-                    <TableRow key={tx.id}>
+                    <TableRow
+                      key={tx.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/transactions/${tx.id}`)}
+                    >
                       <TableCell className="font-mono text-sm">
                         {new Date(tx.date).toLocaleDateString()}
                       </TableCell>
@@ -258,7 +262,7 @@ function TransactionLogContent() {
                       </TableCell>
                       <TableCell>{formatTransactionSummary(tx)}</TableCell>
                       <TableCell>
-                        {tx.lines.map((line, idx) => (
+                        {tx.lines.slice(0, 2).map((line, idx) => (
                           <div key={line.id} className="text-sm">
                             {idx > 0 && <span className="text-muted-foreground">, </span>}
                             <span className="font-medium">{line.component.name}</span>
@@ -274,6 +278,11 @@ function TransactionLogContent() {
                             </span>
                           </div>
                         ))}
+                        {tx.lines.length > 2 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{tx.lines.length - 2} more
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {tx.createdBy.name}

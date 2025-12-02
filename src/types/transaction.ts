@@ -28,12 +28,30 @@ export type CreateAdjustmentInput = z.infer<typeof createAdjustmentSchema>
 export const createBuildSchema = z.object({
   date: z.coerce.date(),
   skuId: z.string().uuid('Invalid SKU ID'),
-  unitsBuild: z.coerce.number().int().positive('Units must be positive'),
+  unitsToBuild: z.coerce.number().int().positive('Units must be positive'),
   salesChannel: z.string().optional(),
   notes: z.string().optional().nullable(),
+  allowInsufficientInventory: z.boolean().default(false),
 })
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>
+
+// Insufficient inventory item type (matches service)
+export interface InsufficientInventoryItem {
+  componentId: string
+  componentName: string
+  skuCode: string
+  required: number
+  available: number
+  shortage: number
+}
+
+// Build transaction response includes warning info
+export interface BuildTransactionResponse {
+  transaction: TransactionResponse
+  insufficientItems: InsufficientInventoryItem[]
+  warning: boolean
+}
 
 // Transaction list query schema
 export const transactionListQuerySchema = z.object({

@@ -3,11 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Edit, Package } from 'lucide-react'
+import { ArrowLeft, Edit, Package, Hammer } from 'lucide-react'
 import { BOMVersionList } from '@/components/features/BOMVersionList'
+import { BuildDialog } from '@/components/features/BuildDialog'
+import { BuildableUnitsDisplay } from '@/components/features/BuildableUnitsDisplay'
 import type { SKUDetailResponse } from '@/types/sku'
 import type { BOMVersionResponse } from '@/types/bom'
 
@@ -17,11 +20,15 @@ interface SKUDetailPageProps {
 
 export default function SKUDetailPage({ params }: SKUDetailPageProps) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [skuId, setSkuId] = useState<string | null>(null)
   const [sku, setSku] = useState<SKUDetailResponse | null>(null)
   const [bomVersions, setBomVersions] = useState<BOMVersionResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+
+  const canEdit = session?.user?.role !== 'viewer'
 
   useEffect(() => {
     params.then((p) => setSkuId(p.id))
@@ -103,12 +110,22 @@ export default function SKUDetailPage({ params }: SKUDetailPageProps) {
             <p className="text-muted-foreground font-mono">{sku.internalCode}</p>
           </div>
         </div>
-        <Button asChild variant="outline">
-          <Link href={`/skus/${skuId}/edit`}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Link>
-        </Button>
+        {canEdit && (
+          <div className="flex gap-2">
+            {sku.activeBom && (
+              <Button onClick={() => setBuildDialogOpen(true)}>
+                <Hammer className="h-4 w-4 mr-2" />
+                Build
+              </Button>
+            )}
+            <Button asChild variant="outline">
+              <Link href={`/skus/${skuId}/edit`}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -153,15 +170,10 @@ export default function SKUDetailPage({ params }: SKUDetailPageProps) {
 
             <div>
               <p className="text-sm text-muted-foreground">Max Buildable Units</p>
-              <p className="font-mono text-lg">
-                {sku.maxBuildableUnits != null ? (
-                  <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''}>
-                    {sku.maxBuildableUnits.toLocaleString()}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </p>
+              <BuildableUnitsDisplay
+                maxBuildableUnits={sku.maxBuildableUnits}
+                size="lg"
+              />
             </div>
 
             {Object.keys(sku.externalIds).length > 0 && (
@@ -203,6 +215,18 @@ export default function SKUDetailPage({ params }: SKUDetailPageProps) {
           )}
         </div>
       </div>
+
+      {/* Build Dialog */}
+      {skuId && (
+        <BuildDialog
+          open={buildDialogOpen}
+          onOpenChange={(open) => {
+            setBuildDialogOpen(open)
+            if (!open) handleRefresh()
+          }}
+          preselectedSkuId={skuId}
+        />
+      )}
     </div>
   )
 }
