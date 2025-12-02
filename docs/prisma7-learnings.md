@@ -110,11 +110,67 @@ Note: If using `prisma-client`, you must specify an output path.
 7. [ ] Consider switching to `prisma-client` generator
 8. [ ] Run `npx prisma generate`
 
+### 7. Lazy Initialization for Next.js Builds
+
+With Prisma 7's adapter pattern, the PrismaClient creation throws if `DATABASE_URL` is not set. This causes issues during Next.js static builds because the build process analyzes all modules.
+
+**Problem:**
+```typescript
+// This throws at module load time during build
+export const prisma = new PrismaClient({ adapter })
+```
+
+**Solution - Use a Proxy for lazy initialization:**
+```typescript
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient()
+  }
+  return globalForPrisma.prisma
+}
+
+// Proxy delays client creation until first actual use
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop: string | symbol) {
+    const client = getPrismaClient()
+    const value = client[prop as keyof PrismaClient]
+    if (typeof value === 'function') {
+      return value.bind(client)
+    }
+    return value
+  },
+})
+```
+
+This ensures Prisma is only initialized when actually used at runtime, not during the build static analysis phase.
+
 ## References
 
 - [Prisma 7 Upgrade Guide](https://www.prisma.io/docs/orm/more/upgrade-guides/upgrading-versions/upgrading-to-prisma-7)
 - [Prisma 7 Release Announcement](https://www.prisma.io/blog/announcing-prisma-orm-7-0-0)
 - [GitHub Releases](https://github.com/prisma/prisma/releases)
+
+---
+
+# Docker / Alpine Learnings
+
+## Healthcheck with localhost in Alpine
+
+**Issue**: Docker healthchecks using `localhost` fail in Alpine-based containers with "Connection refused", even when the service is listening on `0.0.0.0`.
+
+**Root cause**: DNS resolution timing or IPv6 handling in BusyBox/Alpine.
+
+**Solution**: Always use `127.0.0.1` instead of `localhost` in healthcheck commands:
+
+```yaml
+# Bad - may fail
+healthcheck:
+  test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:4500/api/health']
+
+# Good - works reliably
+healthcheck:
+  test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:4500/api/health']
+```
 
 ---
 

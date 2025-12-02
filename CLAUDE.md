@@ -27,6 +27,22 @@ TypeScript 5.x (full-stack): Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
 
+## Port Convention
+
+**IMPORTANT**: All ports for this project MUST use the **45xx** range to avoid conflicts with other projects running on the same machine. When adding new services or endpoints, always choose a port in the 4500-4599 range.
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **App URL** | **4543** | **HTTPS entry point (use this)** |
+| App (internal) | 4500 | Next.js internal (not exposed) |
+| PostgreSQL | 4546 | Database |
+| Nginx (HTTP) | 4580 | Redirects to HTTPS |
+| Nginx (HTTPS) | 4543 | Reverse proxy with SSL |
+
+**Access the app at: https://172.16.20.50:4543**
+
+**Do NOT use common ports like 3000, 5432, 80, 443, etc.** Always prefix with 45.
+
 ## Code Quality Standards
 
 We do not tolerate errors or warnings in our code, as we have written all of the code from scratch. If at any point there are errors or warnings or typecheck or linter or compiler errors or warnings, they must be fixed before moving on. They should never be ignored or coded around, they should be debugged and fixed, even if they are just warnings.

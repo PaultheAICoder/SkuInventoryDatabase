@@ -51,3 +51,9 @@ prisma/*.db-journal
 Thumbs.db
 
 /src/generated/prisma
+
+# SSL certificates (generated locally)
+docker/nginx/ssl/
+
+# Database backups
+backups/

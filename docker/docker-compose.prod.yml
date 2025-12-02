@@ -1,27 +1,48 @@
-version: '3.8'
-
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: inventory-nginx
+    restart: unless-stopped
+    ports:
+      - '4580:80'
+      - '4543:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
   app:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: inventory-app
     restart: unless-stopped
-    ports:
-      - '3000:3000'
+    # No external port - only accessible via nginx
+    expose:
+      - '4500'
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/inventory?schema=public
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:4545}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:4500/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   db:
     image: postgres:16-alpine
     container_name: inventory-db-prod
     restart: unless-stopped
+    ports:
+      - '4546:5432'
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
