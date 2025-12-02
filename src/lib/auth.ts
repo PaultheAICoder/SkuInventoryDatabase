@@ -123,3 +123,48 @@ declare module 'next-auth/jwt' {
     companyName: string
   }
 }
+
+/**
+ * Log a security event
+ */
+export async function logSecurityEvent(params: {
+  companyId: string
+  userId?: string
+  eventType: string
+  ipAddress?: string
+  userAgent?: string
+  details?: Record<string, unknown>
+}) {
+  const { companyId, userId, eventType, ipAddress, userAgent, details } = params
+
+  try {
+    await prisma.securityEvent.create({
+      data: {
+        companyId,
+        userId,
+        eventType,
+        ipAddress,
+        userAgent,
+        details: (details ?? {}) as object,
+      },
+    })
+  } catch (error) {
+    // Don't fail the main operation if logging fails
+    console.error('Failed to log security event:', error)
+  }
+}
+
+/**
+ * Security event types
+ */
+export const SECURITY_EVENTS = {
+  LOGIN: 'login',
+  LOGIN_FAILED: 'login_failed',
+  LOGOUT: 'logout',
+  PASSWORD_CHANGED: 'password_changed',
+  USER_CREATED: 'user_created',
+  USER_UPDATED: 'user_updated',
+  USER_DEACTIVATED: 'user_deactivated',
+  ROLE_CHANGED: 'role_changed',
+  SETTINGS_CHANGED: 'settings_changed',
+} as const

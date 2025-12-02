@@ -194,18 +194,18 @@
 
 ### Implementation for User Story 6
 
-- [ ] T093 [US6] Enhance role-based middleware with granular permissions in src/middleware.ts
-- [ ] T094 [US6] Create role permission utilities in src/lib/permissions.ts
-- [ ] T095 [US6] Implement users CRUD API route GET/POST (Admin only) in src/app/api/users/route.ts
-- [ ] T096 [US6] Implement user detail API route GET/PATCH/DELETE in src/app/api/users/[id]/route.ts
-- [ ] T097 [US6] Implement settings API route GET/PATCH (Admin only) in src/app/api/settings/route.ts
-- [ ] T098 [US6] Add security event logging for login/logout/role changes in src/lib/auth.ts
-- [ ] T099 [P] [US6] Create UserForm component in src/components/features/UserForm.tsx
-- [ ] T100 [P] [US6] Create UserTable component in src/components/features/UserTable.tsx
-- [ ] T101 [P] [US6] Create SettingsForm component in src/components/features/SettingsForm.tsx
-- [ ] T102 [US6] Create user management page (Admin only) in src/app/(dashboard)/settings/users/page.tsx
-- [ ] T103 [US6] Create settings page (Admin only) in src/app/(dashboard)/settings/page.tsx
-- [ ] T104 [US6] Add role-based UI element hiding throughout all dashboard pages
+- [x] T093 [US6] Enhance role-based middleware with granular permissions in src/middleware.ts
+- [x] T094 [US6] Create role permission utilities in src/lib/permissions.ts
+- [x] T095 [US6] Implement users CRUD API route GET/POST (Admin only) in src/app/api/users/route.ts
+- [x] T096 [US6] Implement user detail API route GET/PATCH/DELETE in src/app/api/users/[id]/route.ts
+- [x] T097 [US6] Implement settings API route GET/PATCH (Admin only) in src/app/api/settings/route.ts
+- [x] T098 [US6] Add security event logging for login/logout/role changes in src/lib/auth.ts
+- [x] T099 [P] [US6] Create UserForm component in src/components/features/UserForm.tsx
+- [x] T100 [P] [US6] Create UserTable component in src/components/features/UserTable.tsx
+- [x] T101 [P] [US6] Create SettingsForm component in src/components/features/SettingsForm.tsx
+- [x] T102 [US6] Create user management page (Admin only) in src/app/(dashboard)/settings/users/page.tsx
+- [x] T103 [US6] Create settings page (Admin only) in src/app/(dashboard)/settings/page.tsx
+- [x] T104 [US6] Add role-based UI element hiding throughout all dashboard pages
 
 **Checkpoint**: User Story 6 complete - multi-user with role-based access working
 
