@@ -34,7 +34,14 @@ export async function POST(request: NextRequest) {
       },
       include: {
         bomVersions: {
-          where: { isActive: true },
+          where: {
+            effectiveStartDate: { lte: data.date },
+            OR: [
+              { effectiveEndDate: null },
+              { effectiveEndDate: { gte: data.date } }
+            ]
+          },
+          orderBy: { effectiveStartDate: 'desc' },
           take: 1,
         },
       },
@@ -45,10 +52,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!sku.bomVersions[0]) {
-      return error('SKU has no active BOM', 400)
+      const buildDateStr = data.date.toISOString().split('T')[0]
+      return error(`No BOM version effective on ${buildDateStr} for this SKU`, 400)
     }
 
-    const activeBomVersionId = sku.bomVersions[0].id
+    const selectedBomVersionId = sku.bomVersions[0].id
 
     // Get company settings
     const settings = await getCompanySettings(session.user.companyId)
@@ -62,7 +70,7 @@ export async function POST(request: NextRequest) {
       const result = await createBuildTransaction({
         companyId: session.user.companyId,
         skuId: data.skuId,
-        bomVersionId: activeBomVersionId,
+        bomVersionId: selectedBomVersionId,
         unitsToBuild: data.unitsToBuild,
         salesChannel: data.salesChannel,
         date: data.date,
@@ -106,7 +114,7 @@ export async function POST(request: NextRequest) {
       if (error instanceof Error && error.message.includes('Insufficient inventory')) {
         // Return 400 with insufficient items so frontend can show warning
         const insufficientItems = await checkInsufficientInventory({
-          bomVersionId: activeBomVersionId,
+          bomVersionId: selectedBomVersionId,
           unitsToBuild: data.unitsToBuild,
         })
 

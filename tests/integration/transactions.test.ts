@@ -507,6 +507,313 @@ describe('Transaction Flows', () => {
 
       expect(result.status).toBe(401)
     })
+
+    it('build with current date uses date-effective BOM', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component with inventory
+      const component = await createTestComponentInDb(companyId)
+
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Create SKU
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version effective from today (no end date = current)
+      const today = new Date()
+      const bomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0-current',
+          effectiveStartDate: today,
+          effectiveEndDate: null,
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2,
+            },
+          },
+        },
+      })
+
+      // Build with today's date
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 5,
+          date: today.toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse<{ data: { bomVersion: { id: string } } }>(response)
+
+      expect(result.status).toBe(201)
+      expect(result.data?.data?.bomVersion?.id).toBe(bomVersion.id)
+    })
+
+    it('backdated build uses BOM effective on that date', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component with inventory
+      const component = await createTestComponentInDb(companyId)
+
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Create SKU
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create OLD BOM version (effective 30 days ago, ended 10 days ago)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      const tenDaysAgo = new Date()
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
+
+      const oldBomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0-old',
+          effectiveStartDate: thirtyDaysAgo,
+          effectiveEndDate: tenDaysAgo,
+          isActive: false,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 3, // Different quantity from current
+            },
+          },
+        },
+      })
+
+      // Create CURRENT BOM version (effective from 10 days ago, no end date)
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v2.0-current',
+          effectiveStartDate: tenDaysAgo,
+          effectiveEndDate: null,
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2, // Different quantity from old
+            },
+          },
+        },
+      })
+
+      // Build backdated to 20 days ago (should use old BOM)
+      const twentyDaysAgo = new Date()
+      twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20)
+
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 5,
+          date: twentyDaysAgo.toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse<{
+        data: {
+          bomVersion: { id: string }
+          lines: Array<{ component: { id: string }; quantityChange: string }>
+        }
+      }>(response)
+
+      expect(result.status).toBe(201)
+      expect(result.data?.data?.bomVersion?.id).toBe(oldBomVersion.id)
+
+      // Verify component consumption matches OLD BOM (3 per unit * 5 units = 15)
+      const componentTx = result.data?.data?.lines?.find((l) => l.component.id === component.id)
+      expect(Number(componentTx?.quantityChange)).toBe(-15) // Negative = consumed
+    })
+
+    it('build fails when no BOM covers the date', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component
+      const component = await createTestComponentInDb(companyId)
+
+      // Create SKU
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version that starts tomorrow (not effective yet)
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0-future',
+          effectiveStartDate: tomorrow,
+          effectiveEndDate: null,
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2,
+            },
+          },
+        },
+      })
+
+      // Try to build with today's date (should fail - BOM not yet effective)
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 5,
+          date: new Date().toISOString().split('T')[0],
+          allowInsufficientInventory: true, // Bypass inventory check
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse<{ message: string }>(response)
+
+      expect(result.status).toBe(400)
+      expect(result.data?.message).toContain('No BOM version effective on')
+    })
+
+    it('build selects most recent applicable BOM when multiple match', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component with inventory
+      const component = await createTestComponentInDb(companyId)
+
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Create SKU
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create OLDER BOM (effective 30 days ago, no end date)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0-older',
+          effectiveStartDate: thirtyDaysAgo,
+          effectiveEndDate: null, // Still valid
+          isActive: false,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 5,
+            },
+          },
+        },
+      })
+
+      // Create NEWER BOM (effective 10 days ago, no end date)
+      const tenDaysAgo = new Date()
+      tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
+
+      const newerBom = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v2.0-newer',
+          effectiveStartDate: tenDaysAgo,
+          effectiveEndDate: null, // Also still valid
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2,
+            },
+          },
+        },
+      })
+
+      // Build with today's date - both BOMs are technically valid
+      // Should select the NEWER one (more recent effectiveStartDate)
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 5,
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse<{
+        data: {
+          bomVersion: { id: string }
+          lines: Array<{ component: { id: string }; quantityChange: string }>
+        }
+      }>(response)
+
+      expect(result.status).toBe(201)
+      expect(result.data?.data?.bomVersion?.id).toBe(newerBom.id)
+
+      // Verify consumption uses newer BOM (2 per unit, not 5)
+      const componentTx = result.data?.data?.lines?.find((l) => l.component.id === component.id)
+      expect(Number(componentTx?.quantityChange)).toBe(-10) // 2 * 5 = 10 consumed
+    })
   })
 
   describe('Transaction List', () => {
