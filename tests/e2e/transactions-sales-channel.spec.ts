@@ -123,8 +123,7 @@ test.describe('Transactions Sales Channel Filter', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify the dropdown shows Amazon
-    const salesChannelSection = page.locator('div.space-y-1:has(label:has-text("Sales Channel"))')
-    const selectTrigger = salesChannelSection.locator('[role="combobox"]')
+    const _salesChannelSection = page.locator('div.space-y-1:has(label:has-text("Sales Channel"))')
 
     // Click Clear button
     await page.locator('button:has-text("Clear")').click()

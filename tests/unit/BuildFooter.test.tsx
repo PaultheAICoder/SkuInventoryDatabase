@@ -1,17 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-
-// We need to mock version.json before importing the component
-// The path needs to match the actual import path in BuildFooter.tsx
-vi.mock('@/../version.json', () => ({
-  default: {
-    version: '0.5.1',
-    buildTimestamp: '2025-12-02T18:00:00.000Z',
-  },
-}))
-
-// Import after mocking
 import { BuildFooter } from '@/components/ui/BuildFooter'
+
+// version.json is mocked globally in tests/setup.ts
 
 describe('BuildFooter', () => {
   it('renders without crashing', () => {
