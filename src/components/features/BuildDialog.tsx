@@ -132,16 +132,16 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
         // Handle insufficient inventory error
-        if (data.insufficientItems && data.insufficientItems.length > 0) {
+        if (data?.insufficientItems && data.insufficientItems.length > 0) {
           setInsufficientItems(data.insufficientItems)
           setShowWarning(true)
           return
         }
-        throw new Error(data.error || 'Failed to record build')
+        throw new Error(data?.error || 'Failed to record build')
       }
 
       // Show warning if build succeeded with insufficient inventory

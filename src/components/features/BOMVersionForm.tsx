@@ -62,8 +62,8 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
       try {
         const res = await fetch('/api/components?isActive=true&pageSize=100')
         if (res.ok) {
-          const data = await res.json()
-          setComponents(data.data)
+          const data = await res.json().catch(() => ({}))
+          setComponents(data?.data || [])
         }
       } catch (err) {
         console.error('Failed to fetch components:', err)
@@ -147,8 +147,8 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to create BOM version')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to create BOM version')
       }
 
       if (onSuccess) {

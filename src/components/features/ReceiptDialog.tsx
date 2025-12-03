@@ -63,8 +63,8 @@ export function ReceiptDialog({
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to record receipt')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to record receipt')
       }
 
       onOpenChange(false)

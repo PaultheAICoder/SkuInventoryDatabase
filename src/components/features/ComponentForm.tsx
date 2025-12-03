@@ -77,8 +77,8 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to save component')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to save component')
       }
 
       if (onSuccess) {

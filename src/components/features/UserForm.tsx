@@ -71,8 +71,8 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to save user')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to save user')
       }
 
       if (onSuccess) {

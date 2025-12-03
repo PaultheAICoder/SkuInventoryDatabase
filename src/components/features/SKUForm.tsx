@@ -63,8 +63,8 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to save SKU')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to save SKU')
       }
 
       const result = await res.json()

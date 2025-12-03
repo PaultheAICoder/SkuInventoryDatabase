@@ -79,8 +79,8 @@ export function AdjustmentDialog({
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to record adjustment')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to record adjustment')
       }
 
       onOpenChange(false)

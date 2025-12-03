@@ -1,0 +1,13 @@
+{
+  "issue": "30",
+  "workflow_start": "2025-12-03T08:55:00.000Z",
+  "workflow_end": "2025-12-03T15:05:00.000Z",
+  "phases": {
+    "scout": "25m",
+    "plan": "30m",
+    "build": "12m",
+    "test": "11m",
+    "cleanup": "5m"
+  },
+  "total_duration": "83m"
+}
