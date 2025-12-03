@@ -22,6 +22,7 @@ model Company {
   transactions     Transaction[]
   securityEvents   SecurityEvent[]
   defectThresholds DefectThreshold[]
+  alertConfig      AlertConfig?
 }
 
 model Brand {
@@ -117,6 +118,7 @@ model Component {
 
   bomLines         BOMLine[]
   transactionLines TransactionLine[]
+  alertState       ComponentAlertState?
 
   @@unique([brandId, name])
   @@unique([brandId, skuCode])
@@ -281,4 +283,40 @@ model DefectAlert {
   @@index([thresholdId, createdAt(sort: Desc)])
   @@index([skuId, createdAt(sort: Desc)])
   @@index([acknowledgedAt])
+}
+
+// ============================================
+// Low-Stock Alert Configuration
+// ============================================
+
+model AlertConfig {
+  id              String    @id @default(uuid())
+  companyId       String    @unique
+  company         Company   @relation(fields: [companyId], references: [id])
+
+  // Channel configuration
+  slackWebhookUrl String?   @db.VarChar(500)
+  emailAddresses  String[]  // PostgreSQL array type
+
+  // Toggles
+  enableSlack     Boolean   @default(false)
+  enableEmail     Boolean   @default(false)
+
+  // Throttle settings
+  alertMode       String    @default("daily_digest") @db.VarChar(20) // 'daily_digest' | 'per_transition'
+  lastDigestSent  DateTime?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ComponentAlertState {
+  id            String    @id @default(uuid())
+  componentId   String    @unique
+  component     Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  lastStatus    String    @db.VarChar(20) // 'ok' | 'warning' | 'critical'
+  lastAlertSent DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }

@@ -1,0 +1,343 @@
+import { prisma } from '@/lib/db'
+import {
+  getComponentQuantities,
+  calculateReorderStatus,
+  getCompanySettings,
+} from './inventory'
+import type { ReorderStatus } from '@/types'
+import type {
+  AlertConfigResponse,
+  ComponentAlertNeeded,
+  LowStockAlertEvaluation,
+  AlertTransition,
+} from '@/types/lowstock-alert'
+
+/**
+ * Determine the type of state transition
+ */
+function getTransition(
+  previousStatus: ReorderStatus,
+  currentStatus: ReorderStatus
+): AlertTransition {
+  if (previousStatus === currentStatus) return 'no_change'
+
+  const key = `${previousStatus}_to_${currentStatus}` as AlertTransition
+  return key
+}
+
+/**
+ * Check if a transition should trigger an alert
+ * Only alert on transitions TO warning or critical
+ */
+function shouldAlert(transition: AlertTransition): boolean {
+  return [
+    'ok_to_warning',
+    'ok_to_critical',
+    'warning_to_critical',
+  ].includes(transition)
+}
+
+/**
+ * Check if a transition is a recovery (back to OK)
+ */
+function isRecovery(transition: AlertTransition): boolean {
+  return [
+    'warning_to_ok',
+    'critical_to_ok',
+  ].includes(transition)
+}
+
+/**
+ * Get or create alert config for a company
+ */
+export async function getAlertConfig(
+  companyId: string
+): Promise<AlertConfigResponse | null> {
+  const config = await prisma.alertConfig.findUnique({
+    where: { companyId },
+  })
+
+  if (!config) return null
+
+  return {
+    id: config.id,
+    companyId: config.companyId,
+    slackWebhookUrl: config.slackWebhookUrl,
+    emailAddresses: config.emailAddresses,
+    enableSlack: config.enableSlack,
+    enableEmail: config.enableEmail,
+    alertMode: config.alertMode as 'daily_digest' | 'per_transition',
+    lastDigestSent: config.lastDigestSent?.toISOString() ?? null,
+    createdAt: config.createdAt.toISOString(),
+    updatedAt: config.updatedAt.toISOString(),
+  }
+}
+
+/**
+ * Create or update alert config for a company
+ */
+export async function upsertAlertConfig(
+  companyId: string,
+  input: {
+    slackWebhookUrl?: string | null
+    emailAddresses?: string[]
+    enableSlack?: boolean
+    enableEmail?: boolean
+    alertMode?: 'daily_digest' | 'per_transition'
+  }
+): Promise<AlertConfigResponse> {
+  const config = await prisma.alertConfig.upsert({
+    where: { companyId },
+    create: {
+      companyId,
+      slackWebhookUrl: input.slackWebhookUrl ?? null,
+      emailAddresses: input.emailAddresses ?? [],
+      enableSlack: input.enableSlack ?? false,
+      enableEmail: input.enableEmail ?? false,
+      alertMode: input.alertMode ?? 'daily_digest',
+    },
+    update: {
+      ...(input.slackWebhookUrl !== undefined && { slackWebhookUrl: input.slackWebhookUrl }),
+      ...(input.emailAddresses !== undefined && { emailAddresses: input.emailAddresses }),
+      ...(input.enableSlack !== undefined && { enableSlack: input.enableSlack }),
+      ...(input.enableEmail !== undefined && { enableEmail: input.enableEmail }),
+      ...(input.alertMode !== undefined && { alertMode: input.alertMode }),
+    },
+  })
+
+  return {
+    id: config.id,
+    companyId: config.companyId,
+    slackWebhookUrl: config.slackWebhookUrl,
+    emailAddresses: config.emailAddresses,
+    enableSlack: config.enableSlack,
+    enableEmail: config.enableEmail,
+    alertMode: config.alertMode as 'daily_digest' | 'per_transition',
+    lastDigestSent: config.lastDigestSent?.toISOString() ?? null,
+    createdAt: config.createdAt.toISOString(),
+    updatedAt: config.updatedAt.toISOString(),
+  }
+}
+
+/**
+ * Update last digest sent timestamp
+ */
+export async function updateLastDigestSent(companyId: string): Promise<void> {
+  await prisma.alertConfig.update({
+    where: { companyId },
+    data: { lastDigestSent: new Date() },
+  })
+}
+
+/**
+ * Update component alert state after evaluation
+ */
+async function updateComponentAlertState(
+  componentId: string,
+  status: ReorderStatus,
+  alertSent: boolean
+): Promise<void> {
+  await prisma.componentAlertState.upsert({
+    where: { componentId },
+    create: {
+      componentId,
+      lastStatus: status,
+      lastAlertSent: alertSent ? new Date() : null,
+    },
+    update: {
+      lastStatus: status,
+      ...(alertSent && { lastAlertSent: new Date() }),
+    },
+  })
+}
+
+/**
+ * Main evaluation function - detects state transitions for components
+ *
+ * This function:
+ * 1. Fetches all active components with reorder points > 0
+ * 2. Calculates current quantities using getComponentQuantities()
+ * 3. Determines reorder status using calculateReorderStatus()
+ * 4. Compares to previous state in ComponentAlertState
+ * 5. Returns list of components that need alerts (state transitions)
+ */
+export async function evaluateLowStockAlerts(
+  companyId: string
+): Promise<LowStockAlertEvaluation> {
+  const evaluatedAt = new Date().toISOString()
+
+  // Get company settings for reorderWarningMultiplier
+  const settings = await getCompanySettings(companyId)
+
+  // Fetch all active components with reorder points > 0 for this company
+  const components = await prisma.component.findMany({
+    where: {
+      brand: { companyId },
+      isActive: true,
+      reorderPoint: { gt: 0 },
+    },
+    select: {
+      id: true,
+      name: true,
+      skuCode: true,
+      reorderPoint: true,
+      leadTimeDays: true,
+      brand: {
+        select: { name: true },
+      },
+    },
+  })
+
+  if (components.length === 0) {
+    return {
+      companyId,
+      evaluatedAt,
+      totalComponents: 0,
+      componentsNeedingAlert: [],
+      newWarnings: 0,
+      newCriticals: 0,
+      recoveries: 0,
+    }
+  }
+
+  // Get current quantities for all components
+  const componentIds = components.map((c) => c.id)
+  const quantities = await getComponentQuantities(componentIds)
+
+  // Get previous states for all components
+  const previousStates = await prisma.componentAlertState.findMany({
+    where: { componentId: { in: componentIds } },
+    select: { componentId: true, lastStatus: true },
+  })
+  const previousStateMap = new Map(
+    previousStates.map((s) => [s.componentId, s.lastStatus as ReorderStatus])
+  )
+
+  const componentsNeedingAlert: ComponentAlertNeeded[] = []
+  let newWarnings = 0
+  let newCriticals = 0
+  let recoveries = 0
+
+  // Evaluate each component
+  for (const component of components) {
+    const quantityOnHand = quantities.get(component.id) ?? 0
+    const currentStatus = calculateReorderStatus(
+      quantityOnHand,
+      component.reorderPoint,
+      settings.reorderWarningMultiplier
+    )
+
+    // Default to 'ok' if no previous state (new component)
+    const previousStatus = previousStateMap.get(component.id) ?? 'ok'
+    const transition = getTransition(previousStatus, currentStatus)
+
+    // Update state (always, to track current status)
+    const needsAlert = shouldAlert(transition)
+    await updateComponentAlertState(component.id, currentStatus, needsAlert)
+
+    // Count by transition type
+    if (transition === 'ok_to_warning' || transition === 'critical_to_warning') {
+      newWarnings++
+    }
+    if (transition === 'ok_to_critical' || transition === 'warning_to_critical') {
+      newCriticals++
+    }
+    if (isRecovery(transition)) {
+      recoveries++
+    }
+
+    // Add to alert list if needs alert
+    if (needsAlert) {
+      componentsNeedingAlert.push({
+        componentId: component.id,
+        componentName: component.name,
+        skuCode: component.skuCode,
+        brandName: component.brand.name,
+        previousStatus,
+        currentStatus,
+        transition,
+        quantityOnHand,
+        reorderPoint: component.reorderPoint,
+        leadTimeDays: component.leadTimeDays,
+      })
+    }
+  }
+
+  return {
+    companyId,
+    evaluatedAt,
+    totalComponents: components.length,
+    componentsNeedingAlert,
+    newWarnings,
+    newCriticals,
+    recoveries,
+  }
+}
+
+/**
+ * Check if alerts are enabled for a company
+ */
+export async function areAlertsEnabled(companyId: string): Promise<boolean> {
+  const config = await getAlertConfig(companyId)
+  if (!config) return false
+  return config.enableSlack || config.enableEmail
+}
+
+/**
+ * Get components currently in warning or critical status
+ * Useful for digest emails
+ */
+export async function getComponentsInAlertStatus(
+  companyId: string
+): Promise<{
+  warnings: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }>
+  criticals: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }>
+}> {
+  const settings = await getCompanySettings(companyId)
+
+  const components = await prisma.component.findMany({
+    where: {
+      brand: { companyId },
+      isActive: true,
+      reorderPoint: { gt: 0 },
+    },
+    select: {
+      id: true,
+      name: true,
+      reorderPoint: true,
+    },
+  })
+
+  const componentIds = components.map((c) => c.id)
+  const quantities = await getComponentQuantities(componentIds)
+
+  const warnings: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }> = []
+  const criticals: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }> = []
+
+  for (const component of components) {
+    const quantityOnHand = quantities.get(component.id) ?? 0
+    const status = calculateReorderStatus(
+      quantityOnHand,
+      component.reorderPoint,
+      settings.reorderWarningMultiplier
+    )
+
+    if (status === 'warning') {
+      warnings.push({
+        componentId: component.id,
+        componentName: component.name,
+        quantityOnHand,
+        reorderPoint: component.reorderPoint,
+      })
+    } else if (status === 'critical') {
+      criticals.push({
+        componentId: component.id,
+        componentName: component.name,
+        quantityOnHand,
+        reorderPoint: component.reorderPoint,
+      })
+    }
+  }
+
+  return { warnings, criticals }
+}
