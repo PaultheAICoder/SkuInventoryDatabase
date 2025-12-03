@@ -7,6 +7,23 @@ import { getComponentQuantities, calculateReorderStatus, getCompanySettings } fr
 import { calculateMaxBuildableUnitsForSKUs, calculateBOMUnitCosts } from '@/services/bom'
 import type { ReorderStatus } from '@/types'
 
+/**
+ * Calculate urgency score for reorder prioritization.
+ * Higher score = more urgent (should appear first in list).
+ * Formula: (deficitRatio * 100) + (leadTimeDays * 2)
+ * - Deficit ratio is primary factor (0-100+ range)
+ * - Lead time adds secondary weight (2 points per day)
+ */
+function calculateUrgencyScore(
+  quantityOnHand: number,
+  reorderPoint: number,
+  leadTimeDays: number
+): number {
+  const deficit = reorderPoint - quantityOnHand
+  const deficitRatio = deficit / Math.max(reorderPoint, 1)
+  return (deficitRatio * 100) + (leadTimeDays * 2)
+}
+
 interface DashboardResponse {
   componentStats: {
     total: number
@@ -20,6 +37,7 @@ interface DashboardResponse {
     skuCode: string
     quantityOnHand: number
     reorderPoint: number
+    leadTimeDays: number
     reorderStatus: ReorderStatus
   }>
   topBuildableSkus: Array<{
@@ -86,6 +104,7 @@ export async function GET(request: NextRequest) {
         name: true,
         skuCode: true,
         reorderPoint: true,
+        leadTimeDays: true,
       },
     })
 
@@ -121,13 +140,13 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Get critical components (sorted by how far below reorder point)
+    // Get critical components (sorted by urgency score - deficit ratio + lead time)
     const criticalComponents = componentsWithStatus
       .filter((c) => c.reorderStatus === 'critical')
       .sort((a, b) => {
-        const aDeficit = a.reorderPoint - a.quantityOnHand
-        const bDeficit = b.reorderPoint - b.quantityOnHand
-        return bDeficit - aDeficit
+        const aUrgency = calculateUrgencyScore(a.quantityOnHand, a.reorderPoint, a.leadTimeDays)
+        const bUrgency = calculateUrgencyScore(b.quantityOnHand, b.reorderPoint, b.leadTimeDays)
+        return bUrgency - aUrgency  // Higher urgency first
       })
       .slice(0, 10)
 

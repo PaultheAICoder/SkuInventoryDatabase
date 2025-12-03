@@ -11,12 +11,44 @@ import {
 import { ReorderStatusBadge } from './ReorderStatusBadge'
 import type { ReorderStatus } from '@/types'
 
+/**
+ * Generate lead-time urgency hint text based on reorder status and lead time.
+ * Provides actionable guidance for procurement decisions.
+ */
+function getLeadTimeHint(status: ReorderStatus, leadTimeDays: number): string {
+  if (status === 'ok') {
+    return ''  // No hint needed for OK status
+  }
+
+  if (leadTimeDays === 0) {
+    return status === 'critical' ? 'Order immediately' : 'Monitor stock'
+  }
+
+  if (leadTimeDays <= 3) {
+    return status === 'critical'
+      ? 'Order immediately'
+      : `Monitor (${leadTimeDays}d lead time)`
+  }
+
+  if (leadTimeDays <= 7) {
+    return `Order soon (${leadTimeDays} days lead time)`
+  }
+
+  if (leadTimeDays <= 14) {
+    return `Order within 1 week (${leadTimeDays} days lead time)`
+  }
+
+  const weeks = Math.ceil(leadTimeDays / 7)
+  return `Order urgently (${weeks} weeks lead time)`
+}
+
 interface CriticalComponent {
   id: string
   name: string
   skuCode: string
   quantityOnHand: number
   reorderPoint: number
+  leadTimeDays: number
   reorderStatus: ReorderStatus
 }
 
@@ -55,12 +87,15 @@ export function CriticalComponentsList({ components }: CriticalComponentsListPro
               <TableHead className="text-right">On Hand</TableHead>
               <TableHead className="text-right">Reorder Point</TableHead>
               <TableHead className="text-right">Deficit</TableHead>
+              <TableHead className="text-right">Lead Time</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {components.map((component) => {
               const deficit = component.reorderPoint - component.quantityOnHand
+              const hint = getLeadTimeHint(component.reorderStatus, component.leadTimeDays)
               return (
                 <TableRow key={component.id}>
                   <TableCell>
@@ -83,8 +118,14 @@ export function CriticalComponentsList({ components }: CriticalComponentsListPro
                   <TableCell className="text-right font-mono text-red-600" suppressHydrationWarning>
                     -{deficit.toLocaleString()}
                   </TableCell>
+                  <TableCell className="text-right font-mono" suppressHydrationWarning>
+                    {component.leadTimeDays > 0 ? `${component.leadTimeDays}d` : '-'}
+                  </TableCell>
                   <TableCell>
                     <ReorderStatusBadge status={component.reorderStatus} />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {hint}
                   </TableCell>
                 </TableRow>
               )

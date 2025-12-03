@@ -30,6 +30,7 @@ interface DashboardData {
     skuCode: string
     quantityOnHand: number
     reorderPoint: number
+    leadTimeDays: number
     reorderStatus: ReorderStatus
   }>
   topBuildableSkus: Array<{
