@@ -75,6 +75,7 @@ export const transactionListQuerySchema = z.object({
   type: z.enum(['receipt', 'build', 'adjustment', 'initial']).optional(),
   componentId: z.string().uuid().optional(),
   skuId: z.string().uuid().optional(),
+  salesChannel: z.string().optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   sortBy: z.enum(['date', 'createdAt', 'type']).default('createdAt'),

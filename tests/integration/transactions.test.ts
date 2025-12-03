@@ -865,5 +865,81 @@ describe('Transaction Flows', () => {
       expect(receiptResult.data?.createdBy).toBeDefined()
       expect(receiptResult.data?.createdBy.id).toBe(TEST_SESSIONS.admin!.user.id)
     })
+
+    it('filters transactions by salesChannel', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create a component and SKU for build transactions
+      const component = await createTestComponentInDb(companyId)
+      const sku = await createTestSKUInDb(companyId, {
+        salesChannel: 'Amazon',
+      })
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version for the SKU
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 1,
+            },
+          },
+        },
+      })
+
+      // First add inventory via receipt
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Create a build transaction with Amazon channel
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 5,
+          salesChannel: 'Amazon',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createBuild(buildRequest)
+
+      // Filter by Amazon - should find the build
+      const amazonRequest = createTestRequest('/api/transactions?salesChannel=Amazon')
+      const amazonResponse = await getTransactions(amazonRequest)
+      const amazonResult = await parseRouteResponse<Array<{ type: string; salesChannel: string | null }>>(amazonResponse)
+
+      expect(amazonResult.status).toBe(200)
+      const amazonData = Array.isArray(amazonResult.data) ? amazonResult.data : []
+      expect(amazonData.some((tx) => tx.salesChannel === 'Amazon')).toBe(true)
+
+      // Filter by Shopify - should not find the Amazon build
+      const shopifyRequest = createTestRequest('/api/transactions?salesChannel=Shopify')
+      const shopifyResponse = await getTransactions(shopifyRequest)
+      const shopifyResult = await parseRouteResponse<Array<{ type: string; salesChannel: string | null }>>(shopifyResponse)
+
+      expect(shopifyResult.status).toBe(200)
+      const shopifyData = Array.isArray(shopifyResult.data) ? shopifyResult.data : []
+      const shopifyBuilds = shopifyData.filter((tx) => tx.type === 'build' && tx.salesChannel === 'Shopify')
+      expect(shopifyBuilds.length).toBe(0)
+    })
   })
 })

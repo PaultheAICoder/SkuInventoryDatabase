@@ -24,6 +24,7 @@ import {
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
 import type { TransactionResponse } from '@/types/transaction'
+import { salesChannels } from '@/types'
 
 const TRANSACTION_TYPES = [
   { value: 'all', label: 'All Types' },
@@ -50,6 +51,7 @@ function TransactionLogContent() {
     type: searchParams.get('type') ?? '',
     componentId: searchParams.get('componentId') ?? '',
     skuId: searchParams.get('skuId') ?? '',
+    salesChannel: searchParams.get('salesChannel') ?? '',
     dateFrom: searchParams.get('dateFrom') ?? '',
     dateTo: searchParams.get('dateTo') ?? '',
   })
@@ -80,6 +82,7 @@ function TransactionLogContent() {
       if (filters.type) params.set('type', filters.type)
       if (filters.componentId) params.set('componentId', filters.componentId)
       if (filters.skuId) params.set('skuId', filters.skuId)
+      if (filters.salesChannel) params.set('salesChannel', filters.salesChannel)
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
 
@@ -110,6 +113,7 @@ function TransactionLogContent() {
       type: '',
       componentId: '',
       skuId: '',
+      salesChannel: '',
       dateFrom: '',
       dateTo: '',
     })
@@ -149,6 +153,7 @@ function TransactionLogContent() {
   // Build export query params from current filters
   const exportQueryParams = {
     type: filters.type,
+    salesChannel: filters.salesChannel,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
   }
@@ -209,6 +214,26 @@ function TransactionLogContent() {
                 value={filters.dateTo}
                 onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
               />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Sales Channel</label>
+              <Select
+                value={filters.salesChannel || 'all'}
+                onValueChange={(value) => setFilters((prev) => ({ ...prev, salesChannel: value === 'all' ? '' : value }))}
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="All Channels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Channels</SelectItem>
+                  {salesChannels.map((channel) => (
+                    <SelectItem key={channel} value={channel}>
+                      {channel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex gap-2">

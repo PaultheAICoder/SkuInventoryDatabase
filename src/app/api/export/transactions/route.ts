@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
+    const salesChannel = searchParams.get('salesChannel')
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
 
@@ -48,6 +49,10 @@ export async function GET(request: NextRequest) {
 
     if (type) {
       where.type = type as Prisma.EnumTransactionTypeFilter
+    }
+
+    if (salesChannel) {
+      where.salesChannel = salesChannel
     }
 
     if (dateFrom || dateTo) {

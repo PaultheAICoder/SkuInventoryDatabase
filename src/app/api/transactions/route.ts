@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const queryResult = parseQuery(searchParams, transactionListQuerySchema)
     if (queryResult.error) return queryResult.error
 
-    const { page, pageSize, type, componentId, skuId, dateFrom, dateTo, sortBy, sortOrder } =
+    const { page, pageSize, type, componentId, skuId, salesChannel, dateFrom, dateTo, sortBy, sortOrder } =
       queryResult.data
 
     // Build where clause
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       companyId: session.user.companyId,
       ...(type && { type }),
       ...(skuId && { skuId }),
+      ...(salesChannel && { salesChannel }),
       ...(componentId && {
         lines: {
           some: { componentId },

@@ -1,0 +1,11 @@
+{
+  "issue": "23",
+  "workflow_start": "2025-12-03T06:10:00.000Z",
+  "workflow_end": "2025-12-03T06:45:00.000Z",
+  "scout_duration_minutes": 22,
+  "plan_duration_minutes": 25,
+  "build_duration_minutes": 18,
+  "test_duration_minutes": 11,
+  "cleanup_duration_minutes": 8,
+  "total_duration_minutes": 84
+}
