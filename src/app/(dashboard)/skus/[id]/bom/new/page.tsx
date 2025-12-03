@@ -1,29 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { BOMVersionForm } from '@/components/features/BOMVersionForm'
 
-interface NewBOMPageProps {
-  params: Promise<{ id: string }>
-}
-
-export default function NewBOMPage({ params }: NewBOMPageProps) {
+export default function NewBOMPage() {
   const router = useRouter()
-  const [skuId, setSkuId] = useState<string | null>(null)
+  const params = useParams()
+  const skuId = params.id as string
   const [skuName, setSkuName] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    params.then((p) => setSkuId(p.id))
-  }, [params])
-
-  useEffect(() => {
-    if (!skuId) return
-
     async function fetchSKU() {
       try {
         const res = await fetch(`/api/skus/${skuId}`)
@@ -56,7 +47,7 @@ export default function NewBOMPage({ params }: NewBOMPageProps) {
     )
   }
 
-  if (error || !skuId) {
+  if (error) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
