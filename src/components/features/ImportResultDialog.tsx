@@ -40,7 +40,7 @@ interface ImportResultDialogProps {
   /**
    * Type of import for display purposes
    */
-  importType: 'components' | 'skus' | 'initial-inventory'
+  importType: 'components' | 'skus' | 'initial-inventory' | 'inventory-snapshot'
 }
 
 export function ImportResultDialog({
@@ -75,6 +75,8 @@ export function ImportResultDialog({
         return { singular: 'SKU', plural: 'SKUs' }
       case 'initial-inventory':
         return { singular: 'inventory record', plural: 'inventory records' }
+      case 'inventory-snapshot':
+        return { singular: 'snapshot item', plural: 'snapshot items' }
     }
   }
 

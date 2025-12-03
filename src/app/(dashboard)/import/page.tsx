@@ -11,9 +11,11 @@ export default function ImportPage() {
   const [componentResult, setComponentResult] = useState<ImportResult | null>(null)
   const [skuResult, setSKUResult] = useState<ImportResult | null>(null)
   const [initialInventoryResult, setInitialInventoryResult] = useState<ImportResult | null>(null)
+  const [snapshotResult, setSnapshotResult] = useState<ImportResult | null>(null)
   const [showComponentResult, setShowComponentResult] = useState(false)
   const [showSKUResult, setShowSKUResult] = useState(false)
   const [showInitialInventoryResult, setShowInitialInventoryResult] = useState(false)
+  const [showSnapshotResult, setShowSnapshotResult] = useState(false)
 
   // Redirect if not authenticated or viewer role
   if (status === 'loading') {
@@ -57,11 +59,16 @@ export default function ImportPage() {
     setShowInitialInventoryResult(true)
   }
 
+  const handleSnapshotImport = (result: ImportResult) => {
+    setSnapshotResult(result)
+    setShowSnapshotResult(true)
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Import Data</h1>
-        <p className="text-muted-foreground">Import components, SKUs, and initial inventory from CSV files</p>
+        <p className="text-muted-foreground">Import components, SKUs, and initial inventory from CSV files, or inventory snapshots from Excel files</p>
       </div>
 
       {/* Instructions */}
@@ -95,6 +102,12 @@ export default function ImportPage() {
           description="Set opening balances for existing components with quantities and optional costs"
           onImportComplete={handleInitialInventoryImport}
         />
+        <ImportForm
+          importType="inventory-snapshot"
+          title="Inventory Snapshot (Excel)"
+          description="Import inventory snapshot from Excel file with auto-component creation and opening balances"
+          onImportComplete={handleSnapshotImport}
+        />
       </div>
 
       {/* Result Dialogs */}
@@ -115,6 +128,12 @@ export default function ImportPage() {
         onClose={() => setShowInitialInventoryResult(false)}
         result={initialInventoryResult}
         importType="initial-inventory"
+      />
+      <ImportResultDialog
+        open={showSnapshotResult}
+        onClose={() => setShowSnapshotResult(false)}
+        result={snapshotResult}
+        importType="inventory-snapshot"
       />
     </div>
   )

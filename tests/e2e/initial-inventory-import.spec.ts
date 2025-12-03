@@ -27,35 +27,37 @@ test.describe('Initial Inventory Import Feature', () => {
     await expect(page.getByRole('heading', { name: 'Initial Inventory' })).toBeVisible()
   })
 
-  test('Import page shows all three import forms', async ({ page }) => {
+  test('Import page shows all four import forms', async ({ page }) => {
     await page.goto('/import')
 
     // Wait for page to load
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    // Verify all three import form headings are visible
+    // Verify all four import form headings are visible
     await expect(page.getByRole('heading', { name: 'Components' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'SKUs' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Initial Inventory' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Inventory Snapshot/i })).toBeVisible()
   })
 
-  test('Initial Inventory form has download template and upload buttons', async ({ page }) => {
+  test('Import forms have download template and upload buttons', async ({ page }) => {
     await page.goto('/import')
 
     // Wait for page to load
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    // Count the number of "Template" buttons - should be 3 (one for each form)
+    // Count the number of "Template" buttons - should be 3 (Components, SKUs, Initial Inventory)
+    // Note: Inventory Snapshot uses Excel format info instead of template download
     const downloadButtons = page.getByRole('button', { name: /template/i })
     await expect(downloadButtons).toHaveCount(3)
 
-    // Count the number of file inputs - should be 3 (one for each form)
+    // Count the number of file inputs - should be 4 (one for each form)
     const fileInputs = page.locator('input[type="file"]')
-    await expect(fileInputs).toHaveCount(3)
+    await expect(fileInputs).toHaveCount(4)
 
-    // Verify Import buttons
+    // Verify Import buttons - should be 4 (one for each form)
     const importButtons = page.getByRole('button', { name: /import/i })
-    await expect(importButtons).toHaveCount(3)
+    await expect(importButtons).toHaveCount(4)
   })
 
   test('Page header mentions initial inventory', async ({ page }) => {
@@ -80,8 +82,8 @@ test.describe('Initial Inventory Import Feature', () => {
     // Wait for page to load
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    // Verify checkbox is visible
-    await expect(page.getByLabel('Allow Overwrite')).toBeVisible()
+    // Verify Initial Inventory checkbox is visible (using specific ID)
+    await expect(page.locator('#overwrite-initial-inventory')).toBeVisible()
   })
 
   test('Allow Overwrite checkbox is unchecked by default', async ({ page }) => {
@@ -89,8 +91,8 @@ test.describe('Initial Inventory Import Feature', () => {
 
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    // Verify checkbox is unchecked
-    const checkbox = page.getByLabel('Allow Overwrite')
+    // Verify Initial Inventory checkbox is unchecked (using specific ID)
+    const checkbox = page.locator('#overwrite-initial-inventory')
     await expect(checkbox).not.toBeChecked()
   })
 
@@ -99,7 +101,8 @@ test.describe('Initial Inventory Import Feature', () => {
 
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    const checkbox = page.getByLabel('Allow Overwrite')
+    // Use specific ID for Initial Inventory checkbox
+    const checkbox = page.locator('#overwrite-initial-inventory')
 
     // Initially unchecked
     await expect(checkbox).not.toBeChecked()
@@ -113,13 +116,17 @@ test.describe('Initial Inventory Import Feature', () => {
     await expect(checkbox).not.toBeChecked()
   })
 
-  test('Allow Overwrite checkbox only appears for Initial Inventory form', async ({ page }) => {
+  test('Allow Overwrite checkbox appears for Initial Inventory and Inventory Snapshot forms', async ({ page }) => {
     await page.goto('/import')
 
     await expect(page.locator('h1')).toContainText('Import Data')
 
-    // There should be exactly 1 "Allow Overwrite" checkbox (on Initial Inventory form only)
+    // There should be exactly 2 "Allow Overwrite" checkboxes (Initial Inventory and Inventory Snapshot)
     const checkboxes = page.getByLabel('Allow Overwrite')
-    await expect(checkboxes).toHaveCount(1)
+    await expect(checkboxes).toHaveCount(2)
+
+    // Verify each specific checkbox exists
+    await expect(page.locator('#overwrite-initial-inventory')).toBeVisible()
+    await expect(page.locator('#overwrite-inventory-snapshot')).toBeVisible()
   })
 })

@@ -22,9 +22,9 @@ export interface ImportResult {
 
 interface ImportFormProps {
   /**
-   * Type of import (components, skus, or initial-inventory)
+   * Type of import (components, skus, initial-inventory, or inventory-snapshot)
    */
-  importType: 'components' | 'skus' | 'initial-inventory'
+  importType: 'components' | 'skus' | 'initial-inventory' | 'inventory-snapshot'
   /**
    * Title for the import card
    */
@@ -89,9 +89,19 @@ export function ImportForm({
       return
     }
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      setUploadError('Please select a CSV file')
-      return
+    const isCSV = file.name.toLowerCase().endsWith('.csv')
+    const isXLSX = file.name.toLowerCase().endsWith('.xlsx')
+
+    if (importType === 'inventory-snapshot') {
+      if (!isXLSX) {
+        setUploadError('Please select an Excel (.xlsx) file')
+        return
+      }
+    } else {
+      if (!isCSV) {
+        setUploadError('Please select a CSV file')
+        return
+      }
     }
 
     setIsUploading(true)
@@ -100,7 +110,7 @@ export function ImportForm({
     try {
       const formData = new FormData()
       formData.append('file', file)
-      if (importType === 'initial-inventory') {
+      if (importType === 'initial-inventory' || importType === 'inventory-snapshot') {
         formData.append('allowOverwrite', allowOverwrite ? 'true' : 'false')
       }
 
@@ -157,38 +167,53 @@ export function ImportForm({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Download Template Section */}
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div>
-            <p className="text-sm font-medium">Download Template</p>
+        {/* Download Template Section - not shown for inventory-snapshot */}
+        {importType !== 'inventory-snapshot' && (
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">Download Template</p>
+              <p className="text-xs text-muted-foreground">
+                Get a CSV template with the correct column headers
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Template
+            </Button>
+          </div>
+        )}
+
+        {/* Format Info for inventory-snapshot */}
+        {importType === 'inventory-snapshot' && (
+          <div className="rounded-lg border bg-muted/50 p-3">
+            <p className="text-sm font-medium">Expected Format</p>
             <p className="text-xs text-muted-foreground">
-              Get a CSV template with the correct column headers
+              Excel file with columns: Item (name), Current Balance (quantity).
+              Date is extracted from filename (e.g., 2025-11-13_Inventory.xlsx).
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadTemplate}
-            disabled={isDownloading}
-          >
-            {isDownloading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Template
-          </Button>
-        </div>
+        )}
 
         {/* File Upload Section */}
         <div className="space-y-2">
-          <Label htmlFor={`file-${importType}`}>Upload CSV File</Label>
+          <Label htmlFor={`file-${importType}`}>
+            Upload {importType === 'inventory-snapshot' ? 'Excel (.xlsx)' : 'CSV'} File
+          </Label>
           <div className="flex gap-2">
             <Input
               id={`file-${importType}`}
               ref={fileInputRef}
               type="file"
-              accept=".csv"
+              accept={importType === 'inventory-snapshot' ? '.xlsx' : '.csv'}
               onChange={handleFileChange}
               className="flex-1"
             />
@@ -200,8 +225,8 @@ export function ImportForm({
           )}
         </div>
 
-        {/* Allow Overwrite Option - only for initial-inventory */}
-        {importType === 'initial-inventory' && (
+        {/* Allow Overwrite Option - for initial-inventory and inventory-snapshot */}
+        {(importType === 'initial-inventory' || importType === 'inventory-snapshot') && (
           <div className="flex items-center space-x-2">
             <Checkbox
               id={`overwrite-${importType}`}
