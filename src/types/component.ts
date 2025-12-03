@@ -1,5 +1,11 @@
 import { z } from 'zod'
 
+// Component trend data point for sparkline visualization
+export interface ComponentTrendPoint {
+  date: string
+  quantityOnHand: number
+}
+
 // Component create schema
 export const createComponentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -82,4 +88,5 @@ export interface ComponentDetailResponse extends ComponentResponse {
     quantityChange: string
     createdAt: string
   }>
+  trend?: ComponentTrendPoint[]
 }

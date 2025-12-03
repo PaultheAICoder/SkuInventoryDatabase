@@ -12,6 +12,7 @@ import {
   parseBody,
 } from '@/lib/api-response'
 import { updateComponentSchema } from '@/types/component'
+import type { ComponentTrendPoint } from '@/types/component'
 import {
   getComponentQuantity,
   calculateReorderStatus,
@@ -22,6 +23,95 @@ import { calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
+/**
+ * Calculate on-hand quantity trend for a component over a given period.
+ * Returns data points showing cumulative quantity at regular intervals.
+ */
+async function calculateComponentTrend(
+  componentId: string,
+  days: number
+): Promise<ComponentTrendPoint[]> {
+  // Get all transaction lines for this component, ordered by date
+  const transactionLines = await prisma.transactionLine.findMany({
+    where: { componentId },
+    include: {
+      transaction: {
+        select: { date: true },
+      },
+    },
+    orderBy: {
+      transaction: { date: 'asc' },
+    },
+  })
+
+  if (transactionLines.length === 0) {
+    return []
+  }
+
+  // Calculate running total grouped by date
+  const dailyTotals = new Map<string, number>()
+  let runningTotal = 0
+
+  for (const line of transactionLines) {
+    const dateStr = line.transaction.date.toISOString().split('T')[0]
+    runningTotal += line.quantityChange.toNumber()
+    dailyTotals.set(dateStr, runningTotal)
+  }
+
+  // Generate date range for the requested period
+  const today = new Date()
+  const startDate = new Date(today)
+  startDate.setDate(startDate.getDate() - days)
+  startDate.setHours(0, 0, 0, 0)
+
+  const trend: ComponentTrendPoint[] = []
+  let lastKnownQuantity = 0
+
+  // Find the quantity at startDate by looking at transactions before that date
+  const sortedDates = Array.from(dailyTotals.keys()).sort()
+  for (const dateStr of sortedDates) {
+    if (new Date(dateStr) < startDate) {
+      lastKnownQuantity = dailyTotals.get(dateStr) ?? 0
+    }
+  }
+
+  // Generate trend points for the date range
+  // Limit to ~30 points for performance (sample if more days)
+  const step = Math.max(1, Math.floor(days / 30))
+  const currentDate = new Date(startDate)
+
+  while (currentDate <= today) {
+    const dateStr = currentDate.toISOString().split('T')[0]
+
+    // Check if we have data for this date
+    if (dailyTotals.has(dateStr)) {
+      lastKnownQuantity = dailyTotals.get(dateStr)!
+    }
+
+    trend.push({
+      date: dateStr,
+      quantityOnHand: lastKnownQuantity,
+    })
+
+    currentDate.setDate(currentDate.getDate() + step)
+  }
+
+  // Ensure we include today if not already included
+  const todayStr = today.toISOString().split('T')[0]
+  const lastEntry = trend[trend.length - 1]
+  if (lastEntry && lastEntry.date !== todayStr) {
+    if (dailyTotals.has(todayStr)) {
+      lastKnownQuantity = dailyTotals.get(todayStr)!
+    }
+    trend.push({
+      date: todayStr,
+      quantityOnHand: lastKnownQuantity,
+    })
+  }
+
+  return trend
+}
+
 // GET /api/components/:id - Get component details
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
@@ -31,6 +121,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { id } = await params
+
+    // Parse optional trendDays query parameter
+    const { searchParams } = new URL(request.url)
+    const trendDaysParam = searchParams.get('trendDays')
+    const trendDays = trendDaysParam ? parseInt(trendDaysParam, 10) : null
 
     // Get company settings
     const settings = await getCompanySettings(session.user.companyId)
@@ -102,6 +197,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         maxBuildableUnits: buildableUnits.get(line.bomVersion.sku.id) ?? 0,
       }))
 
+    // Calculate trend data if requested
+    let trend: ComponentTrendPoint[] | undefined
+    if (trendDays) {
+      trend = await calculateComponentTrend(id, trendDays)
+    }
+
     return success({
       id: component.id,
       name: component.name,
@@ -133,6 +234,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         quantityChange: line.quantityChange.toString(),
         createdAt: line.transaction.createdAt.toISOString(),
       })),
+      ...(trend && { trend }),
     })
   } catch (error) {
     console.error('Error getting component:', error)

@@ -43,12 +43,20 @@ interface DashboardResponse {
 }
 
 // GET /api/dashboard - Get dashboard data
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
     }
+
+    // Parse optional days query parameter for filtering recent transactions
+    const { searchParams } = new URL(request.url)
+    const daysParam = searchParams.get('days')
+    const days = daysParam ? parseInt(daysParam, 10) : null
+    const startDate = days
+      ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      : null
 
     // Get user's brand
     const user = await prisma.user.findUnique({
@@ -166,9 +174,12 @@ export async function GET(_request: NextRequest) {
       .slice(0, 10)
       .map(({ hasBom: _hasBom, ...sku }) => sku)
 
-    // Get recent transactions
+    // Get recent transactions (with optional date filtering)
     const recentTransactions = await prisma.transaction.findMany({
-      where: { companyId: session.user.companyId },
+      where: {
+        companyId: session.user.companyId,
+        ...(startDate && { date: { gte: startDate } }),
+      },
       orderBy: { createdAt: 'desc' },
       take: 10,
       include: {

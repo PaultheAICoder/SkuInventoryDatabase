@@ -1,0 +1,13 @@
+{
+  "issue": "18",
+  "workflow_start": "2025-12-03T05:00:00.000Z",
+  "workflow_end": "2025-12-03T05:30:00.000Z",
+  "total_duration_minutes": 180.2,
+  "agents": {
+    "scout": 48,
+    "plan": 45,
+    "build": 78,
+    "test": 4.2,
+    "cleanup": 5
+  }
+}

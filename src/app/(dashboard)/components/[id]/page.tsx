@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/table'
 import { ReceiptDialog } from '@/components/features/ReceiptDialog'
 import { AdjustmentDialog } from '@/components/features/AdjustmentDialog'
+import { ComponentSparkline } from '@/components/features/ComponentSparkline'
+import { SparklineTimeFilter } from '@/components/features/SparklineTimeFilter'
 import { ArrowLeft, Edit, Package, Plus, Minus } from 'lucide-react'
 import type { ComponentDetailResponse } from '@/types/component'
 
@@ -29,10 +31,11 @@ export default function ComponentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
+  const [sparklineDays, setSparklineDays] = useState(30)
 
   const fetchComponent = useCallback(async () => {
     try {
-      const res = await fetch(`/api/components/${id}`)
+      const res = await fetch(`/api/components/${id}?trendDays=${sparklineDays}`)
       if (!res.ok) {
         if (res.status === 404) {
           throw new Error('Component not found')
@@ -46,7 +49,7 @@ export default function ComponentDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [id])
+  }, [id, sparklineDays])
 
   useEffect(() => {
     fetchComponent()
@@ -140,7 +143,10 @@ export default function ComponentDetailPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Inventory</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Inventory</CardTitle>
+              <SparklineTimeFilter value={sparklineDays} onChange={setSparklineDays} />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -148,6 +154,16 @@ export default function ComponentDetailPage() {
                 <p className="text-sm text-muted-foreground">Quantity on Hand</p>
                 <p className="text-3xl font-bold">{component.quantityOnHand.toLocaleString()}</p>
               </div>
+
+              {/* Sparkline Trend */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Trend</p>
+                <ComponentSparkline
+                  data={component.trend || []}
+                  isLoading={isLoading}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Reorder Point</p>

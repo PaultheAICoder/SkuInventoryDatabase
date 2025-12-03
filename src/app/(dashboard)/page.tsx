@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DashboardStats } from '@/components/features/DashboardStats'
 import { CriticalComponentsList } from '@/components/features/CriticalComponentsList'
 import { TopBuildableSkusList } from '@/components/features/TopBuildableSkusList'
+import { DashboardTimeFilter } from '@/components/features/DashboardTimeFilter'
 import {
   Table,
   TableBody,
@@ -55,11 +56,13 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [timeFilter, setTimeFilter] = useState<number | null>(30)
 
   useEffect(() => {
     async function fetchDashboard() {
       try {
-        const res = await fetch('/api/dashboard')
+        const url = timeFilter ? `/api/dashboard?days=${timeFilter}` : '/api/dashboard'
+        const res = await fetch(url)
         if (!res.ok) {
           throw new Error('Failed to load dashboard')
         }
@@ -72,7 +75,7 @@ export default function DashboardPage() {
       }
     }
     fetchDashboard()
-  }, [])
+  }, [timeFilter])
 
   if (isLoading) {
     return (
@@ -98,9 +101,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome to the Inventory & BOM Tracker</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome to the Inventory & BOM Tracker</p>
+        </div>
+        <DashboardTimeFilter value={timeFilter} onChange={setTimeFilter} />
       </div>
 
       <DashboardStats stats={data.componentStats} />
