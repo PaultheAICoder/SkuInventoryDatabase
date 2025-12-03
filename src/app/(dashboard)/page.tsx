@@ -132,7 +132,7 @@ export default function DashboardPage() {
                 <TableBody>
                   {data.recentTransactions.slice(0, 5).map((tx) => (
                     <TableRow key={tx.id}>
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-sm" suppressHydrationWarning>
                         {new Date(tx.date).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="capitalize">{tx.type}</TableCell>
@@ -160,6 +160,7 @@ export default function DashboardPage() {
                                 ? 'text-green-600'
                                 : 'text-red-600'
                             }`}
+                            suppressHydrationWarning
                           >
                             {parseFloat(tx.lines[0].quantityChange) >= 0 ? '+' : ''}
                             {parseFloat(tx.lines[0].quantityChange).toLocaleString()}

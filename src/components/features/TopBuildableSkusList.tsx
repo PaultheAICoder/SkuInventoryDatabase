@@ -75,7 +75,7 @@ export function TopBuildableSkusList({ skus }: TopBuildableSkusListProps) {
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-green-600'}>
+                  <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-green-600'} suppressHydrationWarning>
                     {sku.maxBuildableUnits.toLocaleString()}
                   </span>
                 </TableCell>

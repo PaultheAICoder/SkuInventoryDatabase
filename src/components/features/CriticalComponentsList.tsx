@@ -74,13 +74,13 @@ export function CriticalComponentsList({ components }: CriticalComponentsListPro
                       {component.skuCode}
                     </div>
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono" suppressHydrationWarning>
                     {component.quantityOnHand.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono" suppressHydrationWarning>
                     {component.reorderPoint.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-red-600">
+                  <TableCell className="text-right font-mono text-red-600" suppressHydrationWarning>
                     -{deficit.toLocaleString()}
                   </TableCell>
                   <TableCell>
