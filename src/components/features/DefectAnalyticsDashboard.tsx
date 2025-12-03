@@ -2,13 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Download, Loader2 } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Download, Loader2, BarChart3, Settings, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { DefectAnalyticsFilters } from './DefectAnalyticsFilters'
 import { DefectAnalyticsSummary } from './DefectAnalyticsSummary'
 import { DefectTrendChart } from './DefectTrendChart'
 import { DefectBOMComparisonChart } from './DefectBOMComparisonChart'
+import { DefectAlertsList } from './DefectAlertsList'
+import { DefectThresholdConfig } from './DefectThresholdConfig'
 import type { DefectAnalyticsResponse } from '@/types/analytics'
+import type { DefectAlertResponse } from '@/types/alert'
 
 interface FilterOptions {
   skus: Array<{ id: string; name: string; internalCode: string }>
@@ -34,7 +38,11 @@ const defaultFilters: FilterValues = {
   groupBy: 'day',
 }
 
-export function DefectAnalyticsDashboard() {
+interface DefectAnalyticsDashboardProps {
+  userRole: string
+}
+
+export function DefectAnalyticsDashboard({ userRole }: DefectAnalyticsDashboardProps) {
   const [data, setData] = useState<DefectAnalyticsResponse | null>(null)
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     skus: [],
@@ -45,6 +53,43 @@ export function DefectAnalyticsDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<DefectAlertResponse[]>([])
+  const [isAcknowledging, setIsAcknowledging] = useState(false)
+  const [activeTab, setActiveTab] = useState('analytics')
+
+  // Fetch alerts
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts/defects?acknowledged=false&limit=10')
+      if (res.ok) {
+        const result = await res.json()
+        setAlerts(result.data.alerts || [])
+      }
+    } catch (err) {
+      console.error('Error fetching alerts:', err)
+    }
+  }, [])
+
+  // Handle acknowledge alert
+  const handleAcknowledge = async (alertId: string) => {
+    setIsAcknowledging(true)
+    try {
+      const res = await fetch(`/api/alerts/defects/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledge: true }),
+      })
+
+      if (!res.ok) throw new Error('Failed to acknowledge alert')
+
+      toast.success('Alert acknowledged')
+      fetchAlerts()
+    } catch {
+      toast.error('Failed to acknowledge alert')
+    } finally {
+      setIsAcknowledging(false)
+    }
+  }
 
   // Fetch filter options
   const fetchFilterOptions = useCallback(async (skuId?: string) => {
@@ -96,6 +141,7 @@ export function DefectAnalyticsDashboard() {
   useEffect(() => {
     fetchFilterOptions()
     fetchAnalytics()
+    fetchAlerts()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update BOM versions when SKU changes
@@ -174,6 +220,8 @@ export function DefectAnalyticsDashboard() {
     }
   }
 
+  const unacknowledgedCount = alerts.length
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -199,54 +247,103 @@ export function DefectAnalyticsDashboard() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <DefectAnalyticsFilters
-        filters={filters}
-        options={filterOptions}
-        onFilterChange={handleFilterChange}
-        onApply={handleApplyFilters}
-        onClear={handleClearFilters}
-        isLoading={isLoading}
-      />
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      {/* Active Alerts Banner - Show at top when there are alerts */}
+      {unacknowledgedCount > 0 && activeTab === 'analytics' && (
+        <DefectAlertsList
+          alerts={alerts}
+          onAcknowledge={handleAcknowledge}
+          isLoading={isAcknowledging}
+        />
       )}
 
-      {/* Error State */}
-      {error && !isLoading && (
-        <div className="flex h-64 items-center justify-center text-red-500">{error}</div>
-      )}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Alerts
+            {unacknowledgedCount > 0 && (
+              <span className="ml-1 rounded-full bg-yellow-500 px-1.5 py-0.5 text-xs font-medium text-white">
+                {unacknowledgedCount}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="thresholds" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Thresholds
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Content */}
-      {data && !isLoading && !error && (
-        <>
-          {/* Summary Stats */}
-          <DefectAnalyticsSummary summary={data.summary} />
+        {/* Analytics Tab */}
+        <TabsContent value="analytics" className="space-y-6">
+          {/* Filters */}
+          <DefectAnalyticsFilters
+            filters={filters}
+            options={filterOptions}
+            onFilterChange={handleFilterChange}
+            onApply={handleApplyFilters}
+            onClear={handleClearFilters}
+            isLoading={isLoading}
+          />
 
-          {/* Charts Grid */}
-          <div className="grid gap-6 lg:grid-cols-1">
-            <DefectTrendChart data={data.trends} groupBy={data.filters.groupBy} />
-          </div>
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
 
-          <div className="grid gap-6 lg:grid-cols-1">
-            <DefectBOMComparisonChart data={data.byBOMVersion} />
-          </div>
-        </>
-      )}
+          {/* Error State */}
+          {error && !isLoading && (
+            <div className="flex h-64 items-center justify-center text-red-500">{error}</div>
+          )}
 
-      {/* No Data State */}
-      {data && data.summary.totalBuilds === 0 && !isLoading && !error && (
-        <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
-          <p className="text-lg font-medium">No build transactions found</p>
-          <p className="text-sm">
-            Try adjusting your filters or record some build transactions with defect data
-          </p>
-        </div>
-      )}
+          {/* Content */}
+          {data && !isLoading && !error && (
+            <>
+              {/* Summary Stats */}
+              <DefectAnalyticsSummary summary={data.summary} />
+
+              {/* Charts Grid */}
+              <div className="grid gap-6 lg:grid-cols-1">
+                <DefectTrendChart data={data.trends} groupBy={data.filters.groupBy} />
+              </div>
+
+              <div className="grid gap-6 lg:grid-cols-1">
+                <DefectBOMComparisonChart data={data.byBOMVersion} />
+              </div>
+            </>
+          )}
+
+          {/* No Data State */}
+          {data && data.summary.totalBuilds === 0 && !isLoading && !error && (
+            <div className="flex h-64 flex-col items-center justify-center text-muted-foreground">
+              <p className="text-lg font-medium">No build transactions found</p>
+              <p className="text-sm">
+                Try adjusting your filters or record some build transactions with defect data
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Alerts Tab */}
+        <TabsContent value="alerts" className="space-y-6">
+          <DefectAlertsList
+            alerts={alerts}
+            onAcknowledge={handleAcknowledge}
+            isLoading={isAcknowledging}
+          />
+        </TabsContent>
+
+        {/* Thresholds Tab */}
+        <TabsContent value="thresholds" className="space-y-6">
+          <DefectThresholdConfig userRole={userRole} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

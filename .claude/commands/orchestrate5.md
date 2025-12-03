@@ -1,10 +1,10 @@
 ---
-command: "/orchestrate"
+command: "/orchestrate5"
 category: "Project Orchestration"
 purpose: "Execute complete 5-agent workflow (Scout → Plan → Build → Test → Cleanup)"
 ---
 
-# Orchestrate Command - 5-Agent Workflow
+# Orchestrate5 Command - 5-Agent Workflow
 
 Execute the complete 5-agent workflow for implementing features, fixing bugs, or completing chores. This command orchestrates all agents sequentially without doing any work itself.
 
@@ -14,7 +14,7 @@ Execute the complete 5-agent workflow for implementing features, fixing bugs, or
 
 ## ⚠️ CRITICAL: ORCHESTRATION ONLY ⚠️
 
-**WHEN THE USER TYPES `/orchestrate`, YOU ARE A CONDUCTOR, NOT A PERFORMER.**
+**WHEN THE USER TYPES `/orchestrate5`, YOU ARE A CONDUCTOR, NOT A PERFORMER.**
 
 **YOU MUST:**
 - ✅ Call agents directly via Task tool
@@ -32,21 +32,21 @@ Execute the complete 5-agent workflow for implementing features, fixing bugs, or
 - ❌ Investigate bugs yourself
 - ❌ Do ANY implementation work
 
-**IF YOU CATCH YOURSELF USING Read, Write, Edit, Grep, Glob, or Bash tools directly during `/orchestrate`, YOU ARE DOING IT WRONG. STOP IMMEDIATELY AND DELEGATE TO AN AGENT.**
+**IF YOU CATCH YOURSELF USING Read, Write, Edit, Grep, Glob, or Bash tools directly during `/orchestrate5`, YOU ARE DOING IT WRONG. STOP IMMEDIATELY AND DELEGATE TO AN AGENT.**
 
 Your ONLY job is to call agents via the Task tool and report their results. Nothing more.
 
 ## Usage
 
 ```
-/orchestrate [input]
+/orchestrate5 [input]
 ```
 
 **Input can be:**
-- Plain text description: `/orchestrate Add dark mode toggle to settings`
-- Github issue: `/orchestrate gh issue #17`
-- Bug description: `/orchestrate Fix null pointer in prioritizer`
-- Multiple items: `/orchestrate Implement OAuth2 + Add user management`
+- Plain text description: `/orchestrate5 Add dark mode toggle to settings`
+- Github issue: `/orchestrate5 gh issue #17`
+- Bug description: `/orchestrate5 Fix null pointer in prioritizer`
+- Multiple items: `/orchestrate5 Implement OAuth2 + Add user management`
 
 ## Workflow Process
 
@@ -57,9 +57,9 @@ Your ONLY job is to call agents via the Task tool and report their results. Noth
 **Your Role**:
 1. Parse user input for issue number patterns:
    - GitHub URL: `https://github.com/user/trevor-inventory/issues/7` → Extract `7`
-   - Issue reference: `/orchestrate #7` → Extract `7`
-   - Issue command: `/orchestrate gh issue #7` → Extract `7`
-   - Plain text: `/orchestrate Add dark mode` → No issue number (use timestamp)
+   - Issue reference: `/orchestrate5 #7` → Extract `7`
+   - Issue command: `/orchestrate5 gh issue #7` → Extract `7`
+   - Plain text: `/orchestrate5 Add dark mode` → No issue number (use timestamp)
 
 2. Set ISSUE_NUMBER variable:
    ```bash
@@ -141,13 +141,18 @@ Follow your Scout Agent instructions to investigate and analyze this request.
 
 **Your Role**:
 1. Use Scout's AGENT_RETURN filename (from Phase 1)
-2. Call Plan agent via Task tool
-3. Report: "📋 Plan Agent starting..."
-4. Wait for Plan agent to complete
-5. **Extract AGENT_RETURN**: Plan will end with `AGENT_RETURN: plan-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
-6. Capture timing
-7. Report: "✅ Plan Agent complete"
-8. **If GitHub issue**: Post comment with brief summary
+2. Capture start timestamp:
+   ```bash
+   PLAN_START=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+   echo "⏱️ Plan Agent starting at $PLAN_START"
+   ```
+3. Call Plan agent via Task tool
+4. Report: "📋 Plan Agent starting..."
+5. Wait for Plan agent to complete
+6. **Extract AGENT_RETURN**: Plan will end with `AGENT_RETURN: plan-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
+7. Capture end timestamp and save timing
+8. Report: "✅ Plan Agent complete"
+9. **If GitHub issue**: Post comment with brief summary
 
 **Plan Task**:
 ```
@@ -169,13 +174,18 @@ Follow your Plan Agent instructions to create detailed implementation plan.
 
 **Your Role**:
 1. Use Plan's AGENT_RETURN filename (from Phase 2)
-2. Call Build agent via Task tool
-3. Report: "🔨 Build Agent starting..."
-4. Wait for Build agent to complete
-5. **Extract AGENT_RETURN**: Build will end with `AGENT_RETURN: build-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
-6. Capture timing
-7. Report: "✅ Build Agent complete"
-8. **If GitHub issue**: Post comment with brief summary
+2. Capture start timestamp:
+   ```bash
+   BUILD_START=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+   echo "⏱️ Build Agent starting at $BUILD_START"
+   ```
+3. Call Build agent via Task tool
+4. Report: "🔨 Build Agent starting..."
+5. Wait for Build agent to complete
+6. **Extract AGENT_RETURN**: Build will end with `AGENT_RETURN: build-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
+7. Capture end timestamp and save timing
+8. Report: "✅ Build Agent complete"
+9. **If GitHub issue**: Post comment with brief summary
 
 **Build Task**:
 ```
@@ -198,13 +208,18 @@ Execute subtasks in order, validate each subtask, fix all warnings.
 
 **Your Role**:
 1. Use Build's AGENT_RETURN filename (from Phase 3)
-2. Call Test agent via Task tool
-3. Report: "🧪 Test Agent starting..."
-4. Wait for Test agent to complete
-5. **Extract AGENT_RETURN**: Test will end with `AGENT_RETURN: test-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
-6. Capture timing
-7. Report: "✅ Test Agent complete"
-8. **If GitHub issue**: Post comment with brief summary
+2. Capture start timestamp:
+   ```bash
+   TEST_START=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+   echo "⏱️ Test Agent starting at $TEST_START"
+   ```
+3. Call Test agent via Task tool
+4. Report: "🧪 Test Agent starting..."
+5. Wait for Test agent to complete
+6. **Extract AGENT_RETURN**: Test will end with `AGENT_RETURN: test-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
+7. Capture end timestamp and save timing
+8. Report: "✅ Test Agent complete"
+9. **If GitHub issue**: Post comment with brief summary
 
 **Test Task**:
 ```
@@ -229,13 +244,18 @@ Resolve blockers first, create unit tests, run automated validation.
 
 **Your Role**:
 1. Use all AGENT_RETURN filenames (from Phases 1-4)
-2. Call Cleanup agent via Task tool
-3. Report: "🧹 Cleanup Agent starting..."
-4. Wait for Cleanup agent to complete
-5. **Extract AGENT_RETURN**: Cleanup will end with `AGENT_RETURN: cleanup-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
-6. Capture final timing
-7. Report: "✅ Cleanup Agent complete"
-8. **If GitHub issue**: Post comment with brief summary
+2. Capture start timestamp:
+   ```bash
+   CLEANUP_START=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+   echo "⏱️ Cleanup Agent starting at $CLEANUP_START"
+   ```
+3. Call Cleanup agent via Task tool
+4. Report: "🧹 Cleanup Agent starting..."
+5. Wait for Cleanup agent to complete
+6. **Extract AGENT_RETURN**: Cleanup will end with `AGENT_RETURN: cleanup-[ISSUE_NUMBER]-[MMDDYY]` - save this filename
+7. Capture end timestamp and save final timing
+8. Report: "✅ Cleanup Agent complete"
+9. **If GitHub issue**: Post comment with brief summary
 
 **Cleanup Task**:
 ```
@@ -321,7 +341,7 @@ Git commit and push.
 
 ### GitHub Issue Input
 
-If user provides a GitHub issue (e.g., `/orchestrate gh issue #17` or `/orchestrate #17`):
+If user provides a GitHub issue (e.g., `/orchestrate5 gh issue #17` or `/orchestrate5 #17`):
 
 1. **Extract issue number**: Parse issue number from input
 2. **Pass to Scout**: Scout reads issue via `gh issue view #[number]`
@@ -351,7 +371,7 @@ If any agent encounters a blocker:
 
 ## GitHub Issue Progress Updates
 
-When processing a GitHub issue (`/orchestrate gh issue #N`), post brief progress comments after each agent completes:
+When processing a GitHub issue (`/orchestrate5 gh issue #N`), post brief progress comments after each agent completes:
 
 1. **🔍 Scout**: What was discovered about the issue (2-3 sentences)
 2. **📋 Plan**: Number of tasks, estimated effort, key changes
@@ -363,7 +383,7 @@ When processing a GitHub issue (`/orchestrate gh issue #N`), post brief progress
 
 1. **🚨 ORCHESTRATION ONLY - NO DIRECT WORK 🚨**:
    - You are a CONDUCTOR, not a performer
-   - Your ONLY allowed tools during `/orchestrate` are: Task (to call agents) and Read (ONLY to read agent output files)
+   - Your ONLY allowed tools during `/orchestrate5` are: Task (to call agents) and Read (ONLY to read agent output files)
    - All investigation, implementation, testing, and documentation MUST be done by agents via the Task tool
 
 2. **SEQUENTIAL EXECUTION**: Each agent must complete before next starts
@@ -394,15 +414,15 @@ When processing a GitHub issue (`/orchestrate gh issue #N`), post brief progress
 
 ```bash
 # Bug fix from GitHub issue
-/orchestrate gh issue #7
-/orchestrate #7
+/orchestrate5 gh issue #7
+/orchestrate5 #7
 
 # Bug fix from description
-/orchestrate Fix type mismatch in src/services/inventory.ts causing query errors
+/orchestrate5 Fix type mismatch in src/services/inventory.ts causing query errors
 
 # Feature from plain text
-/orchestrate Add CSV export functionality for component inventory
+/orchestrate5 Add CSV export functionality for component inventory
 
 # Multiple related items
-/orchestrate Fix component quantities + Add bulk update + Update audit logging
+/orchestrate5 Fix component quantities + Add bulk update + Update audit logging
 ```

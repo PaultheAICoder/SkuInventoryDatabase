@@ -11,6 +11,11 @@ export const companySettingsSchema = z.object({
   dateFormat: z.enum(['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD']).default('MM/DD/YYYY'),
   currencySymbol: z.string().max(5).default('$'),
   decimalPlaces: z.coerce.number().int().min(0).max(4).default(2),
+
+  // Quality alert settings
+  defectRateWarningThreshold: z.coerce.number().min(0).max(100).default(5),
+  defectRateCriticalThreshold: z.coerce.number().min(0).max(100).default(10),
+  enableDefectAlerts: z.boolean().default(true),
 })
 
 export type CompanySettings = z.infer<typeof companySettingsSchema>
@@ -28,6 +33,9 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   dateFormat: 'MM/DD/YYYY',
   currencySymbol: '$',
   decimalPlaces: 2,
+  defectRateWarningThreshold: 5,
+  defectRateCriticalThreshold: 10,
+  enableDefectAlerts: true,
 }
 
 // Settings response type

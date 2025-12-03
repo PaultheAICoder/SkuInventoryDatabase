@@ -17,10 +17,11 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  brands         Brand[]
-  users          User[]
-  transactions   Transaction[]
-  securityEvents SecurityEvent[]
+  brands           Brand[]
+  users            User[]
+  transactions     Transaction[]
+  securityEvents   SecurityEvent[]
+  defectThresholds DefectThreshold[]
 }
 
 model Brand {
@@ -59,13 +60,17 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   // Audit relations
-  componentsCreated Component[] @relation("ComponentCreatedBy")
-  componentsUpdated Component[] @relation("ComponentUpdatedBy")
-  skusCreated       SKU[]       @relation("SKUCreatedBy")
-  skusUpdated       SKU[]       @relation("SKUUpdatedBy")
+  componentsCreated Component[]     @relation("ComponentCreatedBy")
+  componentsUpdated Component[]     @relation("ComponentUpdatedBy")
+  skusCreated       SKU[]           @relation("SKUCreatedBy")
+  skusUpdated       SKU[]           @relation("SKUUpdatedBy")
   bomVersions       BOMVersion[]
   transactions      Transaction[]
   securityEvents    SecurityEvent[]
+
+  // Defect alert relations
+  thresholdsCreated  DefectThreshold[] @relation("ThresholdCreatedBy")
+  alertsAcknowledged DefectAlert[]     @relation("AlertAcknowledgedBy")
 
   @@index([companyId, isActive])
 }
@@ -126,30 +131,31 @@ enum TransactionType {
 }
 
 model Transaction {
-  id           String          @id @default(uuid())
-  companyId    String
-  company      Company         @relation(fields: [companyId], references: [id])
-  type         TransactionType
-  date         DateTime        @db.Date
-  skuId        String?
-  sku          SKU?            @relation(fields: [skuId], references: [id])
-  bomVersionId String?
-  bomVersion   BOMVersion?     @relation(fields: [bomVersionId], references: [id])
-  salesChannel String?         @db.VarChar(50)
-  unitsBuild   Int?
-  unitBomCost  Decimal?        @db.Decimal(10, 4)
-  totalBomCost Decimal?        @db.Decimal(10, 4)
-  supplier     String?         @db.VarChar(100)
-  reason       String?         @db.VarChar(200)
-  notes        String?         @db.Text
-  defectCount    Int?
-  defectNotes    String?  @db.Text
-  affectedUnits  Int?
-  createdAt    DateTime        @default(now())
-  createdById  String
-  createdBy    User            @relation(fields: [createdById], references: [id])
+  id            String          @id @default(uuid())
+  companyId     String
+  company       Company         @relation(fields: [companyId], references: [id])
+  type          TransactionType
+  date          DateTime        @db.Date
+  skuId         String?
+  sku           SKU?            @relation(fields: [skuId], references: [id])
+  bomVersionId  String?
+  bomVersion    BOMVersion?     @relation(fields: [bomVersionId], references: [id])
+  salesChannel  String?         @db.VarChar(50)
+  unitsBuild    Int?
+  unitBomCost   Decimal?        @db.Decimal(10, 4)
+  totalBomCost  Decimal?        @db.Decimal(10, 4)
+  supplier      String?         @db.VarChar(100)
+  reason        String?         @db.VarChar(200)
+  notes         String?         @db.Text
+  defectCount   Int?
+  defectNotes   String?         @db.Text
+  affectedUnits Int?
+  createdAt     DateTime        @default(now())
+  createdById   String
+  createdBy     User            @relation(fields: [createdById], references: [id])
 
-  lines TransactionLine[]
+  lines        TransactionLine[]
+  defectAlerts DefectAlert[]
 
   @@index([companyId, createdAt(sort: Desc)])
   @@index([skuId])
@@ -189,8 +195,10 @@ model SKU {
   updatedById  String
   updatedBy    User     @relation("SKUUpdatedBy", fields: [updatedById], references: [id])
 
-  bomVersions  BOMVersion[]
-  transactions Transaction[]
+  bomVersions      BOMVersion[]
+  transactions     Transaction[]
+  defectThresholds DefectThreshold[]
+  defectAlerts     DefectAlert[]
 
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
@@ -228,4 +236,49 @@ model BOMLine {
   notes           String?    @db.Text
 
   @@unique([bomVersionId, componentId])
+}
+
+// ============================================
+// Defect Threshold & Alert Entities
+// ============================================
+
+model DefectThreshold {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  skuId             String? // null = global threshold for company
+  sku               SKU?     @relation(fields: [skuId], references: [id])
+  defectRateLimit   Decimal  @db.Decimal(5, 2) // e.g., 5.00 = 5%
+  affectedRateLimit Decimal? @db.Decimal(5, 2) // optional secondary threshold
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String
+  createdBy         User     @relation("ThresholdCreatedBy", fields: [createdById], references: [id])
+
+  alerts DefectAlert[]
+
+  @@unique([companyId, skuId])
+  @@index([companyId, isActive])
+}
+
+model DefectAlert {
+  id               String          @id @default(uuid())
+  thresholdId      String
+  threshold        DefectThreshold @relation(fields: [thresholdId], references: [id])
+  transactionId    String
+  transaction      Transaction     @relation(fields: [transactionId], references: [id])
+  skuId            String
+  sku              SKU             @relation(fields: [skuId], references: [id])
+  defectRate       Decimal         @db.Decimal(5, 2)
+  thresholdValue   Decimal         @db.Decimal(5, 2)
+  severity         String          @db.VarChar(20) // 'warning' | 'critical'
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  acknowledgedBy   User?           @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
+  createdAt        DateTime        @default(now())
+
+  @@index([thresholdId, createdAt(sort: Desc)])
+  @@index([skuId, createdAt(sort: Desc)])
+  @@index([acknowledgedAt])
 }

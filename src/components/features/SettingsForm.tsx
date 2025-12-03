@@ -207,6 +207,87 @@ export function SettingsForm({ settings, companyName, onSave }: SettingsFormProp
         </CardContent>
       </Card>
 
+      {/* Quality Alert Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quality Alerts</CardTitle>
+          <CardDescription>Configure defect rate monitoring and alert thresholds</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <input
+              id="enableDefectAlerts"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={formData.enableDefectAlerts}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, enableDefectAlerts: e.target.checked }))
+              }
+            />
+            <div>
+              <Label htmlFor="enableDefectAlerts" className="font-normal">
+                Enable Defect Alerts
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Generate alerts when defect rates exceed configured thresholds
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="defectRateWarningThreshold">Warning Threshold (%)</Label>
+              <Input
+                id="defectRateWarningThreshold"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={formData.defectRateWarningThreshold}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    defectRateWarningThreshold: parseFloat(e.target.value) || 5,
+                  }))
+                }
+                disabled={!formData.enableDefectAlerts}
+              />
+              <p className="text-xs text-muted-foreground">
+                Defect rates above this will trigger warning alerts
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defectRateCriticalThreshold">Critical Threshold (%)</Label>
+              <Input
+                id="defectRateCriticalThreshold"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={formData.defectRateCriticalThreshold}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    defectRateCriticalThreshold: parseFloat(e.target.value) || 10,
+                  }))
+                }
+                disabled={!formData.enableDefectAlerts}
+              />
+              <p className="text-xs text-muted-foreground">
+                Defect rates above this will trigger critical alerts
+              </p>
+            </div>
+          </div>
+
+          {formData.defectRateWarningThreshold >= formData.defectRateCriticalThreshold && (
+            <p className="text-sm text-yellow-600">
+              Warning: Warning threshold should be lower than critical threshold
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end">
         <Button type="submit" disabled={isLoading}>
           {isLoading ? 'Saving...' : 'Save Settings'}

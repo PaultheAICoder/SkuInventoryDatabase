@@ -6,6 +6,7 @@ import {
   DEFAULT_SETTINGS,
   type CompanySettings,
 } from '@/types/settings'
+import { evaluateDefectThreshold } from './alert'
 
 /**
  * Fetch and merge company settings with defaults
@@ -539,6 +540,24 @@ export async function createBuildTransaction(params: {
       },
     },
   })
+
+  // Evaluate defect threshold if defects were recorded
+  if (defectCount && defectCount > 0 && unitsToBuild > 0) {
+    const defectRate = (defectCount / unitsToBuild) * 100
+    try {
+      await evaluateDefectThreshold({
+        transactionId: transaction.id,
+        skuId,
+        defectRate,
+        companyId,
+        unitsBuild: unitsToBuild,
+        defectCount,
+      })
+    } catch (error) {
+      // Log but don't fail the build transaction
+      console.error('Error evaluating defect threshold:', error)
+    }
+  }
 
   return {
     transaction: transaction as unknown as BuildTransactionResult,
