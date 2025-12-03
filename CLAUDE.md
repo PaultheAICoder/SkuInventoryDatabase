@@ -33,13 +33,11 @@ TypeScript 5.x (full-stack): Follow standard conventions
 
 | Service | Port | Description |
 |---------|------|-------------|
-| **App URL** | **4543** | **HTTPS entry point (use this)** |
+| **App URL** | **4545** | **HTTP entry point (use this)** |
 | App (internal) | 4500 | Next.js internal (not exposed) |
 | PostgreSQL | 4546 | Database |
-| Nginx (HTTP) | 4580 | Redirects to HTTPS |
-| Nginx (HTTPS) | 4543 | Reverse proxy with SSL |
 
-**Access the app at: https://172.16.20.50:4543**
+**Access the app at: http://172.16.20.50:4545**
 
 **Do NOT use common ports like 3000, 5432, 80, 443, etc.** Always prefix with 45.
 

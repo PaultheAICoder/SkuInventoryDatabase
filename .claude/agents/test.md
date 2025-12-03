@@ -107,7 +107,7 @@ npm run test:e2e -- --headed
 ```
 
 **E2E Test Requirements**:
-- Tests run against the Docker production deployment (https://172.16.20.50:4543)
+- Tests run against the Docker production deployment (http://172.16.20.50:4545)
 - Tests must login using test credentials before accessing dashboard pages
 - Create new E2E tests in `tests/e2e/` for new UI features
 - Take screenshots on failure for debugging
@@ -125,7 +125,7 @@ npm run test:e2e -- --headed
 3. Wait for container to be healthy before re-running tests
 
 ### Step 6: Manual Verification (if E2E tests insufficient)
-- Access app at https://172.16.20.50:4543
+- Access app at http://172.16.20.50:4545
 - Login flow works
 - CRUD operations work
 - Check for JS console errors
