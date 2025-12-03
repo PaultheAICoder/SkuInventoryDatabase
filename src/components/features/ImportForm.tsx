@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -48,6 +49,7 @@ export function ImportForm({
   const [isUploading, setIsUploading] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [allowOverwrite, setAllowOverwrite] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,6 +100,9 @@ export function ImportForm({
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (importType === 'initial-inventory') {
+        formData.append('allowOverwrite', allowOverwrite ? 'true' : 'false')
+      }
 
       const response = await fetch(`/api/import/${importType}`, {
         method: 'POST',
@@ -126,6 +131,7 @@ export function ImportForm({
 
       // Reset form
       setFile(null)
+      setAllowOverwrite(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -193,6 +199,28 @@ export function ImportForm({
             </p>
           )}
         </div>
+
+        {/* Allow Overwrite Option - only for initial-inventory */}
+        {importType === 'initial-inventory' && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`overwrite-${importType}`}
+              checked={allowOverwrite}
+              onCheckedChange={(checked) => setAllowOverwrite(checked === true)}
+            />
+            <div className="grid gap-1.5 leading-none">
+              <label
+                htmlFor={`overwrite-${importType}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Allow Overwrite
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Replace existing initial inventory transactions for components that already have one
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {uploadError && (

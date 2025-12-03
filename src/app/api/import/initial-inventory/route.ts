@@ -13,6 +13,7 @@ import { createInitialTransaction } from '@/services/inventory'
 interface InitialInventoryImportResult {
   total: number
   imported: number
+  overwritten: number
   skipped: number
   errors: Array<{
     rowNumber: number
@@ -60,9 +61,17 @@ export async function POST(request: NextRequest) {
       }
 
       csvContent = await file.text()
+
+      // Extract allowOverwrite parameter (for re-importing)
+      const allowOverwriteParam = formData.get('allowOverwrite')
+      const allowOverwrite = allowOverwriteParam === 'true' || allowOverwriteParam === '1'
+      ;(request as NextRequest & { allowOverwrite?: boolean }).allowOverwrite = allowOverwrite
     } else {
       csvContent = await request.text()
     }
+
+    // Get allowOverwrite flag (set from form data processing above, defaults to false)
+    const allowOverwrite = (request as NextRequest & { allowOverwrite?: boolean }).allowOverwrite ?? false
 
     if (!csvContent.trim()) {
       return error('Empty file provided', 400)
@@ -75,6 +84,7 @@ export async function POST(request: NextRequest) {
     const result: InitialInventoryImportResult = {
       total: importSummary.total,
       imported: 0,
+      overwritten: 0,
       skipped: 0,
       errors: [],
     }
@@ -123,15 +133,27 @@ export async function POST(request: NextRequest) {
         })
 
         if (existingInitial) {
-          result.skipped++
-          result.errors.push({
-            rowNumber: row.rowNumber,
-            componentSkuCode: rowData.componentSkuCode,
-            errors: [
-              `Component "${rowData.componentSkuCode}" already has an initial inventory transaction`,
-            ],
-          })
-          continue
+          if (allowOverwrite) {
+            // Delete existing transaction (cascade deletes lines)
+            await prisma.transaction.delete({
+              where: { id: existingInitial.id },
+            })
+            // Log for audit trail
+            console.log(
+              `Overwriting initial transaction ${existingInitial.id} for component ${rowData.componentSkuCode}`
+            )
+            result.overwritten++
+          } else {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              componentSkuCode: rowData.componentSkuCode,
+              errors: [
+                `Component "${rowData.componentSkuCode}" already has an initial inventory transaction (use "Allow Overwrite" to replace)`,
+              ],
+            })
+            continue
+          }
         }
 
         // Create initial transaction

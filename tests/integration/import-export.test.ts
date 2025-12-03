@@ -86,6 +86,40 @@ describe('Import API', () => {
     })
   })
 
+  describe('POST /api/import/initial-inventory', () => {
+    it('documents allowOverwrite parameter behavior', () => {
+      // When allowOverwrite=false (default):
+      // - Components with existing initial transactions are skipped
+      // - Error message suggests using "Allow Overwrite" option
+      //
+      // When allowOverwrite=true:
+      // - Existing initial transactions are deleted first
+      // - New transaction is created
+      // - Old transaction ID is logged for audit trail
+      // - Response includes "overwritten" count
+      expect(true).toBe(true)
+    })
+
+    it('documents response format with overwrite count', () => {
+      // Response includes:
+      // {
+      //   total: number,
+      //   imported: number,
+      //   overwritten: number,  // NEW: count of replaced transactions
+      //   skipped: number,
+      //   errors: [...]
+      // }
+      expect(true).toBe(true)
+    })
+
+    it('documents cascade delete behavior', () => {
+      // When a Transaction is deleted:
+      // - Associated TransactionLines are automatically deleted (onDelete: Cascade)
+      // - No orphaned records remain
+      expect(true).toBe(true)
+    })
+  })
+
   describe('POST /api/import/skus', () => {
     it('documents SKU import flow', () => {
       // Similar to component import but for SKUs

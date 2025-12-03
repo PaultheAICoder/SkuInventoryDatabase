@@ -73,4 +73,53 @@ test.describe('Initial Inventory Import Feature', () => {
       page.getByText('Set opening balances for existing components with quantities and optional costs')
     ).toBeVisible()
   })
+
+  test('Initial Inventory form displays "Allow Overwrite" checkbox', async ({ page }) => {
+    await page.goto('/import')
+
+    // Wait for page to load
+    await expect(page.locator('h1')).toContainText('Import Data')
+
+    // Verify checkbox is visible
+    await expect(page.getByLabel('Allow Overwrite')).toBeVisible()
+  })
+
+  test('Allow Overwrite checkbox is unchecked by default', async ({ page }) => {
+    await page.goto('/import')
+
+    await expect(page.locator('h1')).toContainText('Import Data')
+
+    // Verify checkbox is unchecked
+    const checkbox = page.getByLabel('Allow Overwrite')
+    await expect(checkbox).not.toBeChecked()
+  })
+
+  test('Allow Overwrite checkbox can be toggled', async ({ page }) => {
+    await page.goto('/import')
+
+    await expect(page.locator('h1')).toContainText('Import Data')
+
+    const checkbox = page.getByLabel('Allow Overwrite')
+
+    // Initially unchecked
+    await expect(checkbox).not.toBeChecked()
+
+    // Click to check
+    await checkbox.click()
+    await expect(checkbox).toBeChecked()
+
+    // Click to uncheck
+    await checkbox.click()
+    await expect(checkbox).not.toBeChecked()
+  })
+
+  test('Allow Overwrite checkbox only appears for Initial Inventory form', async ({ page }) => {
+    await page.goto('/import')
+
+    await expect(page.locator('h1')).toContainText('Import Data')
+
+    // There should be exactly 1 "Allow Overwrite" checkbox (on Initial Inventory form only)
+    const checkboxes = page.getByLabel('Allow Overwrite')
+    await expect(checkboxes).toHaveCount(1)
+  })
 })
