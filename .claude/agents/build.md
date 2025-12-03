@@ -118,7 +118,40 @@ Before marking complete, verify new code actually runs:
 - Execute new endpoints: `curl` or manual verification
 - Check for TypeScript errors
 
-### 8. Final Completion Verification
+### 8. Docker Container Rebuild (MANDATORY)
+
+**After all code changes are complete and validated locally, you MUST rebuild the Docker container.**
+
+```bash
+cd /home/pbrown/SkuInventory/docker
+
+# Rebuild the app container with new code
+docker compose -f docker-compose.prod.yml build app
+
+# Restart the app service to pick up changes
+docker compose -f docker-compose.prod.yml up -d app
+
+# Verify the container started successfully
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs app --tail=50
+```
+
+**CRITICAL: ALL errors and warnings during Docker rebuild MUST be resolved.**
+
+- Build failures → Debug and fix the root cause
+- Runtime errors in logs → Debug and fix the application code
+- Container health check failures → Investigate and resolve
+- Deprecation warnings → Address them, do not ignore
+
+**The Build agent's work is NOT complete until:**
+1. `docker compose build app` completes with zero errors
+2. `docker compose up -d app` starts successfully
+3. Container health check passes (check with `docker compose ps`)
+4. Application logs show no errors or warnings
+
+**Do NOT hand off to Test agent with a broken or unhealthy container.**
+
+### 9. Final Completion Verification
 - [ ] All phases addressed
 - [ ] All subtasks in build-output.md
 - [ ] File count matches Plan
@@ -128,6 +161,9 @@ Before marking complete, verify new code actually runs:
 - [ ] TypeScript compiles with ZERO WARNINGS
 - [ ] No stubbed code (search TODO, FIXME)
 - [ ] Pre-handoff verification passed
+- [ ] Docker container rebuilt successfully
+- [ ] Docker container healthy and running
+- [ ] Container logs show no errors or warnings
 
 ## Context Management
 
