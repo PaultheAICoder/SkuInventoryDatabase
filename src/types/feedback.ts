@@ -40,3 +40,19 @@ export interface RateLimitEntry {
   count: number
   resetAt: Date
 }
+
+// Claude Code headless mode response
+export interface ClaudeCodeResponse {
+  success: boolean
+  issueTitle: string
+  issueBody: string
+  error?: string
+  duration?: number
+}
+
+// Issue enhancement request
+export interface EnhanceIssueRequest {
+  type: FeedbackType
+  description: string
+  answers: string[]
+}

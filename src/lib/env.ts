@@ -6,6 +6,7 @@ const envSchema = z.object({
   NEXTAUTH_URL: z.string().url().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  CLAUDE_CODE_PATH: z.string().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>
