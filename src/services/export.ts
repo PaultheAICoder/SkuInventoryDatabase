@@ -131,6 +131,9 @@ export interface TransactionExportData {
   supplier: string | null
   reason: string | null
   notes: string | null
+  defectCount: number | null
+  defectNotes: string | null
+  affectedUnits: number | null
   createdAt: string
   createdByName: string
   // Flattened component lines
@@ -157,6 +160,9 @@ export const transactionExportColumns: CSVColumn<TransactionExportData>[] = [
   { header: 'Supplier', accessor: (t) => t.supplier },
   { header: 'Reason', accessor: (t) => t.reason },
   { header: 'Notes', accessor: (t) => t.notes },
+  { header: 'Defect Count', accessor: (t) => t.defectCount },
+  { header: 'Defect Notes', accessor: (t) => t.defectNotes },
+  { header: 'Affected Units', accessor: (t) => t.affectedUnits },
   { header: 'Created At', accessor: (t) => t.createdAt },
   { header: 'Created By', accessor: (t) => t.createdByName },
 ]

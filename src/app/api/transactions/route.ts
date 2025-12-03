@@ -76,6 +76,9 @@ export async function GET(request: NextRequest) {
       supplier: tx.supplier,
       reason: tx.reason,
       notes: tx.notes,
+      defectCount: tx.defectCount,
+      defectNotes: tx.defectNotes,
+      affectedUnits: tx.affectedUnits,
       createdAt: tx.createdAt.toISOString(),
       createdBy: tx.createdBy,
       lines: tx.lines.map((line) => ({

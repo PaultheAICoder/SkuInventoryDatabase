@@ -398,6 +398,9 @@ export interface BuildTransactionResult {
   unitBomCost: { toString(): string } | null
   totalBomCost: { toString(): string } | null
   notes: string | null
+  defectCount: number | null
+  defectNotes: string | null
+  affectedUnits: number | null
   createdAt: Date
   createdBy: { id: string; name: string }
   lines: Array<{
@@ -420,6 +423,9 @@ export async function createBuildTransaction(params: {
   salesChannel?: string
   date: Date
   notes?: string | null
+  defectCount?: number | null
+  defectNotes?: string | null
+  affectedUnits?: number | null
   createdById: string
   allowInsufficientInventory?: boolean
 }): Promise<{
@@ -435,6 +441,9 @@ export async function createBuildTransaction(params: {
     salesChannel,
     date,
     notes,
+    defectCount,
+    defectNotes,
+    affectedUnits,
     createdById,
     allowInsufficientInventory = false,
   } = params
@@ -485,6 +494,9 @@ export async function createBuildTransaction(params: {
       unitBomCost: new Prisma.Decimal(unitBomCost),
       totalBomCost: new Prisma.Decimal(totalBomCost),
       notes,
+      defectCount,
+      defectNotes,
+      affectedUnits,
       createdById,
       lines: {
         create: bomLines.map((line) => ({

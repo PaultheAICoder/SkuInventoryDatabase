@@ -52,6 +52,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
     effectiveStartDate: new Date().toISOString().split('T')[0],
     isActive: false,
     notes: '',
+    defectNotes: '',
   })
 
   const [lines, setLines] = useState<BOMLine[]>([])
@@ -136,6 +137,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
           effectiveStartDate: formData.effectiveStartDate,
           isActive: formData.isActive,
           notes: formData.notes || null,
+          defectNotes: formData.defectNotes || null,
           lines: lines.map((line) => ({
             componentId: line.componentId,
             quantityPerUnit: parseFloat(line.quantityPerUnit),
@@ -226,6 +228,17 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
               value={formData.notes}
               onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
               placeholder="Reason for this version..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="defectNotes">Defect Notes</Label>
+            <textarea
+              id="defectNotes"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={formData.defectNotes}
+              onChange={(e) => setFormData((prev) => ({ ...prev, defectNotes: e.target.value }))}
+              placeholder="Document any known defects or quality issues with this BOM version..."
             />
           </div>
 

@@ -41,6 +41,9 @@ interface TransactionDetailProps {
     supplier: string | null
     reason: string | null
     notes: string | null
+    defectCount: number | null
+    defectNotes: string | null
+    affectedUnits: number | null
     createdAt: string
     createdBy: { id: string; name: string }
     lines: TransactionLine[]
@@ -179,6 +182,33 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
               <div className="md:col-span-2 lg:col-span-3">
                 <p className="text-sm text-muted-foreground">Notes</p>
                 <p className="text-sm">{transaction.notes}</p>
+              </div>
+            )}
+
+            {/* Defect Info (for build transactions with defect data) */}
+            {transaction.type === 'build' && (transaction.defectCount || transaction.defectNotes || transaction.affectedUnits) && (
+              <div className="md:col-span-2 lg:col-span-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-sm font-medium text-yellow-800 mb-2">Defect Information</p>
+                <div className="grid gap-2 md:grid-cols-3">
+                  {transaction.defectCount != null && (
+                    <div>
+                      <p className="text-xs text-yellow-700">Defect Count</p>
+                      <p className="font-medium text-yellow-900">{transaction.defectCount}</p>
+                    </div>
+                  )}
+                  {transaction.affectedUnits != null && (
+                    <div>
+                      <p className="text-xs text-yellow-700">Affected Units</p>
+                      <p className="font-medium text-yellow-900">{transaction.affectedUnits}</p>
+                    </div>
+                  )}
+                  {transaction.defectNotes && (
+                    <div className="md:col-span-3">
+                      <p className="text-xs text-yellow-700">Defect Notes</p>
+                      <p className="text-sm text-yellow-900">{transaction.defectNotes}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

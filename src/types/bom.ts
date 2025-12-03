@@ -15,6 +15,8 @@ export const createBOMVersionSchema = z.object({
   effectiveStartDate: z.coerce.date(),
   isActive: z.boolean().default(false),
   notes: z.string().optional().nullable(),
+  defectNotes: z.string().optional().nullable(),
+  qualityMetadata: z.record(z.string(), z.unknown()).optional().default({}),
   lines: z.array(bomLineSchema).min(1, 'At least one component is required'),
 })
 
@@ -62,6 +64,8 @@ export interface BOMVersionResponse {
   effectiveEndDate: string | null
   isActive: boolean
   notes: string | null
+  defectNotes: string | null
+  qualityMetadata: Record<string, unknown>
   unitCost: string
   lines: BOMLineResponse[]
   createdAt: string

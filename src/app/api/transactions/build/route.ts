@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
         salesChannel: data.salesChannel,
         date: data.date,
         notes: data.notes,
+        defectCount: data.defectCount,
+        defectNotes: data.defectNotes,
+        affectedUnits: data.affectedUnits,
         createdById: session.user.id,
         allowInsufficientInventory: allowInsufficient,
       })
@@ -83,6 +86,9 @@ export async function POST(request: NextRequest) {
           unitBomCost: result.transaction.unitBomCost?.toString() ?? null,
           totalBomCost: result.transaction.totalBomCost?.toString() ?? null,
           notes: result.transaction.notes,
+          defectCount: result.transaction.defectCount,
+          defectNotes: result.transaction.defectNotes,
+          affectedUnits: result.transaction.affectedUnits,
           createdAt: result.transaction.createdAt.toISOString(),
           createdBy: result.transaction.createdBy,
           lines: result.transaction.lines.map((line) => ({

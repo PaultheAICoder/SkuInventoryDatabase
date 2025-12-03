@@ -94,6 +94,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         effectiveEndDate: version.effectiveEndDate?.toISOString().split('T')[0] ?? null,
         isActive: version.isActive,
         notes: version.notes,
+        defectNotes: version.defectNotes,
+        qualityMetadata: version.qualityMetadata as Record<string, unknown>,
         unitCost: unitCost.toFixed(4),
         lines: version.lines.map((line) => ({
           id: line.id,
@@ -173,6 +175,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       effectiveStartDate: data.effectiveStartDate,
       isActive: data.isActive,
       notes: data.notes,
+      defectNotes: data.defectNotes,
+      qualityMetadata: data.qualityMetadata,
       lines: data.lines,
       createdById: session.user.id,
     })
@@ -191,6 +195,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
+      defectNotes: bomVersion.defectNotes,
+      qualityMetadata: bomVersion.qualityMetadata as Record<string, unknown>,
       unitCost: unitCost.toFixed(4),
       lines: bomVersion.lines.map((line) => ({
         id: line.id,

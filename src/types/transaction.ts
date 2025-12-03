@@ -43,6 +43,9 @@ export const createBuildSchema = z.object({
   unitsToBuild: z.coerce.number().int().positive('Units must be positive'),
   salesChannel: z.string().optional(),
   notes: z.string().optional().nullable(),
+  defectCount: z.coerce.number().int().nonnegative().optional().nullable(),
+  defectNotes: z.string().optional().nullable(),
+  affectedUnits: z.coerce.number().int().nonnegative().optional().nullable(),
   allowInsufficientInventory: z.boolean().default(false),
 })
 
@@ -94,6 +97,9 @@ export interface TransactionResponse {
   supplier: string | null
   reason: string | null
   notes: string | null
+  defectCount: number | null
+  defectNotes: string | null
+  affectedUnits: number | null
   createdAt: string
   createdBy: { id: string; name: string }
   lines: TransactionLineResponse[]

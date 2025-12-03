@@ -52,6 +52,9 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     unitsToBuild: '',
     salesChannel: '',
     notes: '',
+    defectCount: '',
+    defectNotes: '',
+    affectedUnits: '',
   })
 
   // Fetch SKUs when dialog opens
@@ -116,6 +119,9 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           unitsToBuild: parseInt(formData.unitsToBuild),
           salesChannel: formData.salesChannel || undefined,
           notes: formData.notes || null,
+          defectCount: formData.defectCount ? parseInt(formData.defectCount) : null,
+          defectNotes: formData.defectNotes || null,
+          affectedUnits: formData.affectedUnits ? parseInt(formData.affectedUnits) : null,
           allowInsufficientInventory: forceSubmit,
         }),
       })
@@ -147,6 +153,9 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         unitsToBuild: '',
         salesChannel: '',
         notes: '',
+        defectCount: '',
+        defectNotes: '',
+        affectedUnits: '',
       })
       setInsufficientItems([])
       setShowWarning(false)
@@ -322,6 +331,65 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
               />
             </div>
+
+            {/* Defect Tracking (collapsible) */}
+            <details className="col-span-4">
+              <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                Defect Tracking (optional)
+              </summary>
+              <div className="mt-4 space-y-4 pl-4 border-l-2 border-muted">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="defectCount" className="text-right">
+                    Defects
+                  </Label>
+                  <Input
+                    id="defectCount"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="col-span-3"
+                    placeholder="Number of defective units"
+                    value={formData.defectCount}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, defectCount: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="affectedUnits" className="text-right">
+                    Affected
+                  </Label>
+                  <Input
+                    id="affectedUnits"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="col-span-3"
+                    placeholder="Number of affected units"
+                    value={formData.affectedUnits}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, affectedUnits: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="defectNotes" className="text-right">
+                    Notes
+                  </Label>
+                  <Input
+                    id="defectNotes"
+                    className="col-span-3"
+                    placeholder="Description of defects..."
+                    value={formData.defectNotes}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, defectNotes: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </details>
           </div>
 
           {!showWarning && (

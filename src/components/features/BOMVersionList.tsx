@@ -183,6 +183,12 @@ export function BOMVersionList({ versions, skuId, onRefresh }: BOMVersionListPro
                   {version.notes && (
                     <p className="text-sm text-muted-foreground mb-4">{version.notes}</p>
                   )}
+                  {version.defectNotes && (
+                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm font-medium text-yellow-800">Defect Notes</p>
+                      <p className="text-sm text-yellow-700">{version.defectNotes}</p>
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>

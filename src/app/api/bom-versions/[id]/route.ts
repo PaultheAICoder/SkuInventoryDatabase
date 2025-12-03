@@ -78,6 +78,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
+      defectNotes: bomVersion.defectNotes,
+      qualityMetadata: bomVersion.qualityMetadata as Record<string, unknown>,
       unitCost: unitCost.toFixed(4),
       lines: bomVersion.lines.map((line) => ({
         id: line.id,

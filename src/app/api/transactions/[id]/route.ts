@@ -75,6 +75,9 @@ export async function GET(
         supplier: transaction.supplier,
         reason: transaction.reason,
         notes: transaction.notes,
+        defectCount: transaction.defectCount,
+        defectNotes: transaction.defectNotes,
+        affectedUnits: transaction.affectedUnits,
         createdAt: transaction.createdAt.toISOString(),
         createdBy: transaction.createdBy,
         lines: transaction.lines.map((line) => ({

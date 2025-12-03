@@ -170,6 +170,8 @@ export async function createBOMVersion(params: {
   effectiveStartDate: Date
   isActive: boolean
   notes?: string | null
+  defectNotes?: string | null
+  qualityMetadata?: Record<string, unknown>
   lines: Array<{
     componentId: string
     quantityPerUnit: number
@@ -177,7 +179,7 @@ export async function createBOMVersion(params: {
   }>
   createdById: string
 }) {
-  const { skuId, versionName, effectiveStartDate, isActive, notes, lines, createdById } = params
+  const { skuId, versionName, effectiveStartDate, isActive, notes, defectNotes, qualityMetadata, lines, createdById } = params
 
   return prisma.$transaction(async (tx) => {
     // If this version should be active, deactivate any existing active version
@@ -202,6 +204,8 @@ export async function createBOMVersion(params: {
         effectiveStartDate,
         isActive,
         notes,
+        defectNotes,
+        qualityMetadata: (qualityMetadata ?? {}) as Prisma.InputJsonValue,
         createdById,
         lines: {
           create: lines.map((line) => ({

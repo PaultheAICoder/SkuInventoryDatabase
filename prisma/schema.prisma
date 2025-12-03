@@ -142,6 +142,9 @@ model Transaction {
   supplier     String?         @db.VarChar(100)
   reason       String?         @db.VarChar(200)
   notes        String?         @db.Text
+  defectCount    Int?
+  defectNotes    String?  @db.Text
+  affectedUnits  Int?
   createdAt    DateTime        @default(now())
   createdById  String
   createdBy    User            @relation(fields: [createdById], references: [id])
@@ -202,6 +205,8 @@ model BOMVersion {
   effectiveEndDate   DateTime? @db.Date
   isActive           Boolean   @default(false)
   notes              String?   @db.Text
+  defectNotes        String?   @db.Text
+  qualityMetadata    Json      @default("{}")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   createdById        String
