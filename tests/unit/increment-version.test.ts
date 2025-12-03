@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import { execSync } from 'child_process'
 
@@ -12,23 +13,31 @@ import { execSync } from 'child_process'
  */
 
 describe('increment-version script', () => {
-  const projectRoot = '/home/pbrown/SkuInventory'
+  const projectRoot = path.resolve(__dirname, '..', '..')
   const versionFilePath = path.join(projectRoot, 'version.json')
   const scriptPath = path.join(projectRoot, 'scripts', 'increment-version.js')
-  let originalVersion: { version: string; buildTimestamp: string }
+  let originalVersionContent: string | null = null
 
   beforeEach(() => {
     // Save original version.json content before each test
     try {
-      originalVersion = JSON.parse(fs.readFileSync(versionFilePath, 'utf8'))
+      originalVersionContent = fs.readFileSync(versionFilePath, 'utf8')
     } catch {
-      originalVersion = { version: '0.5.0', buildTimestamp: new Date().toISOString() }
+      originalVersionContent = null
     }
   })
 
   afterEach(() => {
     // Restore original version.json after each test
-    fs.writeFileSync(versionFilePath, JSON.stringify(originalVersion, null, 2) + '\n', 'utf8')
+    if (originalVersionContent !== null) {
+      fs.writeFileSync(versionFilePath, originalVersionContent, 'utf8')
+    } else {
+      try {
+        fs.unlinkSync(versionFilePath)
+      } catch {
+        // File didn't exist originally
+      }
+    }
     // Unstage the version.json file if it was staged
     try {
       execSync('git restore --staged version.json', { cwd: projectRoot, stdio: 'pipe' })
@@ -82,24 +91,35 @@ describe('increment-version script', () => {
 
   describe('missing version.json handling', () => {
     it('creates default version.json if file is missing', () => {
-      // Delete the version file
+      // Use a temp directory to avoid deleting the real version.json
+      // which could cause race conditions with other tests
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'increment-version-test-'))
+      const tempVersionFile = path.join(tempDir, 'version.json')
+
       try {
-        fs.unlinkSync(versionFilePath)
-      } catch {
-        // Ignore if doesn't exist
+        // Run the script with custom path - it should create a default
+        const output = execSync(`node ${scriptPath}`, {
+          cwd: projectRoot,
+          encoding: 'utf8',
+          env: { ...process.env, VERSION_FILE_PATH: tempVersionFile }
+        })
+
+        // File should now exist
+        expect(fs.existsSync(tempVersionFile)).toBe(true)
+
+        const result = JSON.parse(fs.readFileSync(tempVersionFile, 'utf8'))
+        // Default starts at 0.5.0 and gets incremented to 0.5.1
+        expect(result.version).toBe('0.5.1')
+        expect(result.buildTimestamp).toBeDefined()
+        expect(output).toContain('version.json not found')
+      } finally {
+        // Clean up temp directory
+        try {
+          fs.rmSync(tempDir, { recursive: true })
+        } catch {
+          // Ignore cleanup errors
+        }
       }
-
-      // Run the script - it should create a default
-      const output = execSync(`node ${scriptPath}`, { cwd: projectRoot, encoding: 'utf8' })
-
-      // File should now exist
-      expect(fs.existsSync(versionFilePath)).toBe(true)
-
-      const result = JSON.parse(fs.readFileSync(versionFilePath, 'utf8'))
-      // Default starts at 0.5.0 and gets incremented to 0.5.1
-      expect(result.version).toBe('0.5.1')
-      expect(result.buildTimestamp).toBeDefined()
-      expect(output).toContain('version.json not found')
     })
   })
 

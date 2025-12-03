@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FeedbackDialog } from '@/components/features/FeedbackDialog'
 
@@ -346,11 +346,13 @@ describe('FeedbackDialog', () => {
 
       expect(screen.getByText('Getting Questions...')).toBeInTheDocument()
 
-      // Cleanup
-      resolvePromise!({
-        ok: true,
-        json: () => Promise.resolve({
-          data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+      // Cleanup - wrap in act to handle async state updates
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          })
         })
       })
     })
@@ -373,10 +375,13 @@ describe('FeedbackDialog', () => {
       const button = screen.getByRole('button', { name: /Getting Questions/i })
       expect(button).toBeDisabled()
 
-      resolvePromise!({
-        ok: true,
-        json: () => Promise.resolve({
-          data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+      // Cleanup - wrap in act to handle async state updates
+      await act(async () => {
+        resolvePromise!({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          })
         })
       })
     })
@@ -416,10 +421,13 @@ describe('FeedbackDialog', () => {
       expect(screen.getByText('Submitting Feedback')).toBeInTheDocument()
       expect(screen.getByText('Creating your GitHub issue...')).toBeInTheDocument()
 
-      resolveSubmit!({
-        ok: true,
-        json: () => Promise.resolve({
-          data: { issueUrl: 'https://github.com/test/123', issueNumber: 123 }
+      // Cleanup - wrap in act to handle async state updates
+      await act(async () => {
+        resolveSubmit!({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { issueUrl: 'https://github.com/test/123', issueNumber: 123 }
+          })
         })
       })
     })
@@ -458,10 +466,13 @@ describe('FeedbackDialog', () => {
 
       expect(screen.getByText('Please wait...')).toBeInTheDocument()
 
-      resolveSubmit!({
-        ok: true,
-        json: () => Promise.resolve({
-          data: { issueUrl: 'https://github.com/test/123', issueNumber: 123 }
+      // Cleanup - wrap in act to handle async state updates
+      await act(async () => {
+        resolveSubmit!({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { issueUrl: 'https://github.com/test/123', issueNumber: 123 }
+          })
         })
       })
     })
@@ -847,8 +858,10 @@ describe('FeedbackDialog', () => {
       // Close dialog
       rerender(<FeedbackDialog open={false} onOpenChange={() => {}} />)
 
-      // Wait for reset (200ms delay in component)
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Wait for reset (200ms delay in component) - wrap in act to handle async state updates
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 300))
+      })
 
       // Reopen and verify reset
       rerender(<FeedbackDialog open={true} onOpenChange={() => {}} />)
@@ -866,9 +879,13 @@ describe('FeedbackDialog', () => {
 
       expect(screen.getByDisplayValue('Test description')).toBeInTheDocument()
 
+      // Close dialog
       rerender(<FeedbackDialog open={false} onOpenChange={() => {}} />)
 
-      await new Promise(resolve => setTimeout(resolve, 250))
+      // Wait for reset - wrap in act to handle async state updates
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 250))
+      })
 
       rerender(<FeedbackDialog open={true} onOpenChange={() => {}} />)
       await user.click(screen.getByText('Report a Bug'))
@@ -911,9 +928,15 @@ describe('FeedbackDialog', () => {
         expect(screen.getByText('Submission Failed')).toBeInTheDocument()
       })
 
-      // Close and reopen
+      // Close dialog
       rerender(<FeedbackDialog open={false} onOpenChange={() => {}} />)
-      await new Promise(resolve => setTimeout(resolve, 250))
+
+      // Wait for reset - wrap in act to handle async state updates
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 250))
+      })
+
+      // Reopen
       rerender(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       expect(screen.getByText('Submit Feedback')).toBeInTheDocument()

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const VERSION_FILE = path.join(__dirname, '..', 'version.json');
+const VERSION_FILE = process.env.VERSION_FILE_PATH || path.join(__dirname, '..', 'version.json');
 
 function main() {
   // Read current version
@@ -52,12 +52,14 @@ function main() {
   fs.writeFileSync(VERSION_FILE, JSON.stringify(versionData, null, 2) + '\n', 'utf8');
   console.log(`Version bumped: ${major}.${minor}.${patch} -> ${newVersion}`);
 
-  // Stage the updated file
-  try {
-    execSync('git add version.json', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
-  } catch {
-    console.error('Failed to stage version.json');
-    process.exit(1);
+  // Stage the updated file (only if using default path)
+  if (!process.env.VERSION_FILE_PATH) {
+    try {
+      execSync('git add version.json', { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
+    } catch {
+      console.error('Failed to stage version.json');
+      process.exit(1);
+    }
   }
 }
 
