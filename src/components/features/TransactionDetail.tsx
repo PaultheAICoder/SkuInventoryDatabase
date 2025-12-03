@@ -34,6 +34,7 @@ interface TransactionDetailProps {
     company?: { id: string; name: string }
     sku?: { id: string; name: string; internalCode?: string } | null
     bomVersion?: { id: string; versionName: string } | null
+    location?: { id: string; name: string; type?: string } | null
     salesChannel: string | null
     unitsBuild: number | null
     unitBomCost: string | null
@@ -174,6 +175,14 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
               <div>
                 <p className="text-sm text-muted-foreground">BOM Version</p>
                 <p className="font-medium">{transaction.bomVersion.versionName}</p>
+              </div>
+            )}
+
+            {/* Location if present */}
+            {transaction.location && (
+              <div>
+                <p className="text-sm text-muted-foreground">Location</p>
+                <p className="font-medium">{transaction.location.name}</p>
               </div>
             )}
 

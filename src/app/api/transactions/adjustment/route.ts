@@ -38,6 +38,20 @@ export async function POST(request: NextRequest) {
       return notFound('Component')
     }
 
+    // Validate location if provided
+    if (data.locationId) {
+      const location = await prisma.location.findFirst({
+        where: {
+          id: data.locationId,
+          companyId: session.user.companyId,
+          isActive: true,
+        },
+      })
+      if (!location) {
+        return notFound('Location')
+      }
+    }
+
     // Create the adjustment transaction
     const transaction = await createAdjustmentTransaction({
       companyId: session.user.companyId,
@@ -47,6 +61,7 @@ export async function POST(request: NextRequest) {
       reason: data.reason,
       notes: data.notes,
       createdById: session.user.id,
+      locationId: data.locationId,
     })
 
     return created({
@@ -55,6 +70,8 @@ export async function POST(request: NextRequest) {
       date: transaction.date.toISOString().split('T')[0],
       reason: transaction.reason,
       notes: transaction.notes,
+      locationId: transaction.locationId,
+      location: transaction.location,
       createdAt: transaction.createdAt.toISOString(),
       createdBy: transaction.createdBy,
       lines: transaction.lines.map((line) => ({

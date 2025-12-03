@@ -45,6 +45,8 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  transactions Transaction[]
+
   @@unique([companyId, name])
   @@index([companyId, isActive])
 }
@@ -166,6 +168,8 @@ model Transaction {
   sku           SKU?            @relation(fields: [skuId], references: [id])
   bomVersionId  String?
   bomVersion    BOMVersion?     @relation(fields: [bomVersionId], references: [id])
+  locationId    String?
+  location      Location?       @relation(fields: [locationId], references: [id])
   salesChannel  String?         @db.VarChar(50)
   unitsBuild    Int?
   unitBomCost   Decimal?        @db.Decimal(10, 4)
@@ -186,6 +190,7 @@ model Transaction {
   @@index([companyId, createdAt(sort: Desc)])
   @@index([skuId])
   @@index([type])
+  @@index([locationId])
 }
 
 model TransactionLine {

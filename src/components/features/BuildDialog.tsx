@@ -55,18 +55,37 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     defectCount: '',
     defectNotes: '',
     affectedUnits: '',
+    locationId: '',
   })
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
-  // Fetch SKUs when dialog opens
+  // Fetch SKUs and locations when dialog opens
   useEffect(() => {
     if (open) {
       fetchSkus()
+      fetchLocations()
       setFormData((prev) => ({
         ...prev,
         skuId: preselectedSkuId || '',
       }))
     }
   }, [open, preselectedSkuId])
+
+  const fetchLocations = async () => {
+    setIsLoadingLocations(true)
+    try {
+      const res = await fetch('/api/locations?isActive=true&pageSize=50')
+      if (res.ok) {
+        const data = await res.json()
+        setLocations(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations:', err)
+    } finally {
+      setIsLoadingLocations(false)
+    }
+  }
 
   const fetchSkus = async () => {
     setIsLoadingSkus(true)
@@ -129,6 +148,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           defectNotes: formData.defectNotes || null,
           affectedUnits: formData.affectedUnits ? parseInt(formData.affectedUnits) : null,
           allowInsufficientInventory: forceSubmit,
+          locationId: formData.locationId || undefined,
         }),
       })
 
@@ -162,6 +182,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         defectCount: '',
         defectNotes: '',
         affectedUnits: '',
+        locationId: '',
       })
       setInsufficientItems([])
       setShowWarning(false)
@@ -336,6 +357,28 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 value={formData.notes}
                 onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
               />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="location" className="text-right">
+                Location
+              </Label>
+              <Select
+                value={formData.locationId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
+                disabled={isLoadingLocations}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Defect Tracking (collapsible) */}

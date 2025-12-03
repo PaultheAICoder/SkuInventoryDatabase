@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -48,6 +48,8 @@ export function AdjustmentDialog({
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -55,7 +57,29 @@ export function AdjustmentDialog({
     quantity: '',
     reason: '',
     notes: '',
+    locationId: '',
   })
+
+  useEffect(() => {
+    if (open) {
+      fetchLocations()
+    }
+  }, [open])
+
+  const fetchLocations = async () => {
+    setIsLoadingLocations(true)
+    try {
+      const res = await fetch('/api/locations?isActive=true&pageSize=50')
+      if (res.ok) {
+        const data = await res.json()
+        setLocations(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations:', err)
+    } finally {
+      setIsLoadingLocations(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,6 +99,7 @@ export function AdjustmentDialog({
           quantity: adjustedQuantity,
           reason: formData.reason,
           notes: formData.notes || null,
+          locationId: formData.locationId || undefined,
         }),
       })
 
@@ -93,6 +118,7 @@ export function AdjustmentDialog({
         quantity: '',
         reason: '',
         notes: '',
+        locationId: '',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -206,6 +232,28 @@ export function AdjustmentDialog({
                   {ADJUSTMENT_REASONS.map((reason) => (
                     <SelectItem key={reason.value} value={reason.value}>
                       {reason.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="location" className="text-right">
+                Location
+              </Label>
+              <Select
+                value={formData.locationId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
+                disabled={isLoadingLocations}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

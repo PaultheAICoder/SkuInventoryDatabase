@@ -58,6 +58,20 @@ export async function POST(request: NextRequest) {
 
     const selectedBomVersionId = sku.bomVersions[0].id
 
+    // Validate location if provided
+    if (data.locationId) {
+      const location = await prisma.location.findFirst({
+        where: {
+          id: data.locationId,
+          companyId: session.user.companyId,
+          isActive: true,
+        },
+      })
+      if (!location) {
+        return notFound('Location')
+      }
+    }
+
     // Get company settings
     const settings = await getCompanySettings(session.user.companyId)
 
@@ -80,6 +94,7 @@ export async function POST(request: NextRequest) {
         affectedUnits: data.affectedUnits,
         createdById: session.user.id,
         allowInsufficientInventory: allowInsufficient,
+        locationId: data.locationId,
       })
 
       return created({
@@ -89,6 +104,8 @@ export async function POST(request: NextRequest) {
           date: result.transaction.date.toISOString().split('T')[0],
           sku: result.transaction.sku,
           bomVersion: result.transaction.bomVersion,
+          locationId: result.transaction.locationId,
+          location: result.transaction.location,
           salesChannel: result.transaction.salesChannel,
           unitsBuild: result.transaction.unitsBuild,
           unitBomCost: result.transaction.unitBomCost?.toString() ?? null,

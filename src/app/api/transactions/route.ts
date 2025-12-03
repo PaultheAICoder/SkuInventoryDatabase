@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
       include: {
         sku: { select: { id: true, name: true } },
         bomVersion: { select: { id: true, versionName: true } },
+        location: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         lines: {
           include: {
@@ -70,6 +71,8 @@ export async function GET(request: NextRequest) {
       date: tx.date.toISOString().split('T')[0],
       sku: tx.sku,
       bomVersion: tx.bomVersion,
+      locationId: tx.locationId,
+      location: tx.location,
       salesChannel: tx.salesChannel,
       unitsBuild: tx.unitsBuild,
       unitBomCost: tx.unitBomCost?.toString() ?? null,

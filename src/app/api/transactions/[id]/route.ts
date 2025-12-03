@@ -38,6 +38,13 @@ export async function GET(
             versionName: true,
           },
         },
+        location: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
         lines: {
           include: {
             component: {
@@ -68,6 +75,8 @@ export async function GET(
         company: transaction.company,
         sku: transaction.sku,
         bomVersion: transaction.bomVersion,
+        locationId: transaction.locationId,
+        location: transaction.location,
         salesChannel: transaction.salesChannel,
         unitsBuild: transaction.unitsBuild,
         unitBomCost: transaction.unitBomCost?.toString() ?? null,

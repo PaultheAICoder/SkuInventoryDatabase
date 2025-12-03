@@ -9,6 +9,7 @@ export const createReceiptSchema = z.object({
   costPerUnit: z.coerce.number().nonnegative().optional(),
   updateComponentCost: z.boolean().default(false),
   notes: z.string().optional().nullable(),
+  locationId: z.string().uuid('Invalid location ID').optional(),
 })
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
@@ -20,6 +21,7 @@ export const createAdjustmentSchema = z.object({
   quantity: z.coerce.number().refine((val) => val !== 0, 'Quantity cannot be zero'),
   reason: z.string().min(1, 'Reason is required').max(200),
   notes: z.string().optional().nullable(),
+  locationId: z.string().uuid('Invalid location ID').optional(),
 })
 
 export type CreateAdjustmentInput = z.infer<typeof createAdjustmentSchema>
@@ -32,6 +34,7 @@ export const createInitialSchema = z.object({
   costPerUnit: z.coerce.number().nonnegative().optional(),
   updateComponentCost: z.boolean().default(false),
   notes: z.string().optional().nullable(),
+  locationId: z.string().uuid('Invalid location ID').optional(),
 })
 
 export type CreateInitialInput = z.infer<typeof createInitialSchema>
@@ -47,6 +50,7 @@ export const createBuildSchema = z.object({
   defectNotes: z.string().optional().nullable(),
   affectedUnits: z.coerce.number().int().nonnegative().optional().nullable(),
   allowInsufficientInventory: z.boolean().default(false),
+  locationId: z.string().uuid('Invalid location ID').optional(),
 })
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>
@@ -91,6 +95,8 @@ export interface TransactionResponse {
   date: string
   sku?: { id: string; name: string } | null
   bomVersion?: { id: string; versionName: string } | null
+  locationId: string | null
+  location?: { id: string; name: string } | null
   salesChannel: string | null
   unitsBuild: number | null
   unitBomCost: string | null
@@ -116,4 +122,5 @@ export interface TransactionLineResponse {
 // Transaction detail response
 export interface TransactionDetailResponse extends TransactionResponse {
   company: { id: string; name: string }
+  location?: { id: string; name: string; type: string } | null
 }

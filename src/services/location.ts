@@ -113,3 +113,12 @@ export async function getDefaultLocation(companyId: string) {
     },
   })
 }
+
+/**
+ * Get the default location ID for a company
+ * Returns null if no default location exists
+ */
+export async function getDefaultLocationId(companyId: string): Promise<string | null> {
+  const location = await getDefaultLocation(companyId)
+  return location?.id ?? null
+}

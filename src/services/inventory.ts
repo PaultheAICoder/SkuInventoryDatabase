@@ -7,6 +7,7 @@ import {
   type CompanySettings,
 } from '@/types/settings'
 import { evaluateDefectThreshold } from './alert'
+import { getDefaultLocationId } from './location'
 
 /**
  * Fetch and merge company settings with defaults
@@ -99,6 +100,7 @@ export async function createReceiptTransaction(params: {
   updateComponentCost: boolean
   notes?: string | null
   createdById: string
+  locationId?: string
 }) {
   const {
     companyId,
@@ -110,7 +112,10 @@ export async function createReceiptTransaction(params: {
     updateComponentCost,
     notes,
     createdById,
+    locationId,
   } = params
+
+  const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
   return prisma.$transaction(async (tx) => {
     // Get component for cost snapshot
@@ -133,6 +138,7 @@ export async function createReceiptTransaction(params: {
         supplier,
         notes,
         createdById,
+        locationId: locationIdToUse,
         lines: {
           create: {
             componentId,
@@ -150,6 +156,9 @@ export async function createReceiptTransaction(params: {
           },
         },
         createdBy: {
+          select: { id: true, name: true },
+        },
+        location: {
           select: { id: true, name: true },
         },
       },
@@ -181,8 +190,11 @@ export async function createAdjustmentTransaction(params: {
   reason: string
   notes?: string | null
   createdById: string
+  locationId?: string
 }) {
-  const { companyId, componentId, quantity, date, reason, notes, createdById } = params
+  const { companyId, componentId, quantity, date, reason, notes, createdById, locationId } = params
+
+  const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
   // Get component for cost snapshot
   const component = await prisma.component.findUnique({
@@ -201,6 +213,7 @@ export async function createAdjustmentTransaction(params: {
       reason,
       notes,
       createdById,
+      locationId: locationIdToUse,
       lines: {
         create: {
           componentId,
@@ -220,6 +233,9 @@ export async function createAdjustmentTransaction(params: {
       createdBy: {
         select: { id: true, name: true },
       },
+      location: {
+        select: { id: true, name: true },
+      },
     },
   })
 }
@@ -236,6 +252,7 @@ export async function createInitialTransaction(params: {
   updateComponentCost: boolean
   notes?: string | null
   createdById: string
+  locationId?: string
 }) {
   const {
     companyId,
@@ -246,7 +263,10 @@ export async function createInitialTransaction(params: {
     updateComponentCost,
     notes,
     createdById,
+    locationId,
   } = params
+
+  const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
   return prisma.$transaction(async (tx) => {
     // Get component for cost snapshot
@@ -268,6 +288,7 @@ export async function createInitialTransaction(params: {
         date,
         notes,
         createdById,
+        locationId: locationIdToUse,
         lines: {
           create: {
             componentId,
@@ -285,6 +306,9 @@ export async function createInitialTransaction(params: {
           },
         },
         createdBy: {
+          select: { id: true, name: true },
+        },
+        location: {
           select: { id: true, name: true },
         },
       },
@@ -394,6 +418,8 @@ export interface BuildTransactionResult {
   date: Date
   sku: { id: string; name: string; internalCode: string } | null
   bomVersion: { id: string; versionName: string } | null
+  locationId: string | null
+  location: { id: string; name: string } | null
   salesChannel: string | null
   unitsBuild: number | null
   unitBomCost: { toString(): string } | null
@@ -429,6 +455,7 @@ export async function createBuildTransaction(params: {
   affectedUnits?: number | null
   createdById: string
   allowInsufficientInventory?: boolean
+  locationId?: string
 }): Promise<{
   transaction: BuildTransactionResult
   insufficientItems: InsufficientInventoryItem[]
@@ -447,7 +474,10 @@ export async function createBuildTransaction(params: {
     affectedUnits,
     createdById,
     allowInsufficientInventory = false,
+    locationId,
   } = params
+
+  const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
   // Check for insufficient inventory
   const insufficientItems = await checkInsufficientInventory({
@@ -490,6 +520,7 @@ export async function createBuildTransaction(params: {
       date,
       skuId,
       bomVersionId,
+      locationId: locationIdToUse,
       salesChannel,
       unitsBuild: unitsToBuild,
       unitBomCost: new Prisma.Decimal(unitBomCost),
@@ -522,6 +553,12 @@ export async function createBuildTransaction(params: {
         select: {
           id: true,
           versionName: true,
+        },
+      },
+      location: {
+        select: {
+          id: true,
+          name: true,
         },
       },
       lines: {
