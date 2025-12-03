@@ -12,6 +12,7 @@ import {
   Boxes,
   ArrowLeftRight,
   Upload,
+  BarChart3,
   Settings,
   Users,
   LogOut,
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'SKUs', href: '/skus', icon: Boxes },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
   { name: 'Import', href: '/import', icon: Upload },
+  { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]
