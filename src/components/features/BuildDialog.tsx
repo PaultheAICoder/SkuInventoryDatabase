@@ -70,6 +70,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
 
   const fetchSkus = async () => {
     setIsLoadingSkus(true)
+    setError(null)
     try {
       const res = await fetch('/api/skus?pageSize=100&isActive=true')
       if (res.ok) {
@@ -84,9 +85,14 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             hasActiveBom: sku.hasActiveBom,
           }))
         )
+      } else {
+        // Handle HTTP errors (4xx, 5xx)
+        const errorData = await res.json().catch(() => ({}))
+        setError(errorData.error || 'Failed to load SKUs. Please try again.')
       }
     } catch (err) {
       console.error('Failed to fetch SKUs:', err)
+      setError('Unable to connect. Please check your network and try again.')
     } finally {
       setIsLoadingSkus(false)
     }
