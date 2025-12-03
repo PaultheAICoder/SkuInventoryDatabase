@@ -16,6 +16,37 @@ import { toast } from 'sonner'
 import { Bug, Lightbulb, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import type { FeedbackType, FeedbackStep } from '@/types/feedback'
 
+// Response validation helper
+function isValidApiResponse<T>(data: unknown, validator: (d: unknown) => d is T): data is { data: T } {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'data' in data &&
+    validator((data as { data: unknown }).data)
+  )
+}
+
+// Type guards for API responses
+function isClarifyData(data: unknown): data is { questions: string[] } {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'questions' in data &&
+    Array.isArray((data as { questions: unknown }).questions)
+  )
+}
+
+function isSubmitFeedbackData(data: unknown): data is { issueUrl: string; issueNumber: number } {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'issueUrl' in data &&
+    typeof (data as { issueUrl: unknown }).issueUrl === 'string' &&
+    'issueNumber' in data &&
+    typeof (data as { issueNumber: unknown }).issueNumber === 'number'
+  )
+}
+
 interface FeedbackDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -74,11 +105,17 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to get clarifying questions')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to get clarifying questions')
       }
 
       const data = await res.json()
+
+      // Validate response structure
+      if (!isValidApiResponse(data, isClarifyData)) {
+        throw new Error('Invalid response from server. Please try again.')
+      }
+
       setQuestions(data.data.questions)
       setStep('clarify')
     } catch (err) {
@@ -111,11 +148,17 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       })
 
       if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Failed to submit feedback')
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to submit feedback')
       }
 
       const data = await res.json()
+
+      // Validate response structure
+      if (!isValidApiResponse(data, isSubmitFeedbackData)) {
+        throw new Error('Invalid response from server. Your feedback may have been submitted. Please check GitHub.')
+      }
+
       setIssueUrl(data.data.issueUrl)
       setStep('success')
       toast.success('Feedback submitted!', {

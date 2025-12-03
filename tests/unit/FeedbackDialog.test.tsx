@@ -965,5 +965,191 @@ describe('FeedbackDialog', () => {
         expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
       })
     })
+
+    it('handles malformed clarify response (null data)', async () => {
+      const user = userEvent.setup()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: null })  // Malformed: data is null
+      })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Testing malformed response')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        // Should show error and stay on describe step
+        expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
+        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      })
+    })
+
+    it('handles malformed clarify response (missing questions property)', async () => {
+      const user = userEvent.setup()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: { wrongProperty: 'value' } })  // Missing questions
+      })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Testing missing questions')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
+        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      })
+    })
+
+    it('handles malformed clarify response (questions is not array)', async () => {
+      const user = userEvent.setup()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: { questions: 'not an array' } })  // Wrong type
+      })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Testing wrong type')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
+        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      })
+    })
+
+    it('handles JSON parse failure gracefully', async () => {
+      const user = userEvent.setup()
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.reject(new Error('Invalid JSON'))  // JSON parse fails
+      })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Testing JSON parse failure')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        // Should show default error message since JSON parsing failed
+        expect(screen.getByText('Failed to get clarifying questions')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('submit API error handling', () => {
+    it('handles malformed submit response (missing data property)', async () => {
+      const user = userEvent.setup()
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ wrongShape: true })  // Missing data property
+        })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        expect(screen.getByText('A Few Quick Questions')).toBeInTheDocument()
+      })
+
+      const textareas = screen.getAllByPlaceholderText('Your answer...')
+      await user.type(textareas[0], 'Answer 1')
+      await user.type(textareas[1], 'Answer 2')
+      await user.type(textareas[2], 'Answer 3')
+      await user.click(screen.getByText('Submit Feedback'))
+
+      await waitFor(() => {
+        // Should show error state
+        expect(screen.getByText('Submission Failed')).toBeInTheDocument()
+        expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
+      })
+    })
+
+    it('handles malformed submit response (missing issueUrl)', async () => {
+      const user = userEvent.setup()
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: { issueNumber: 123 } })  // Missing issueUrl
+        })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        expect(screen.getByText('A Few Quick Questions')).toBeInTheDocument()
+      })
+
+      const textareas = screen.getAllByPlaceholderText('Your answer...')
+      await user.type(textareas[0], 'Answer 1')
+      await user.type(textareas[1], 'Answer 2')
+      await user.type(textareas[2], 'Answer 3')
+      await user.click(screen.getByText('Submit Feedback'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Submission Failed')).toBeInTheDocument()
+      })
+    })
+
+    it('handles malformed submit response (missing issueNumber)', async () => {
+      const user = userEvent.setup()
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ data: { issueUrl: 'https://github.com/test/123' } })  // Missing issueNumber
+        })
+
+      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+      await user.click(screen.getByText('Report a Bug'))
+      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await user.click(screen.getByText('Continue'))
+
+      await waitFor(() => {
+        expect(screen.getByText('A Few Quick Questions')).toBeInTheDocument()
+      })
+
+      const textareas = screen.getAllByPlaceholderText('Your answer...')
+      await user.type(textareas[0], 'Answer 1')
+      await user.type(textareas[1], 'Answer 2')
+      await user.type(textareas[2], 'Answer 3')
+      await user.click(screen.getByText('Submit Feedback'))
+
+      await waitFor(() => {
+        expect(screen.getByText('Submission Failed')).toBeInTheDocument()
+      })
+    })
   })
 })
