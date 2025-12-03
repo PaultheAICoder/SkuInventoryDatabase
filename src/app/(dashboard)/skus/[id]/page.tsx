@@ -199,8 +199,8 @@ export default function SKUDetailPage() {
             )}
 
             <div className="text-xs text-muted-foreground pt-4 border-t">
-              <p>Created: {new Date(sku.createdAt).toLocaleDateString()}</p>
-              <p>Updated: {new Date(sku.updatedAt).toLocaleDateString()}</p>
+              <p suppressHydrationWarning>Created: {new Date(sku.createdAt).toLocaleDateString()}</p>
+              <p suppressHydrationWarning>Updated: {new Date(sku.updatedAt).toLocaleDateString()}</p>
             </div>
           </CardContent>
         </Card>
@@ -236,13 +236,13 @@ export default function SKUDetailPage() {
               <TableBody>
                 {sku.recentTransactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                    <TableCell suppressHydrationWarning>{new Date(tx.date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {tx.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-green-600">
+                    <TableCell className="text-right font-mono text-green-600" suppressHydrationWarning>
                       {tx.unitsBuild !== null ? `+${tx.unitsBuild.toLocaleString()}` : '-'}
                     </TableCell>
                   </TableRow>

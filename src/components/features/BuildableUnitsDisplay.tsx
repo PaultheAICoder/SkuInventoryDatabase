@@ -37,6 +37,7 @@ export function BuildableUnitsDisplay({
           className={`font-mono font-medium ${sizeClasses[size]} ${
             isZero ? 'text-red-600' : isLow ? 'text-yellow-600' : ''
           }`}
+          suppressHydrationWarning
         >
           {maxBuildableUnits.toLocaleString()}
         </span>

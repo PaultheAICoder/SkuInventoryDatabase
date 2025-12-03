@@ -133,7 +133,7 @@ export function UserTable({ users, currentUserId, onRefresh }: UserTableProps) {
                     {user.isActive ? 'Active' : 'Inactive'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-muted-foreground" suppressHydrationWarning>
                   {user.lastLoginAt
                     ? new Date(user.lastLoginAt).toLocaleDateString()
                     : 'Never'}

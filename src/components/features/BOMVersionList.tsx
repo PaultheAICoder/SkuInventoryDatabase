@@ -208,7 +208,7 @@ export function BOMVersionList({ versions, skuId, onRefresh }: BOMVersionListPro
                               {line.component.skuCode}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right font-mono" suppressHydrationWarning>
                             {parseFloat(line.quantityPerUnit).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-mono">
@@ -217,7 +217,7 @@ export function BOMVersionList({ versions, skuId, onRefresh }: BOMVersionListPro
                           <TableCell className="text-right font-mono">
                             ${parseFloat(line.lineCost).toFixed(4)}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right font-mono" suppressHydrationWarning>
                             {line.component.quantityOnHand?.toLocaleString() ?? '-'}
                           </TableCell>
                         </TableRow>

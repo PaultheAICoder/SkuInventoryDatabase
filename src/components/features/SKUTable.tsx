@@ -189,7 +189,7 @@ export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {sku.maxBuildableUnits != null ? (
-                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''}>
+                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''} suppressHydrationWarning>
                         {sku.maxBuildableUnits.toLocaleString()}
                       </span>
                     ) : (

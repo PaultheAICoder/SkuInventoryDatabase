@@ -216,7 +216,7 @@ export function ComponentTable({ components, total, page, pageSize }: ComponentT
                   </TableCell>
                   <TableCell className="font-mono text-sm">{component.skuCode}</TableCell>
                   <TableCell className="capitalize">{component.category ?? '-'}</TableCell>
-                  <TableCell className="text-right font-mono">
+                  <TableCell className="text-right font-mono" suppressHydrationWarning>
                     {component.quantityOnHand.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right font-mono">

@@ -15,8 +15,8 @@ export function DefectAnalyticsSummary({ summary }: DefectAnalyticsSummaryProps)
           <Package className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{summary.totalBuilds.toLocaleString()}</div>
-          <p className="text-xs text-muted-foreground">
+          <div className="text-2xl font-bold" suppressHydrationWarning>{summary.totalBuilds.toLocaleString()}</div>
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {summary.totalUnitsBuilt.toLocaleString()} units built
           </p>
         </CardContent>
@@ -29,7 +29,7 @@ export function DefectAnalyticsSummary({ summary }: DefectAnalyticsSummaryProps)
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">{summary.overallDefectRate}%</div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {summary.totalDefects.toLocaleString()} total defects
           </p>
         </CardContent>
@@ -42,7 +42,7 @@ export function DefectAnalyticsSummary({ summary }: DefectAnalyticsSummaryProps)
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-orange-600">{summary.overallAffectedRate}%</div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" suppressHydrationWarning>
             {summary.totalAffectedUnits.toLocaleString()} affected units
           </p>
         </CardContent>

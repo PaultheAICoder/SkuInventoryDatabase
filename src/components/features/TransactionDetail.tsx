@@ -103,7 +103,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
               </div>
             </div>
             <div className="text-right text-sm text-muted-foreground">
-              <p>{new Date(transaction.date).toLocaleDateString()}</p>
+              <p suppressHydrationWarning>{new Date(transaction.date).toLocaleDateString()}</p>
               <p className="font-mono text-xs">{transaction.id.slice(0, 8)}...</p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Units Built</p>
-                  <p className="text-2xl font-bold">{transaction.unitsBuild?.toLocaleString()}</p>
+                  <p className="text-2xl font-bold" suppressHydrationWarning>{transaction.unitsBuild?.toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total BOM Cost</p>
@@ -216,7 +216,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
             <div>
               <p className="text-sm text-muted-foreground">Created By</p>
               <p className="font-medium">{transaction.createdBy.name}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground" suppressHydrationWarning>
                 {new Date(transaction.createdAt).toLocaleString()}
               </p>
             </div>
@@ -272,6 +272,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                     <TableCell className="text-right">
                       <span
                         className={`font-mono ${qtyChange >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        suppressHydrationWarning
                       >
                         {qtyChange >= 0 ? '+' : ''}
                         {qtyChange.toLocaleString()}

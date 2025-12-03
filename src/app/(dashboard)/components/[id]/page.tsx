@@ -152,7 +152,7 @@ export default function ComponentDetailPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Quantity on Hand</p>
-                <p className="text-3xl font-bold">{component.quantityOnHand.toLocaleString()}</p>
+                <p className="text-3xl font-bold" suppressHydrationWarning>{component.quantityOnHand.toLocaleString()}</p>
               </div>
 
               {/* Sparkline Trend */}
@@ -192,7 +192,7 @@ export default function ComponentDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Inventory Value</p>
-                <p className="text-lg font-medium">
+                <p className="text-lg font-medium" suppressHydrationWarning>
                   $
                   {(component.quantityOnHand * parseFloat(component.costPerUnit)).toLocaleString(
                     undefined,
@@ -258,7 +258,7 @@ export default function ComponentDetailPage() {
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {sku.maxBuildableUnits != null ? (
-                        <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''}>
+                        <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''} suppressHydrationWarning>
                           {sku.maxBuildableUnits.toLocaleString()}
                         </span>
                       ) : (
@@ -303,7 +303,7 @@ export default function ComponentDetailPage() {
                       {parseFloat(sku.quantityPerUnit).toFixed(4)}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-yellow-700'}>
+                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-yellow-700'} suppressHydrationWarning>
                         {sku.maxBuildableUnits.toLocaleString()}
                       </span>
                     </TableCell>
@@ -334,12 +334,13 @@ export default function ComponentDetailPage() {
               <TableBody>
                 {component.recentTransactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                    <TableCell suppressHydrationWarning>{new Date(tx.date).toLocaleDateString()}</TableCell>
                     <TableCell className="capitalize">{tx.type}</TableCell>
                     <TableCell
                       className={`text-right font-mono ${
                         parseFloat(tx.quantityChange) >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}
+                      suppressHydrationWarning
                     >
                       {parseFloat(tx.quantityChange) >= 0 ? '+' : ''}
                       {parseFloat(tx.quantityChange).toLocaleString()}

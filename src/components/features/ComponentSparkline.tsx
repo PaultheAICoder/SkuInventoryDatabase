@@ -25,10 +25,10 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   const data = payload[0].payload
   return (
     <div className="rounded-lg border bg-background p-2 shadow-lg">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground" suppressHydrationWarning>
         {new Date(data.date).toLocaleDateString()}
       </p>
-      <p className="text-sm font-medium">
+      <p className="text-sm font-medium" suppressHydrationWarning>
         {data.quantityOnHand.toLocaleString()} units
       </p>
     </div>

@@ -1,0 +1,34 @@
+{
+  "issue": "56",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-03T16:55:05.000Z",
+  "phases": {
+    "scout_and_plan": {
+      "start": "2025-12-03T16:55:05.000Z",
+      "end": "2025-12-03T16:30:00.000Z",
+      "duration_minutes": 30
+    },
+    "build": {
+      "start": "2025-12-03T16:50:00.000Z",
+      "end": "2025-12-03T17:15:00.000Z",
+      "duration_minutes": 25
+    },
+    "test_and_cleanup": {
+      "start": "2025-12-03T17:08:00.000Z",
+      "end": "2025-12-03T17:12:00.000Z",
+      "duration_minutes": 4
+    }
+  },
+  "workflow_end": "2025-12-03T17:12:00.000Z",
+  "total_duration_minutes": 59,
+  "metrics": {
+    "files_modified": 13,
+    "instances_fixed": 38,
+    "unit_tests_passed": 325,
+    "e2e_tests_passed": 2,
+    "typescript_errors": 0,
+    "build_errors": 0,
+    "warnings_fixed": 0
+  },
+  "status": "COMPLETE"
+}

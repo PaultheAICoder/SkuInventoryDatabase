@@ -39,7 +39,7 @@ export function InsufficientInventoryWarning({
             </p>
             <ul className="mt-1 text-sm text-yellow-700 space-y-0.5">
               {items.slice(0, 3).map((item) => (
-                <li key={item.componentId}>
+                <li key={item.componentId} suppressHydrationWarning>
                   {item.componentName}: short {item.shortage.toLocaleString()}
                 </li>
               ))}
@@ -61,7 +61,7 @@ export function InsufficientInventoryWarning({
           Insufficient Inventory Warning
         </CardTitle>
         <CardDescription>
-          Cannot build {unitsToBuild.toLocaleString()} unit{unitsToBuild !== 1 ? 's' : ''}
+          <span suppressHydrationWarning>Cannot build {unitsToBuild.toLocaleString()} unit{unitsToBuild !== 1 ? 's' : ''}</span>
           {skuName && <> of <span className="font-medium">{skuName}</span></>} due to component
           shortages
         </CardDescription>
@@ -88,13 +88,13 @@ export function InsufficientInventoryWarning({
                   </Link>
                   <div className="text-xs text-muted-foreground font-mono">{item.skuCode}</div>
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-right font-mono" suppressHydrationWarning>
                   {item.required.toLocaleString()}
                 </TableCell>
-                <TableCell className="text-right font-mono">
+                <TableCell className="text-right font-mono" suppressHydrationWarning>
                   {item.available.toLocaleString()}
                 </TableCell>
-                <TableCell className="text-right font-mono text-red-600 font-medium">
+                <TableCell className="text-right font-mono text-red-600 font-medium" suppressHydrationWarning>
                   {item.shortage.toLocaleString()}
                 </TableCell>
               </TableRow>

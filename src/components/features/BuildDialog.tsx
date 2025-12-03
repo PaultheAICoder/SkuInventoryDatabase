@@ -205,7 +205,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                     </p>
                     <ul className="mt-2 text-sm text-yellow-700 space-y-1">
                       {insufficientItems.map((item) => (
-                        <li key={item.componentId}>
+                        <li key={item.componentId} suppressHydrationWarning>
                           <span className="font-medium">{item.componentName}</span>:{' '}
                           Need {item.required.toLocaleString()}, have {item.available.toLocaleString()}{' '}
                           (short {item.shortage.toLocaleString()})
@@ -268,7 +268,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                       <SelectItem key={sku.id} value={sku.id}>
                         <div className="flex items-center justify-between gap-2">
                           <span>{sku.name}</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                             ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
                           </span>
                         </div>
@@ -277,7 +277,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                   </SelectContent>
                 </Select>
                 {selectedSku && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
                     Max buildable: {selectedSku.maxBuildableUnits?.toLocaleString() ?? '0'} units
                   </p>
                 )}
@@ -303,7 +303,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                   required
                 />
                 {exceedsBuildable && (
-                  <p className="text-xs text-yellow-600 mt-1">
+                  <p className="text-xs text-yellow-600 mt-1" suppressHydrationWarning>
                     Exceeds max buildable units ({selectedSku?.maxBuildableUnits?.toLocaleString()})
                   </p>
                 )}

@@ -290,7 +290,7 @@ function TransactionLogContent() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => router.push(`/transactions/${tx.id}`)}
                     >
-                      <TableCell className="font-mono text-sm">
+                      <TableCell className="font-mono text-sm" suppressHydrationWarning>
                         {new Date(tx.date).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
@@ -308,6 +308,7 @@ function TransactionLogContent() {
                                   ? 'text-green-600'
                                   : 'text-red-600'
                               }`}
+                              suppressHydrationWarning
                             >
                               {parseFloat(line.quantityChange) >= 0 ? '+' : ''}
                               {parseFloat(line.quantityChange).toLocaleString()}
