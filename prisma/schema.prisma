@@ -19,10 +19,34 @@ model Company {
 
   brands           Brand[]
   users            User[]
+  locations        Location[]
   transactions     Transaction[]
   securityEvents   SecurityEvent[]
   defectThresholds DefectThreshold[]
   alertConfig      AlertConfig?
+}
+
+enum LocationType {
+  warehouse
+  threepl
+  fba
+  finished_goods
+}
+
+model Location {
+  id        String       @id @default(uuid())
+  companyId String
+  company   Company      @relation(fields: [companyId], references: [id])
+  name      String       @db.VarChar(100)
+  type      LocationType @default(warehouse)
+  isDefault Boolean      @default(false)
+  isActive  Boolean      @default(true)
+  notes     String?      @db.Text
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
 }
 
 model Brand {

@@ -15,6 +15,7 @@ import {
   BarChart3,
   Settings,
   Users,
+  MapPin,
   LogOut,
   Menu,
   X,
@@ -31,6 +32,7 @@ const navigation = [
   { name: 'Import', href: '/import', icon: Upload },
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
+  { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]
 

@@ -64,6 +64,8 @@ const eslintConfig = [
       'prisma/generated/**',
       '.vercel/**',
       'public/**',
+      'playwright-report/**',
+      'test-results/**',
     ],
   },
 ]
