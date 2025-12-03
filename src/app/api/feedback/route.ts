@@ -79,9 +79,10 @@ export async function POST(request: NextRequest) {
     const label = type === 'bug' ? 'bug' : 'enhancement'
 
     // Create GitHub issue using Octokit REST API
-    const githubToken = process.env.GITHUB_TOKEN
+    // Note: We use GITHUB_API_TOKEN (not GITHUB_TOKEN) to avoid conflicts with gh CLI auth
+    const githubToken = process.env.GITHUB_API_TOKEN
     if (!githubToken) {
-      console.error('GITHUB_TOKEN environment variable not set')
+      console.error('GITHUB_API_TOKEN environment variable not set')
       return error('GitHub integration not configured', 500, 'ServiceUnavailable')
     }
 

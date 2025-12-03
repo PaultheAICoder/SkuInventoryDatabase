@@ -88,7 +88,7 @@ test.describe('Feedback Submission', () => {
   test.describe('bug submission flow', () => {
     test('completes full bug submission and creates GitHub issue', async ({ page }) => {
       // NOTE: This test creates a REAL GitHub issue. It requires:
-      // 1. GITHUB_TOKEN environment variable set
+      // 1. GITHUB_API_TOKEN environment variable set
       // 2. GITHUB_OWNER and GITHUB_REPO configured
       // If these are not available, the test may fail or timeout.
 
@@ -182,7 +182,7 @@ test.describe('Feedback Submission', () => {
   test.describe('feature submission flow', () => {
     test('completes full feature submission and creates GitHub issue', async ({ page }) => {
       // NOTE: This test creates a REAL GitHub issue. It requires:
-      // 1. GITHUB_TOKEN environment variable set
+      // 1. GITHUB_API_TOKEN environment variable set
       // 2. GITHUB_OWNER and GITHUB_REPO configured
       // If these are not available, the test may fail or timeout.
 

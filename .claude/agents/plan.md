@@ -114,7 +114,7 @@ If Scout flagged complex code, create Phase 0 subtask: "Untangle [filename] logi
    ```markdown
    ## Required Environment Configuration
    - `ANTHROPIC_API_KEY` - Required for AI features (or specify fallback behavior)
-   - `GITHUB_TOKEN` - Required for GitHub integration
+   - `GITHUB_API_TOKEN` - Required for GitHub integration (API calls via Octokit)
    ```
 
 2. **Include verification subtask in Phase 0**:
