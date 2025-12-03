@@ -1,0 +1,199 @@
+/**
+ * Integration Test Context
+ * Provides utilities for testing API routes with real database
+ */
+import { NextRequest } from 'next/server'
+import { PrismaClient } from '@prisma/client'
+import { getTestPrisma, cleanupTestData } from './db'
+
+let prisma: PrismaClient | null = null
+
+/**
+ * Get shared Prisma instance for integration tests
+ */
+export function getIntegrationPrisma(): PrismaClient {
+  if (!prisma) {
+    prisma = getTestPrisma()
+  }
+  return prisma
+}
+
+/**
+ * Clean test data before each test
+ * Preserves seed data (users, company, brand)
+ */
+export async function cleanupBeforeTest(): Promise<void> {
+  const db = getIntegrationPrisma()
+  await cleanupTestData(db)
+}
+
+/**
+ * Create a mock NextRequest for route handler testing
+ */
+export function createTestRequest(
+  path: string,
+  options: {
+    method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+    body?: Record<string, unknown>
+    searchParams?: Record<string, string>
+  } = {}
+): NextRequest {
+  const { method = 'GET', body, searchParams = {} } = options
+
+  const url = new URL(path, 'http://localhost:4500')
+  Object.entries(searchParams).forEach(([key, value]) => {
+    url.searchParams.set(key, value)
+  })
+
+  const init = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body && method !== 'GET' ? JSON.stringify(body) : undefined,
+  }
+
+  return new NextRequest(url, init)
+}
+
+/**
+ * Parse route handler response for assertions
+ */
+export async function parseRouteResponse<T = unknown>(response: Response): Promise<{
+  status: number
+  data: T | null
+  error: string | null
+}> {
+  const status = response.status
+  const json = await response.json().catch(() => null)
+
+  return {
+    status,
+    data: json?.data ?? json,
+    error: json?.error ?? null,
+  }
+}
+
+/**
+ * Create test component in database with proper brand context
+ */
+export async function createTestComponentInDb(
+  companyId: string,
+  overrides: Partial<{
+    name: string
+    skuCode: string
+    category: string
+    reorderPoint: number
+  }> = {}
+): Promise<{ id: string; name: string; skuCode: string }> {
+  const db = getIntegrationPrisma()
+
+  // Get the company's first ACTIVE brand - matching what the route does
+  const brand = await db.brand.findFirst({
+    where: { company: { id: companyId }, isActive: true },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (!brand) {
+    throw new Error('No brand found for company')
+  }
+
+  // Get admin user for createdById
+  const admin = await db.user.findFirst({
+    where: { companyId, role: 'admin' },
+  })
+
+  const timestamp = Date.now()
+  const component = await db.component.create({
+    data: {
+      brandId: brand.id,
+      name: overrides.name ?? `Test Component ${timestamp}`,
+      skuCode: overrides.skuCode ?? `TC-${timestamp}`,
+      category: overrides.category ?? 'Test',
+      unitOfMeasure: 'each',
+      costPerUnit: 10.0,
+      reorderPoint: overrides.reorderPoint ?? 100,
+      leadTimeDays: 7,
+      createdById: admin?.id ?? brand.id, // fallback
+      updatedById: admin?.id ?? brand.id,
+    },
+  })
+
+  return { id: component.id, name: component.name, skuCode: component.skuCode }
+}
+
+/**
+ * Create test SKU in database with proper brand context
+ */
+export async function createTestSKUInDb(
+  companyId: string,
+  overrides: Partial<{
+    name: string
+    internalCode: string
+    salesChannel: string
+  }> = {}
+): Promise<{ id: string; name: string; internalCode: string }> {
+  const db = getIntegrationPrisma()
+
+  const brand = await db.brand.findFirst({
+    where: { company: { id: companyId }, isActive: true },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (!brand) {
+    throw new Error('No brand found for company')
+  }
+
+  const admin = await db.user.findFirst({
+    where: { companyId, role: 'admin' },
+  })
+
+  const timestamp = Date.now()
+  const sku = await db.sKU.create({
+    data: {
+      brandId: brand.id,
+      name: overrides.name ?? `Test SKU ${timestamp}`,
+      internalCode: overrides.internalCode ?? `SKU-${timestamp}`,
+      salesChannel: overrides.salesChannel ?? 'Amazon',
+      createdById: admin?.id ?? brand.id,
+      updatedById: admin?.id ?? brand.id,
+    },
+  })
+
+  return { id: sku.id, name: sku.name, internalCode: sku.internalCode }
+}
+
+/**
+ * Create test receipt transaction in database
+ */
+export async function createTestReceiptInDb(
+  companyId: string,
+  componentId: string,
+  quantity: number
+): Promise<{ id: string; quantity: number }> {
+  const db = getIntegrationPrisma()
+
+  const admin = await db.user.findFirst({
+    where: { companyId, role: 'admin' },
+  })
+
+  const transaction = await db.transaction.create({
+    data: {
+      companyId,
+      type: 'receipt',
+      date: new Date(),
+      supplier: 'Test Supplier',
+      createdById: admin?.id ?? companyId,
+      lines: {
+        create: {
+          componentId,
+          quantityChange: quantity,
+          costPerUnit: 10.0,
+        },
+      },
+    },
+    include: {
+      lines: true,
+    },
+  })
+
+  return { id: transaction.id, quantity }
+}

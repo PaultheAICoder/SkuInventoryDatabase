@@ -2,235 +2,561 @@
  * Integration tests for Transaction Flows
  * Tests receipt, adjustment, and build transaction logic
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
+import { setTestSession, clearTestSession, TEST_SESSIONS, initializeTestSessions } from '../helpers/auth-mock'
+import {
+  getIntegrationPrisma,
+  cleanupBeforeTest,
+  createTestRequest,
+  parseRouteResponse,
+  createTestComponentInDb,
+  createTestSKUInDb,
+} from '../helpers/integration-context'
+import { disconnectTestDb } from '../helpers/db'
+import { DEFAULT_SETTINGS } from '@/types/settings'
 
-/**
- * Transaction System Architecture:
- *
- * Three transaction types:
- * 1. Receipt - Adds inventory (positive quantity change)
- * 2. Adjustment - Adds or removes inventory with a reason
- * 3. Build - Consumes components per BOM to "build" a SKU
- *
- * All transactions create TransactionLines that track quantity changes per component.
- * The inventory quantity is calculated by summing all TransactionLines for a component.
- */
+// Import route handlers directly
+import { POST as createReceipt } from '@/app/api/transactions/receipt/route'
+import { POST as createAdjustment } from '@/app/api/transactions/adjustment/route'
+import { POST as createBuild } from '@/app/api/transactions/build/route'
+import { GET as getTransactions } from '@/app/api/transactions/route'
 
 describe('Transaction Flows', () => {
+  beforeAll(async () => {
+    const prisma = getIntegrationPrisma()
+    await initializeTestSessions(prisma)
+  })
+
+  beforeEach(async () => {
+    await cleanupBeforeTest()
+    clearTestSession()
+
+    // Reset company settings to defaults to ensure consistent test state
+    const prisma = getIntegrationPrisma()
+    await prisma.company.update({
+      where: { id: TEST_SESSIONS.admin!.user.companyId },
+      data: { settings: DEFAULT_SETTINGS },
+    })
+  })
+
+  afterAll(async () => {
+    await disconnectTestDb()
+  })
+
   describe('Receipt Transaction', () => {
-    it('documents receipt transaction flow', () => {
-      // POST /api/transactions/receipt
-      // Required fields:
-      // - componentId: UUID of component
-      // - quantity: positive number (units received)
-      // - supplier: string (who it was received from)
-      // - date: date of receipt
-      //
-      // Optional fields:
-      // - costPerUnit: override component cost for this receipt
-      // - updateComponentCost: if true, update component's costPerUnit
-      // - notes: additional notes
-      expect(true).toBe(true)
+    it('creates receipt with positive quantity change', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 50,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify quantity in database
+      const prisma = getIntegrationPrisma()
+      const quantity = await prisma.transactionLine.aggregate({
+        where: { componentId: component.id },
+        _sum: { quantityChange: true },
+      })
+
+      expect(Number(quantity._sum.quantityChange)).toBe(50)
     })
 
-    it('documents receipt creates positive quantity change', () => {
-      // Receipt transactions create a TransactionLine with:
-      // - quantityChange: +quantity (positive)
-      // - costPerUnit: either provided costPerUnit or component's current cost
-      //
-      // This increases the component's on-hand quantity
-      expect(true).toBe(true)
+    it('receipt with cost update changes component cost', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+          costPerUnit: 25.50,
+          updateComponentCost: true,
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify component cost was updated
+      const prisma = getIntegrationPrisma()
+      const updatedComponent = await prisma.component.findUnique({
+        where: { id: component.id },
+      })
+
+      expect(Number(updatedComponent?.costPerUnit)).toBe(25.5)
     })
 
-    it('documents receipt cost update option', () => {
-      // If updateComponentCost: true AND costPerUnit is provided:
-      // - Component's costPerUnit is updated to the new value
-      // - Future transactions will use this new cost
-      //
-      // This is useful for updating average/last cost on receipt
-      expect(true).toBe(true)
+    it('viewer cannot create receipt (401)', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      setTestSession(TEST_SESSIONS.viewer!)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 50,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
     })
 
-    it('documents receipt validation', () => {
-      // Validation:
-      // - componentId must exist and belong to user's company
-      // - quantity must be positive
-      // - supplier is required
-      // - date is required
-      //
-      // Returns 404 for invalid componentId (tenant scoping)
-      expect(true).toBe(true)
+    it('ops can create receipt', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      setTestSession(TEST_SESSIONS.ops!)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 75,
+          supplier: 'Ops Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+    })
+
+    it('receipt with invalid component returns 404', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: '00000000-0000-0000-0000-000000000000',
+          quantity: 50,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(404)
     })
   })
 
   describe('Adjustment Transaction', () => {
-    it('documents adjustment transaction flow', () => {
-      // POST /api/transactions/adjustment
-      // Required fields:
-      // - componentId: UUID of component
-      // - quantity: positive or negative number
-      // - reason: string explaining the adjustment
-      // - date: date of adjustment
-      //
-      // Optional fields:
-      // - notes: additional notes
-      expect(true).toBe(true)
+    it('positive adjustment increases inventory', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/adjustment', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 25,
+          reason: 'Found extra inventory',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createAdjustment(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify quantity in database
+      const prisma = getIntegrationPrisma()
+      const quantity = await prisma.transactionLine.aggregate({
+        where: { componentId: component.id },
+        _sum: { quantityChange: true },
+      })
+
+      expect(Number(quantity._sum.quantityChange)).toBe(25)
     })
 
-    it('documents positive adjustment increases inventory', () => {
-      // Positive quantity adjustment:
-      // - Creates TransactionLine with positive quantityChange
-      // - Increases component's on-hand quantity
-      // - Use case: found extra inventory during count
-      expect(true).toBe(true)
+    it('negative adjustment decreases inventory', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      // First add some inventory
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Now create negative adjustment
+      const adjustmentRequest = createTestRequest('/api/transactions/adjustment', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: -30,
+          reason: 'Damaged goods',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createAdjustment(adjustmentRequest)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify final quantity
+      const prisma = getIntegrationPrisma()
+      const quantity = await prisma.transactionLine.aggregate({
+        where: { componentId: component.id },
+        _sum: { quantityChange: true },
+      })
+
+      expect(Number(quantity._sum.quantityChange)).toBe(70) // 100 - 30
     })
 
-    it('documents negative adjustment decreases inventory', () => {
-      // Negative quantity adjustment:
-      // - Creates TransactionLine with negative quantityChange
-      // - Decreases component's on-hand quantity
-      // - Use case: damaged/lost inventory, count correction
-      expect(true).toBe(true)
+    it('adjustment includes reason in response', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/adjustment', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: -10,
+          reason: 'Cycle count correction',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createAdjustment(request)
+      const result = await parseRouteResponse<{ reason: string }>(response)
+
+      expect(result.status).toBe(201)
+      expect(result.data?.reason).toBe('Cycle count correction')
     })
 
-    it('documents adjustment requires reason', () => {
-      // The reason field is required for audit purposes
-      // Examples: "Physical count correction", "Damaged goods", "Cycle count"
-      expect(true).toBe(true)
+    it('viewer cannot create adjustment (401)', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      setTestSession(TEST_SESSIONS.viewer!)
+
+      const request = createTestRequest('/api/transactions/adjustment', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 10,
+          reason: 'Test',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createAdjustment(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
     })
   })
 
   describe('Build Transaction', () => {
-    it('documents build transaction flow', () => {
-      // POST /api/transactions/build
-      // Required fields:
-      // - skuId: UUID of SKU to build
-      // - bomVersionId: UUID of BOM version to use
-      // - unitsToBuild: positive number of units to build
-      // - date: date of build
-      //
-      // Optional fields:
-      // - salesChannel: channel this build is for
-      // - allowInsufficientInventory: override insufficient inventory check
-      // - notes: additional notes
-      expect(true).toBe(true)
+    it('build consumes components per BOM', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component
+      const component = await createTestComponentInDb(companyId)
+
+      // Add inventory
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 100,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Create SKU with BOM
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version with line
+      const bomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2,
+            },
+          },
+        },
+      })
+
+      // Build 10 units (should consume 20 components)
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          bomVersionId: bomVersion.id,
+          unitsToBuild: 10,
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify component quantity decreased
+      const quantity = await prisma.transactionLine.aggregate({
+        where: { componentId: component.id },
+        _sum: { quantityChange: true },
+      })
+
+      expect(Number(quantity._sum.quantityChange)).toBe(80) // 100 - 20
     })
 
-    it('documents build consumes components per BOM', () => {
-      // For each BOM line:
-      // - Calculate required quantity: line.quantityPerUnit * unitsToBuild
-      // - Create TransactionLine with negative quantityChange
-      //
-      // Example: BOM has 2 widgets per unit, building 10 units
-      // -> Consume 20 widgets (quantityChange = -20)
-      expect(true).toBe(true)
+    it('build fails with insufficient inventory', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component (no inventory)
+      const component = await createTestComponentInDb(companyId)
+
+      // Create SKU with BOM
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version with line
+      const bomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 5,
+            },
+          },
+        },
+      })
+
+      // Try to build (should fail - no inventory)
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          bomVersionId: bomVersion.id,
+          unitsToBuild: 10,
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse(response)
+
+      // Should return 400 with insufficient inventory error
+      expect(result.status).toBe(400)
     })
 
-    it('documents build calculates BOM cost', () => {
-      // Build transaction captures:
-      // - unitBomCost: sum of (component cost * quantity per unit) at time of build
-      // - totalBomCost: unitBomCost * unitsToBuild
-      //
-      // This is a snapshot of costs at build time
-      expect(true).toBe(true)
+    it('build with allowInsufficientInventory proceeds', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create component (no inventory)
+      const component = await createTestComponentInDb(companyId)
+
+      // Create SKU with BOM
+      const sku = await createTestSKUInDb(companyId)
+
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
+
+      // Create BOM version
+      const bomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 2,
+            },
+          },
+        },
+      })
+
+      // Build with allowInsufficientInventory
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          bomVersionId: bomVersion.id,
+          unitsToBuild: 5,
+          date: new Date().toISOString().split('T')[0],
+          allowInsufficientInventory: true,
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify negative inventory
+      const quantity = await prisma.transactionLine.aggregate({
+        where: { componentId: component.id },
+        _sum: { quantityChange: true },
+      })
+
+      expect(Number(quantity._sum.quantityChange)).toBe(-10) // 0 - 10
     })
 
-    it('documents build insufficient inventory check', () => {
-      // Before building, check if sufficient inventory exists:
-      // 1. For each BOM line, calculate required quantity
-      // 2. Compare to component's current on-hand quantity
-      // 3. If any component is short, return error with details
-      //
-      // Response includes:
-      // - componentId, componentName, skuCode
-      // - required, available, shortage quantities
-      expect(true).toBe(true)
-    })
+    it('viewer cannot create build (401)', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
 
-    it('documents build allowInsufficientInventory option', () => {
-      // If allowInsufficientInventory: true:
-      // - Build proceeds even with insufficient inventory
-      // - Response includes warning flag
-      // - Response includes insufficientItems list
-      //
-      // Use case: backflushing, manual override for urgent builds
-      expect(true).toBe(true)
-    })
+      const component = await createTestComponentInDb(companyId)
+      const sku = await createTestSKUInDb(companyId)
 
-    it('documents build company settings override', () => {
-      // Company setting allowNegativeInventory:
-      // - If true, acts like allowInsufficientInventory for all builds
-      // - Per-request flag can still override to block
-      //
-      // This allows companies to choose their inventory policy
-      expect(true).toBe(true)
-    })
+      const admin = await prisma.user.findFirst({
+        where: { companyId, role: 'admin' },
+      })
 
-    it('documents build requires active BOM', () => {
-      // Validation:
-      // - skuId must exist and belong to user's company
-      // - bomVersionId must exist and belong to the SKU
-      // - BOM should have at least one line (warning if empty)
-      //
-      // Typically the active BOM is used, but any version can be specified
-      expect(true).toBe(true)
+      const bomVersion = await prisma.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: admin!.id,
+          lines: {
+            create: {
+              componentId: component.id,
+              quantityPerUnit: 1,
+            },
+          },
+        },
+      })
+
+      setTestSession(TEST_SESSIONS.viewer!)
+
+      const buildRequest = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          bomVersionId: bomVersion.id,
+          unitsToBuild: 1,
+          date: new Date().toISOString().split('T')[0],
+          allowInsufficientInventory: true,
+        },
+      })
+
+      const response = await createBuild(buildRequest)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
     })
   })
 
-  describe('Transaction Quantity Calculation', () => {
-    it('documents quantity calculated from transaction lines', () => {
-      // Component quantity on hand is calculated as:
-      // SUM(transactionLines.quantityChange) WHERE componentId = X
-      //
-      // This is done via getComponentQuantity() service function
-      expect(true).toBe(true)
+  describe('Transaction List', () => {
+    it('returns transactions for authenticated user', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      // Create a receipt
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 50,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      await createReceipt(receiptRequest)
+
+      // Get transactions
+      const request = createTestRequest('/api/transactions')
+      const response = await getTransactions(request)
+      const result = await parseRouteResponse<Array<{ type: string }>>(response)
+
+      expect(result.status).toBe(200)
+      const dataArray = Array.isArray(result.data) ? result.data : []
+      expect(dataArray.length).toBeGreaterThan(0)
+      expect(dataArray[0].type).toBe('receipt')
     })
 
-    it('documents quantity can go negative with allowNegativeInventory', () => {
-      // If company allows negative inventory:
-      // - Build can proceed even if it would result in negative on-hand
-      // - Useful for backflushing workflows
-      // - Warning is returned but transaction succeeds
-      expect(true).toBe(true)
-    })
-  })
+    it('transaction includes createdBy info', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
 
-  describe('Transaction Role Restrictions', () => {
-    it('documents viewer cannot create transactions', () => {
-      // Viewers (role: 'viewer') cannot:
-      // - POST /api/transactions/receipt -> 403
-      // - POST /api/transactions/adjustment -> 403
-      // - POST /api/transactions/build -> 403
-      //
-      // They can only read (GET /api/transactions)
-      expect(true).toBe(true)
-    })
+      // Create a receipt
+      const receiptRequest = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 25,
+          supplier: 'Audit Test',
+          date: new Date().toISOString().split('T')[0],
+        },
+      })
+      const receiptResponse = await createReceipt(receiptRequest)
+      const receiptResult = await parseRouteResponse<{ createdBy: { id: string; name: string } }>(receiptResponse)
 
-    it('documents ops and admin can create transactions', () => {
-      // Ops (role: 'ops') and Admin (role: 'admin') can:
-      // - Create all transaction types
-      // - View all transaction types
-      expect(true).toBe(true)
-    })
-  })
-
-  describe('Transaction Audit Trail', () => {
-    it('documents transaction includes creator info', () => {
-      // Each transaction records:
-      // - createdById: user who created it
-      // - createdAt: timestamp
-      //
-      // This provides an audit trail for all inventory changes
-      expect(true).toBe(true)
-    })
-
-    it('documents transaction lines are immutable', () => {
-      // Once created, transactions and their lines cannot be:
-      // - Modified
-      // - Deleted (except by admin for data cleanup)
-      //
-      // To correct an error, create an adjustment transaction
-      expect(true).toBe(true)
+      expect(receiptResult.status).toBe(201)
+      expect(receiptResult.data?.createdBy).toBeDefined()
+      expect(receiptResult.data?.createdBy.id).toBe(TEST_SESSIONS.admin!.user.id)
     })
   })
 })
