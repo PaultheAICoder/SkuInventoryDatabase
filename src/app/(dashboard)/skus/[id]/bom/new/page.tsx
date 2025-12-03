@@ -21,8 +21,8 @@ export default function NewBOMPage() {
         if (!res.ok) {
           throw new Error('SKU not found')
         }
-        const data = await res.json()
-        setSkuName(data.data.name)
+        const data = await res.json().catch(() => ({}))
+        setSkuName(data?.data?.name || '')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load SKU')
       } finally {

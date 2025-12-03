@@ -15,8 +15,8 @@ export default function SettingsPage() {
       if (!res.ok) {
         throw new Error('Failed to load settings')
       }
-      const data = await res.json()
-      setSettings(data.data)
+      const data = await res.json().catch(() => ({}))
+      setSettings(data?.data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -36,8 +36,8 @@ export default function SettingsPage() {
     })
 
     if (!res.ok) {
-      const data = await res.json()
-      throw new Error(data.error || 'Failed to save settings')
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data?.error || 'Failed to save settings')
     }
 
     // Refresh settings

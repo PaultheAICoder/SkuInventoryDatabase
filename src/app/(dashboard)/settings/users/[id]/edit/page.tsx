@@ -22,8 +22,8 @@ export default function EditUserPage() {
         if (!res.ok) {
           throw new Error('User not found')
         }
-        const data = await res.json()
-        setUser(data.data)
+        const data = await res.json().catch(() => ({}))
+        setUser(data?.data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {

@@ -25,8 +25,8 @@ export default function TransactionDetailPage() {
           }
           throw new Error('Failed to load transaction')
         }
-        const data = await res.json()
-        setTransaction(data.data)
+        const data = await res.json().catch(() => ({}))
+        setTransaction(data?.data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {

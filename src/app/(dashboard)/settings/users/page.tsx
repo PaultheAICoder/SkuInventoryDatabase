@@ -39,8 +39,8 @@ export default function UsersPage() {
       if (!res.ok) {
         throw new Error('Failed to load users')
       }
-      const data = await res.json()
-      setUsers(data.data)
+      const data = await res.json().catch(() => ({}))
+      setUsers(data?.data || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
