@@ -1,0 +1,45 @@
+{
+  "issueNumber": 116,
+  "issueTitle": "[Parent #13] Create API endpoints for forecast data and configuration",
+  "phases": {
+    "scout-plan": {
+      "startTime": "2025-12-04T13:48:00Z",
+      "endTime": "2025-12-04T13:55:00Z",
+      "durationMinutes": 7
+    },
+    "build": {
+      "startTime": "2025-12-04T14:00:00Z",
+      "endTime": "2025-12-04T14:25:00Z",
+      "durationMinutes": 25
+    },
+    "review": {
+      "startTime": "2025-12-04T14:00:00Z",
+      "endTime": "2025-12-04T14:05:00Z",
+      "durationMinutes": 5
+    }
+  },
+  "totalDurationMinutes": 37,
+  "status": "complete",
+  "planFile": ".agents/outputs/plan-116-120425.md",
+  "buildFile": ".agents/outputs/build-116-120425.md",
+  "cleanupFile": ".agents/outputs/cleanup-116-120425.md",
+  "estimatedBuildHours": "4-6",
+  "actualBuildMinutes": 25,
+  "complexity": "Moderate",
+  "dependencies": {
+    "112": "CLOSED - Types defined",
+    "115": "CLOSED - Forecast service implemented"
+  },
+  "blockedBy": [],
+  "blocks": ["#4 (Dashboard UI)", "#5 (UI Components)", "#6 (Export)"],
+  "filesCreated": [
+    "src/app/api/forecasts/route.ts",
+    "src/app/api/forecasts/[componentId]/route.ts",
+    "src/app/api/forecasts/config/route.ts"
+  ],
+  "testResults": {
+    "total": 539,
+    "passed": 539,
+    "failed": 0
+  }
+}
