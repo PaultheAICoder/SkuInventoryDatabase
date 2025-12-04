@@ -29,6 +29,20 @@ export async function GET(
         name: true,
         createdAt: true,
         updatedAt: true,
+        brands: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            _count: {
+              select: {
+                components: true,
+                skus: true,
+              },
+            },
+          },
+          orderBy: { name: 'asc' },
+        },
         _count: {
           select: {
             users: true,
@@ -48,6 +62,13 @@ export async function GET(
         name: company.name,
         userCount: company._count.users,
         brandCount: company._count.brands,
+        brands: company.brands.map((b) => ({
+          id: b.id,
+          name: b.name,
+          isActive: b.isActive,
+          componentCount: b._count.components,
+          skuCount: b._count.skus,
+        })),
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),
       },
@@ -109,6 +130,93 @@ export async function PATCH(
       }
     }
 
+    // Handle brand association updates if brandIds provided
+    if (validation.data.brandIds !== undefined) {
+      const requestedBrandIds = validation.data.brandIds
+
+      // Get current brands for this company
+      const currentBrands = await prisma.brand.findMany({
+        where: { companyId: id },
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { components: true, skus: true } },
+        },
+      })
+      const currentBrandIds = currentBrands.map((b) => b.id)
+
+      // Brands to add to this company (reassign from other companies)
+      const brandsToAdd = requestedBrandIds.filter((bid) => !currentBrandIds.includes(bid))
+
+      // Brands to remove from this company
+      const brandsToRemove = currentBrandIds.filter((bid) => !requestedBrandIds.includes(bid))
+
+      // Validate: cannot remove brands that have components or SKUs
+      if (brandsToRemove.length > 0) {
+        const brandsWithData = currentBrands.filter(
+          (b) => brandsToRemove.includes(b.id) && (b._count.components > 0 || b._count.skus > 0)
+        )
+
+        if (brandsWithData.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Cannot disassociate brands with components or SKUs: ${brandsWithData.map((b) => b.name).join(', ')}. Delete the brand's components and SKUs first.`,
+            },
+            { status: 400 }
+          )
+        }
+
+        // For empty brands being removed, we'll delete them
+        await prisma.brand.deleteMany({
+          where: {
+            id: { in: brandsToRemove },
+            components: { none: {} },
+            skus: { none: {} },
+          },
+        })
+      }
+
+      // Validate brands to add exist (and get their current company info)
+      if (brandsToAdd.length > 0) {
+        const brandsToReassign = await prisma.brand.findMany({
+          where: { id: { in: brandsToAdd } },
+          select: {
+            id: true,
+            name: true,
+            companyId: true,
+            _count: { select: { components: true, skus: true } },
+          },
+        })
+
+        const foundIds = brandsToReassign.map((b) => b.id)
+        const missingIds = brandsToAdd.filter((bid) => !foundIds.includes(bid))
+
+        if (missingIds.length > 0) {
+          return NextResponse.json(
+            { error: `Brand IDs not found: ${missingIds.join(', ')}` },
+            { status: 400 }
+          )
+        }
+
+        // Warn about brands with data being moved (could orphan data)
+        const brandsWithData = brandsToReassign.filter(
+          (b) => b._count.components > 0 || b._count.skus > 0
+        )
+        if (brandsWithData.length > 0) {
+          // Allow but warn - the components/SKUs will move with the brand
+          console.warn(
+            `Moving brands with data to company ${id}: ${brandsWithData.map((b) => `${b.name} (${b._count.components} components, ${b._count.skus} SKUs)`).join(', ')}`
+          )
+        }
+
+        // Reassign brands to this company
+        await prisma.brand.updateMany({
+          where: { id: { in: brandsToAdd } },
+          data: { companyId: id },
+        })
+      }
+    }
+
     // Prepare update data
     const updateData: Parameters<typeof prisma.company.update>[0]['data'] = {}
 
@@ -123,6 +231,20 @@ export async function PATCH(
         name: true,
         createdAt: true,
         updatedAt: true,
+        brands: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true,
+            _count: {
+              select: {
+                components: true,
+                skus: true,
+              },
+            },
+          },
+          orderBy: { name: 'asc' },
+        },
         _count: {
           select: {
             users: true,
@@ -138,6 +260,13 @@ export async function PATCH(
         name: company.name,
         userCount: company._count.users,
         brandCount: company._count.brands,
+        brands: company.brands.map((b) => ({
+          id: b.id,
+          name: b.name,
+          isActive: b.isActive,
+          componentCount: b._count.components,
+          skuCount: b._count.skus,
+        })),
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),
       },

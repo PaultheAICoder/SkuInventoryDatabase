@@ -8,22 +8,45 @@ import { ArrowLeft } from 'lucide-react'
 import { CompanyForm } from '@/components/features/CompanyForm'
 import type { CompanyResponse } from '@/types/company'
 
+interface BrandOption {
+  id: string
+  name: string
+  isActive: boolean
+  companyId: string
+  companyName?: string
+  componentCount: number
+  skuCount: number
+}
+
 export default function EditCompanyPage() {
   const params = useParams()
   const id = params.id as string
   const [company, setCompany] = useState<CompanyResponse | null>(null)
+  const [allBrands, setAllBrands] = useState<BrandOption[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchCompany() {
+    async function fetchData() {
       try {
-        const res = await fetch(`/api/companies/${id}`)
-        if (!res.ok) {
+        // Fetch company and all brands in parallel
+        const [companyRes, brandsRes] = await Promise.all([
+          fetch(`/api/companies/${id}`),
+          fetch('/api/brands?all=true&pageSize=100'),
+        ])
+
+        if (!companyRes.ok) {
           throw new Error('Company not found')
         }
-        const data = await res.json().catch(() => ({}))
-        setCompany(data?.data)
+        if (!brandsRes.ok) {
+          throw new Error('Failed to load brands')
+        }
+
+        const companyData = await companyRes.json().catch(() => ({}))
+        const brandsData = await brandsRes.json().catch(() => ({}))
+
+        setCompany(companyData?.data)
+        setAllBrands(brandsData?.data || [])
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
@@ -31,7 +54,7 @@ export default function EditCompanyPage() {
       }
     }
 
-    fetchCompany()
+    fetchData()
   }, [id])
 
   if (isLoading) {
@@ -81,7 +104,7 @@ export default function EditCompanyPage() {
       </div>
 
       <div className="max-w-2xl">
-        <CompanyForm company={company} />
+        <CompanyForm company={company} allBrands={allBrands} />
       </div>
     </div>
   )

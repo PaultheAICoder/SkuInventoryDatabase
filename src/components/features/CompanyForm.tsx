@@ -6,20 +6,38 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
 import type { CompanyResponse } from '@/types/company'
+
+interface BrandOption {
+  id: string
+  name: string
+  isActive: boolean
+  companyId: string
+  companyName?: string
+  componentCount: number
+  skuCount: number
+}
 
 interface CompanyFormProps {
   company?: CompanyResponse
+  allBrands?: BrandOption[]
   onSuccess?: () => void
 }
 
-export function CompanyForm({ company, onSuccess }: CompanyFormProps) {
+export function CompanyForm({ company, allBrands = [], onSuccess }: CompanyFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Get initial selected brand IDs from company's brands
+  const initialBrandIds = company?.brands?.map((b) => b.id) || []
+
   const [formData, setFormData] = useState({
     name: company?.name ?? '',
+    selectedBrandIds: initialBrandIds,
   })
 
   const isEditing = !!company
@@ -33,10 +51,18 @@ export function CompanyForm({ company, onSuccess }: CompanyFormProps) {
       const url = isEditing ? `/api/companies/${company.id}` : '/api/companies'
       const method = isEditing ? 'PATCH' : 'POST'
 
+      const body: Record<string, unknown> = {
+        name: formData.name,
+      }
+
+      if (isEditing) {
+        body.brandIds = formData.selectedBrandIds
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: formData.name }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -55,6 +81,15 @@ export function CompanyForm({ company, onSuccess }: CompanyFormProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleBrandToggle = (brandId: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedBrandIds: checked
+        ? [...prev.selectedBrandIds, brandId]
+        : prev.selectedBrandIds.filter((id) => id !== brandId),
+    }))
   }
 
   return (
@@ -90,7 +125,70 @@ export function CompanyForm({ company, onSuccess }: CompanyFormProps) {
             </p>
           </div>
 
-          {isEditing && (
+          {isEditing && allBrands.length > 0 && (
+            <div className="space-y-3">
+              <Label>Brand Associations</Label>
+              <p className="text-xs text-muted-foreground">
+                Select which brands belong to this company. Brands with components or SKUs cannot be removed.
+              </p>
+              <ScrollArea className="h-[200px] rounded-md border p-3">
+                <div className="space-y-2">
+                  {allBrands.map((brand) => {
+                    const isChecked = formData.selectedBrandIds.includes(brand.id)
+                    const belongsToThisCompany = brand.companyId === company.id
+                    const hasData = brand.componentCount > 0 || brand.skuCount > 0
+                    const isDisabled = belongsToThisCompany && hasData && isChecked
+
+                    return (
+                      <div
+                        key={brand.id}
+                        className="flex items-center justify-between py-1"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`brand-${brand.id}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => handleBrandToggle(brand.id, !!checked)}
+                            disabled={isDisabled}
+                          />
+                          <Label
+                            htmlFor={`brand-${brand.id}`}
+                            className={`font-normal ${isDisabled ? 'text-muted-foreground' : ''}`}
+                          >
+                            {brand.name}
+                            {!brand.isActive && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                Inactive
+                              </Badge>
+                            )}
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {!belongsToThisCompany && brand.companyName && (
+                            <Badge variant="outline" className="text-xs">
+                              {brand.companyName}
+                            </Badge>
+                          )}
+                          {hasData && (
+                            <span>
+                              {brand.componentCount} comp, {brand.skuCount} SKUs
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+              {formData.selectedBrandIds.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  Warning: Company has no brands selected
+                </p>
+              )}
+            </div>
+          )}
+
+          {isEditing && allBrands.length === 0 && (
             <div className="text-sm text-muted-foreground">
               <p>Users: {company.userCount}</p>
               <p>Brands: {company.brandCount}</p>

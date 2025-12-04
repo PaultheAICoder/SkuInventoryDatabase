@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client'
 import { createBrandSchema, brandListQuerySchema } from '@/types/brand'
 
 // GET /api/brands - List brands (admin only)
+// Supports ?all=true to return brands from all companies (for admin editing)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -30,12 +31,17 @@ export async function GET(request: NextRequest) {
 
     const { page, pageSize, search, isActive, sortBy, sortOrder } = validation.data
 
-    // Use selected company for scoping
+    // Check for admin "all brands" mode
+    const showAll = request.nextUrl.searchParams.get('all') === 'true'
+
+    // Use selected company for scoping (unless showing all)
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // Build where clause - scope by selected company
-    const where: Prisma.BrandWhereInput = {
-      companyId: selectedCompanyId,
+    // Build where clause - only scope by company if NOT showing all
+    const where: Prisma.BrandWhereInput = {}
+
+    if (!showAll) {
+      where.companyId = selectedCompanyId
     }
 
     if (search) {
@@ -49,13 +55,20 @@ export async function GET(request: NextRequest) {
     // Get total count
     const total = await prisma.brand.count({ where })
 
-    // Get brands with component and SKU counts
+    // Get brands with component and SKU counts (include company info when showing all)
     const brands = await prisma.brand.findMany({
       where,
       select: {
         id: true,
         name: true,
         isActive: true,
+        companyId: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -77,6 +90,8 @@ export async function GET(request: NextRequest) {
         id: brand.id,
         name: brand.name,
         isActive: brand.isActive,
+        companyId: brand.companyId,
+        companyName: brand.company?.name,
         componentCount: brand._count.components,
         skuCount: brand._count.skus,
         createdAt: brand.createdAt.toISOString(),

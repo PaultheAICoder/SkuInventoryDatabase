@@ -35,6 +35,8 @@ export interface BrandResponse {
   id: string
   name: string
   isActive: boolean
+  companyId?: string
+  companyName?: string
   componentCount: number
   skuCount: number
   createdAt: string

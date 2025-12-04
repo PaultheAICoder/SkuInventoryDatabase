@@ -10,6 +10,7 @@ export type CreateCompanyInput = z.infer<typeof createCompanySchema>
 // Company update schema (admin only)
 export const updateCompanySchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less').optional(),
+  brandIds: z.array(z.string().uuid()).optional(),
 })
 
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>
@@ -25,12 +26,22 @@ export const companyListQuerySchema = z.object({
 
 export type CompanyListQuery = z.infer<typeof companyListQuerySchema>
 
+// Brand info returned with company details
+export interface BrandInfo {
+  id: string
+  name: string
+  isActive: boolean
+  componentCount: number
+  skuCount: number
+}
+
 // Company response type (what API returns)
 export interface CompanyResponse {
   id: string
   name: string
   userCount: number
   brandCount: number
+  brands?: BrandInfo[]
   createdAt: string
   updatedAt: string
 }
