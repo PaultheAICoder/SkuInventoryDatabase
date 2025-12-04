@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
         outputToFinishedGoods: data.outputToFinishedGoods,
         outputLocationId: data.outputLocationId,
         outputQuantity: data.outputQuantity,
+        lotOverrides: data.lotOverrides,
       })
 
       return created({
@@ -139,6 +140,14 @@ export async function POST(request: NextRequest) {
             component: line.component,
             quantityChange: line.quantityChange.toString(),
             costPerUnit: line.costPerUnit?.toString() ?? null,
+            lotId: line.lotId ?? null,
+            lot: line.lot
+              ? {
+                  id: line.lot.id,
+                  lotNumber: line.lot.lotNumber,
+                  expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+                }
+              : null,
           })),
           outputToFinishedGoods: result.transaction.outputToFinishedGoods ?? true,
           outputLocationId: result.transaction.outputLocationId ?? null,

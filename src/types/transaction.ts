@@ -69,6 +69,14 @@ export const createBuildSchema = z.object({
   outputToFinishedGoods: z.boolean().default(true),
   outputLocationId: z.string().uuid('Invalid output location ID').optional(),
   outputQuantity: z.coerce.number().int().positive().optional(),
+  // Lot overrides for manual lot selection during build
+  lotOverrides: z.array(z.object({
+    componentId: z.string().uuid('Invalid component ID'),
+    allocations: z.array(z.object({
+      lotId: z.string().uuid('Invalid lot ID'),
+      quantity: z.coerce.number().positive('Quantity must be positive'),
+    })),
+  })).optional(),
 })
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>
@@ -81,6 +89,18 @@ export interface InsufficientInventoryItem {
   required: number
   available: number
   shortage: number
+}
+
+// Lot selection for build consumption
+export interface LotSelection {
+  lotId: string
+  quantity: number
+}
+
+// Per-component lot allocation override
+export interface ComponentLotOverride {
+  componentId: string
+  allocations: LotSelection[]
 }
 
 // Build transaction response includes warning info

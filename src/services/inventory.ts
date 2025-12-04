@@ -694,6 +694,8 @@ export interface BuildTransactionResult {
     component: { id: string; name: string; skuCode: string }
     quantityChange: { toString(): string }
     costPerUnit: { toString(): string } | null
+    lotId: string | null
+    lot: { id: string; lotNumber: string; expiryDate: Date | null } | null
   }>
   outputToFinishedGoods?: boolean
   outputLocationId?: string | null
@@ -704,6 +706,8 @@ export interface BuildTransactionResult {
 /**
  * Create a build transaction that consumes components per BOM
  * Optionally allows proceeding with insufficient inventory (with warning)
+ * Supports lot consumption with FEFO (First Expiry First Out) algorithm
+ * and optional manual lot overrides per component
  */
 export async function createBuildTransaction(params: {
   companyId: string
@@ -722,6 +726,10 @@ export async function createBuildTransaction(params: {
   outputToFinishedGoods?: boolean
   outputLocationId?: string
   outputQuantity?: number
+  lotOverrides?: Array<{
+    componentId: string
+    allocations: Array<{ lotId: string; quantity: number }>
+  }>
 }): Promise<{
   transaction: BuildTransactionResult
   insufficientItems: InsufficientInventoryItem[]
@@ -741,6 +749,7 @@ export async function createBuildTransaction(params: {
     createdById,
     allowInsufficientInventory = false,
     locationId,
+    lotOverrides,
   } = params
 
   const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
@@ -806,7 +815,103 @@ export async function createBuildTransaction(params: {
       outputLocation = outputLoc
     }
 
-    // Create build transaction with consumption lines
+    // Build consumption lines with lot-aware consumption (FEFO algorithm)
+    const consumptionLines: Prisma.TransactionLineCreateManyTransactionInput[] = []
+
+    for (const bomLine of bomLines) {
+      const requiredQty = bomLine.quantityPerUnit.toNumber() * unitsToBuild
+
+      // Check if this component has a manual override
+      const override = lotOverrides?.find((o) => o.componentId === bomLine.componentId)
+
+      if (override) {
+        // Use manual lot allocations
+        for (const alloc of override.allocations) {
+          consumptionLines.push({
+            componentId: bomLine.componentId,
+            quantityChange: new Prisma.Decimal(-1 * alloc.quantity),
+            costPerUnit: bomLine.component.costPerUnit,
+            lotId: alloc.lotId,
+          })
+
+          // Deduct from LotBalance atomically
+          await tx.lotBalance.update({
+            where: { lotId: alloc.lotId },
+            data: {
+              quantity: { decrement: new Prisma.Decimal(alloc.quantity) },
+            },
+          })
+        }
+      } else {
+        // Try FEFO lot selection - query lots within transaction for consistency
+        const availableLots = await tx.lot.findMany({
+          where: {
+            componentId: bomLine.componentId,
+            balance: { quantity: { gt: 0 } },
+          },
+          include: { balance: true },
+          orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+        })
+
+        // Sort nulls to end (Prisma puts nulls first by default in asc)
+        const sortedLots = availableLots.sort((a, b) => {
+          if (a.expiryDate === null && b.expiryDate === null) return 0
+          if (a.expiryDate === null) return 1
+          if (b.expiryDate === null) return -1
+          return a.expiryDate.getTime() - b.expiryDate.getTime()
+        })
+
+        if (sortedLots.length > 0) {
+          // Component has lots - consume using FEFO
+          let remaining = requiredQty
+
+          for (const lot of sortedLots) {
+            if (remaining <= 0) break
+            const available = lot.balance?.quantity.toNumber() ?? 0
+            const toConsume = Math.min(available, remaining)
+
+            if (toConsume > 0) {
+              consumptionLines.push({
+                componentId: bomLine.componentId,
+                quantityChange: new Prisma.Decimal(-1 * toConsume),
+                costPerUnit: bomLine.component.costPerUnit,
+                lotId: lot.id,
+              })
+
+              // Deduct from LotBalance atomically
+              await tx.lotBalance.update({
+                where: { lotId: lot.id },
+                data: {
+                  quantity: { decrement: new Prisma.Decimal(toConsume) },
+                },
+              })
+
+              remaining -= toConsume
+            }
+          }
+
+          // If still remaining and allowInsufficientInventory, add pooled consumption
+          if (remaining > 0 && allowInsufficientInventory) {
+            consumptionLines.push({
+              componentId: bomLine.componentId,
+              quantityChange: new Prisma.Decimal(-1 * remaining),
+              costPerUnit: bomLine.component.costPerUnit,
+              lotId: null,
+            })
+          }
+        } else {
+          // Component has no lots - use pooled inventory (existing behavior)
+          consumptionLines.push({
+            componentId: bomLine.componentId,
+            quantityChange: new Prisma.Decimal(-1 * requiredQty),
+            costPerUnit: bomLine.component.costPerUnit,
+            lotId: null,
+          })
+        }
+      }
+    }
+
+    // Create build transaction with all consumption lines
     const transaction = await tx.transaction.create({
       data: {
         companyId,
@@ -825,14 +930,9 @@ export async function createBuildTransaction(params: {
         affectedUnits,
         createdById,
         lines: {
-          create: bomLines.map((line) => ({
-            componentId: line.componentId,
-            // Negative quantity (consuming inventory)
-            quantityChange: new Prisma.Decimal(
-              -1 * line.quantityPerUnit.toNumber() * unitsToBuild
-            ),
-            costPerUnit: line.component.costPerUnit,
-          })),
+          createMany: {
+            data: consumptionLines,
+          },
         },
       },
       include: {
@@ -862,6 +962,13 @@ export async function createBuildTransaction(params: {
                 id: true,
                 name: true,
                 skuCode: true,
+              },
+            },
+            lot: {
+              select: {
+                id: true,
+                lotNumber: true,
+                expiryDate: true,
               },
             },
           },

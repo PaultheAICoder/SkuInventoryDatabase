@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Package } from 'lucide-react'
 import type { InsufficientInventoryItem } from '@/types/transaction'
 
 interface SKUOption {
@@ -29,6 +29,22 @@ interface SKUOption {
   internalCode: string
   maxBuildableUnits: number | null
   hasActiveBom: boolean
+}
+
+interface LotAvailabilityItem {
+  componentId: string
+  componentName: string
+  requiredQuantity: number
+  availableQuantity: number
+  hasLots: boolean
+  selectedLots: Array<{
+    lotId: string
+    lotNumber: string
+    quantity: number
+    expiryDate: string | null
+  }>
+  isPooled: boolean
+  isSufficient: boolean
 }
 
 interface BuildDialogProps {
@@ -61,6 +77,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
   })
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
+  const [lotAvailability, setLotAvailability] = useState<LotAvailabilityItem[]>([])
+  const [showLotDetails, setShowLotDetails] = useState(false)
 
   // Fetch SKUs and locations when dialog opens
   useEffect(() => {
@@ -123,6 +141,31 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
   const unitsToBuildNum = parseInt(formData.unitsToBuild) || 0
   const exceedsBuildable =
     selectedSku?.maxBuildableUnits != null && unitsToBuildNum > selectedSku.maxBuildableUnits
+
+  // Fetch lot availability when SKU or units change
+  const fetchLotAvailability = useCallback(async (skuId: string, units: number) => {
+    if (!skuId || !units || units <= 0) {
+      setLotAvailability([])
+      return
+    }
+    try {
+      const res = await fetch(`/api/skus/${skuId}/lot-availability?units=${units}`)
+      if (res.ok) {
+        const data = await res.json()
+        setLotAvailability(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch lot availability:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (formData.skuId && unitsToBuildNum > 0) {
+      fetchLotAvailability(formData.skuId, unitsToBuildNum)
+    } else {
+      setLotAvailability([])
+    }
+  }, [formData.skuId, unitsToBuildNum, fetchLotAvailability])
 
   const handleSubmit = async (e: React.FormEvent, forceSubmit = false) => {
     e.preventDefault()
@@ -192,6 +235,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
       })
       setInsufficientItems([])
       setShowWarning(false)
+      setLotAvailability([])
+      setShowLotDetails(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -488,6 +533,59 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 </div>
               </div>
             </details>
+
+            {/* Lot Selection (collapsible) */}
+            {lotAvailability.some((la) => la.hasLots) && (
+              <details className="col-span-4" open={showLotDetails}>
+                <summary
+                  className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-2"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setShowLotDetails(!showLotDetails)
+                  }}
+                >
+                  <Package className="h-4 w-4" />
+                  Lot Selection (FEFO auto-selected)
+                </summary>
+                <div className="mt-4 space-y-4 pl-4 border-l-2 border-muted">
+                  {lotAvailability
+                    .filter((la) => la.hasLots)
+                    .map((comp) => (
+                      <div key={comp.componentId} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{comp.componentName}</p>
+                          {!comp.isSufficient && (
+                            <span className="text-xs text-yellow-600 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Insufficient lot inventory
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                          Required: {comp.requiredQuantity.toLocaleString()} | Available across lots:{' '}
+                          {comp.availableQuantity.toLocaleString()}
+                        </p>
+                        <div className="text-xs space-y-1">
+                          {comp.selectedLots.map((lot) => (
+                            <div key={lot.lotId} className="flex items-center gap-2 pl-2">
+                              <span className="font-mono bg-muted px-1 rounded">{lot.lotNumber}</span>
+                              <span className="text-muted-foreground" suppressHydrationWarning>
+                                ({lot.quantity.toLocaleString()} units)
+                              </span>
+                              {lot.expiryDate && (
+                                <span className="text-muted-foreground">Expires: {lot.expiryDate}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  <p className="text-xs text-muted-foreground italic">
+                    Lots are automatically selected using FEFO (First Expiry First Out).
+                  </p>
+                </div>
+              </details>
+            )}
           </div>
 
           {!showWarning && (

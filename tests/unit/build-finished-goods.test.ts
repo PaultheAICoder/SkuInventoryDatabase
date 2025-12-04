@@ -26,6 +26,12 @@ vi.mock('@/lib/db', () => ({
     finishedGoodsLine: {
       create: vi.fn(),
     },
+    lot: {
+      findMany: vi.fn(),
+    },
+    lotBalance: {
+      update: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))
@@ -114,29 +120,49 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
     } as never)
   })
 
+  // Helper to create transaction with lot info on lines
+  const mockTransactionWithLots = {
+    ...mockCreatedTransaction,
+    lines: mockCreatedTransaction.lines.map(l => ({ ...l, lotId: null, lot: null })),
+  }
+
+  // Helper to create mock transaction client with lot support
+  function createMockTxClient(overrides: {
+    locationResult?: { id: string; name: string } | null
+    finishedGoodsCallback?: () => void
+  } = {}) {
+    const locationValue = overrides.locationResult === null
+      ? null
+      : overrides.locationResult ?? { id: mockLocationId, name: 'Main Warehouse' }
+    return {
+      location: {
+        findFirst: vi.fn().mockResolvedValue(locationValue),
+      },
+      transaction: {
+        create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+      },
+      finishedGoodsLine: {
+        create: vi.fn().mockImplementation(() => {
+          if (overrides.finishedGoodsCallback) overrides.finishedGoodsCallback()
+          return Promise.resolve({ id: 'fg-line-1' })
+        }),
+      },
+      lot: {
+        findMany: vi.fn().mockResolvedValue([]), // No lots - pooled inventory
+      },
+      lotBalance: {
+        update: vi.fn().mockResolvedValue({}),
+      },
+    }
+  }
+
   describe('outputToFinishedGoods parameter behavior', () => {
     it('outputs to finished goods by default (when outputToFinishedGoods is not specified)', async () => {
       // Setup: Mock $transaction to capture what operations are performed
       let finishedGoodsCreated = false
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockImplementation(() => {
-              finishedGoodsCreated = true
-              return Promise.resolve({ id: 'fg-line-1' })
-            }),
-          },
-        }
+        const tx = createMockTxClient({ finishedGoodsCallback: () => { finishedGoodsCreated = true } })
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -160,23 +186,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       let finishedGoodsCreated = false
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockImplementation(() => {
-              finishedGoodsCreated = true
-              return Promise.resolve({ id: 'fg-line-1' })
-            }),
-          },
-        }
+        const tx = createMockTxClient({ finishedGoodsCallback: () => { finishedGoodsCreated = true } })
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -198,23 +208,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       let finishedGoodsCreated = false
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockImplementation(() => {
-              finishedGoodsCreated = true
-              return Promise.resolve({ id: 'fg-line-1' })
-            }),
-          },
-        }
+        const tx = createMockTxClient({ finishedGoodsCallback: () => { finishedGoodsCreated = true } })
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -248,7 +242,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
+            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { locationId: string } }) => {
@@ -256,6 +250,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
               return Promise.resolve({ id: 'fg-line-1' })
             }),
           },
+          lot: { findMany: vi.fn().mockResolvedValue([]) },
+          lotBalance: { update: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -286,7 +282,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
+            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { locationId: string } }) => {
@@ -294,6 +290,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
               return Promise.resolve({ id: 'fg-line-1' })
             }),
           },
+          lot: { findMany: vi.fn().mockResolvedValue([]) },
+          lotBalance: { update: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -326,7 +324,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             findFirst: vi.fn().mockResolvedValue(null),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
+            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation(() => {
@@ -334,6 +332,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
               return Promise.resolve({ id: 'fg-line-1' })
             }),
           },
+          lot: { findMany: vi.fn().mockResolvedValue([]) },
+          lotBalance: { update: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -367,7 +367,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
+            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { quantityChange: Prisma.Decimal } }) => {
@@ -375,6 +375,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
               return Promise.resolve({ id: 'fg-line-1' })
             }),
           },
+          lot: { findMany: vi.fn().mockResolvedValue([]) },
+          lotBalance: { update: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -406,7 +408,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
+            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { quantityChange: Prisma.Decimal } }) => {
@@ -414,6 +416,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
               return Promise.resolve({ id: 'fg-line-1' })
             }),
           },
+          lot: { findMany: vi.fn().mockResolvedValue([]) },
+          lotBalance: { update: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -437,20 +441,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
   describe('atomic transaction behavior', () => {
     it('uses prisma.$transaction for atomicity', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockResolvedValue({ id: 'fg-line-1' }),
-          },
-        }
+        const tx = createMockTxClient()
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -469,17 +460,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
     it('throws error if output location validation fails', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue(null), // Location not found
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn(),
-          },
-        }
+        const tx = createMockTxClient({ locationResult: null })
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -501,20 +482,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
   describe('backward compatibility', () => {
     it('existing calls without outputToFinishedGoods continue working', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockResolvedValue({ id: 'fg-line-1' }),
-          },
-        }
+        const tx = createMockTxClient()
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -535,20 +503,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
     it('existing calls with outputLocationId continue working', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockOutputLocationId,
-              name: 'FG Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockResolvedValue({ id: 'fg-line-1' }),
-          },
-        }
+        const tx = createMockTxClient({ locationResult: { id: mockOutputLocationId, name: 'FG Warehouse' } })
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
@@ -572,20 +527,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
   describe('result includes FG output info', () => {
     it('includes outputToFinishedGoods in result', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          location: {
-            findFirst: vi.fn().mockResolvedValue({
-              id: mockLocationId,
-              name: 'Main Warehouse',
-            }),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue(mockCreatedTransaction),
-          },
-          finishedGoodsLine: {
-            create: vi.fn().mockResolvedValue({ id: 'fg-line-1' }),
-          },
-        }
+        const tx = createMockTxClient()
         return callback(tx as unknown as Prisma.TransactionClient)
       })
 
