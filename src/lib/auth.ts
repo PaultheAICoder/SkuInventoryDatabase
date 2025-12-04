@@ -48,6 +48,21 @@ export const authOptions: NextAuthOptions = {
           orderBy: { name: 'asc' },
         }) : []
 
+        // Fetch brands for ALL user's accessible companies (for unified selector)
+        const accessibleCompanyIds = user ? user.userCompanies.map(uc => uc.company.id) : []
+        // Ensure primary company is included
+        if (user && !accessibleCompanyIds.includes(user.companyId)) {
+          accessibleCompanyIds.push(user.companyId)
+        }
+        const allBrands = user ? await prisma.brand.findMany({
+          where: {
+            companyId: { in: accessibleCompanyIds },
+            isActive: true,
+          },
+          select: { id: true, name: true, companyId: true },
+          orderBy: { name: 'asc' },
+        }) : []
+
         if (!user || !user.isActive) {
           throw new Error('Invalid email or password')
         }
@@ -99,6 +114,16 @@ export const authOptions: NextAuthOptions = {
         const selectedCompanyId = user.companyId
         const selectedCompanyName = user.company.name
 
+        // Build companiesWithBrands structure for unified selector
+        const companiesWithBrands = companies.map(company => ({
+          id: company.id,
+          name: company.name,
+          role: company.role,
+          brands: allBrands
+            .filter(b => b.companyId === company.id)
+            .map(b => ({ id: b.id, name: b.name }))
+        }))
+
         return {
           id: user.id,
           email: user.email,
@@ -107,6 +132,7 @@ export const authOptions: NextAuthOptions = {
           companyId: user.companyId,
           companyName: user.company.name,
           companies,
+          companiesWithBrands,
           selectedCompanyId,
           selectedCompanyName,
           brands: brands.map(b => ({ id: b.id, name: b.name })),
@@ -124,6 +150,7 @@ export const authOptions: NextAuthOptions = {
         token.companyId = user.companyId
         token.companyName = user.companyName
         token.companies = user.companies
+        token.companiesWithBrands = user.companiesWithBrands
         token.selectedCompanyId = user.selectedCompanyId
         token.selectedCompanyName = user.selectedCompanyName
         token.brands = user.brands
@@ -181,6 +208,7 @@ export const authOptions: NextAuthOptions = {
         session.user.companyId = token.companyId as string
         session.user.companyName = token.companyName as string
         session.user.companies = token.companies as Array<{ id: string; name: string; role?: string }>
+        session.user.companiesWithBrands = token.companiesWithBrands as Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
         session.user.selectedCompanyId = token.selectedCompanyId as string
         session.user.selectedCompanyName = token.selectedCompanyName as string
         session.user.brands = token.brands as Array<{ id: string; name: string }>
@@ -200,6 +228,7 @@ declare module 'next-auth' {
     companyId: string
     companyName: string
     companies: Array<{ id: string; name: string; role?: string }>
+    companiesWithBrands: Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
     selectedCompanyId: string
     selectedCompanyName: string
     brands: Array<{ id: string; name: string }>
@@ -214,6 +243,7 @@ declare module 'next-auth' {
       companyId: string
       companyName: string
       companies: Array<{ id: string; name: string; role?: string }>
+      companiesWithBrands: Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
       selectedCompanyId: string
       selectedCompanyName: string
       brands: Array<{ id: string; name: string }>
@@ -230,6 +260,7 @@ declare module 'next-auth/jwt' {
     companyId: string
     companyName: string
     companies: Array<{ id: string; name: string; role?: string }>
+    companiesWithBrands: Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
     selectedCompanyId: string
     selectedCompanyName: string
     brands: Array<{ id: string; name: string }>

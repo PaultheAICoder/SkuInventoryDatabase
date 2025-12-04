@@ -28,8 +28,7 @@ import {
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
 import { FeedbackDialog } from '@/components/features/FeedbackDialog'
-import { CompanySelector } from '@/components/features/CompanySelector'
-import { BrandSelector } from '@/components/features/BrandSelector'
+import { CompanyBrandSelector } from '@/components/features/CompanyBrandSelector'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -89,8 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Button>
         </div>
 
-        <CompanySelector />
-        <BrandSelector />
+        <CompanyBrandSelector />
 
         <nav className="flex flex-col gap-1 p-4">
           {filteredNavigation.map((item) => {

@@ -78,6 +78,11 @@ export interface SessionBrand {
   name: string
 }
 
+// Company with nested brands for unified selector
+export interface CompanyWithBrands extends SessionCompany {
+  brands: SessionBrand[]
+}
+
 // Session user type (matches NextAuth)
 export interface SessionUser {
   id: string
