@@ -1,0 +1,39 @@
+{
+  "issueNumber": 114,
+  "title": "Transaction Review and Approval Workflow",
+  "parentIssue": 98,
+  "startTime": "2025-12-04T18:30:00Z",
+  "phases": {
+    "scout": {
+      "startTime": "2025-12-04T18:30:00Z",
+      "endTime": "2025-12-04T18:48:00Z",
+      "durationMinutes": 18
+    },
+    "plan": {
+      "startTime": "2025-12-04T18:30:00Z",
+      "endTime": "2025-12-04T18:48:00Z",
+      "durationMinutes": 18
+    },
+    "build": {
+      "startTime": "2025-12-04T13:00:00Z",
+      "endTime": "2025-12-04T13:55:00Z",
+      "durationMinutes": 55
+    },
+    "test": {
+      "startTime": "2025-12-04T13:31:00Z",
+      "endTime": "2025-12-04T13:45:00Z",
+      "durationMinutes": 14
+    }
+  },
+  "status": "complete",
+  "planFile": ".agents/outputs/plan-114-120425.md",
+  "buildFile": ".agents/outputs/build-114-120425.md",
+  "cleanupFile": ".agents/outputs/cleanup-114-120425.md",
+  "estimatedBuildHours": "10-14",
+  "actualBuildMinutes": 55,
+  "complexity": "Moderate",
+  "filesCreated": 10,
+  "filesModified": 8,
+  "testsRun": 507,
+  "testsPassed": 507
+}

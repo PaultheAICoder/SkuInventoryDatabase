@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
     const selectedCompanyId = session.user.selectedCompanyId
 
     // Build where clause - scope by selected company
+    // Exclude drafts by default (only show approved transactions)
     const where: Prisma.TransactionWhereInput = {
       companyId: selectedCompanyId,
+      status: 'approved', // Exclude drafts and rejected transactions
       ...(type && { type }),
       ...(skuId && { skuId }),
       ...(salesChannel && { salesChannel }),

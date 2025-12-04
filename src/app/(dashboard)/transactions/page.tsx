@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronLeft, ChevronRight, Filter, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus, FileCheck } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
 import Link from 'next/link'
 import { LocationFilter } from '@/components/features/LocationFilter'
@@ -47,6 +47,7 @@ function TransactionLogContent() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [draftCount, setDraftCount] = useState(0)
 
   const page = parseInt(searchParams.get('page') ?? '1', 10)
   const pageSize = parseInt(searchParams.get('pageSize') ?? '50', 10)
@@ -108,10 +109,24 @@ function TransactionLogContent() {
     }
   }, [page, pageSize, filters])
 
+  // Fetch draft count
+  const fetchDraftCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/transactions/drafts/count')
+      if (res.ok) {
+        const data = await res.json()
+        setDraftCount(data.count || 0)
+      }
+    } catch (err) {
+      console.error('Failed to fetch draft count:', err)
+    }
+  }, [])
+
   // Refetch when company changes or fetchTransactions changes
   useEffect(() => {
     fetchTransactions()
-  }, [fetchTransactions, session?.user?.selectedCompanyId])
+    fetchDraftCount()
+  }, [fetchTransactions, fetchDraftCount, session?.user?.selectedCompanyId])
 
   const handleApplyFilters = () => {
     updateFilters(filters)
@@ -183,12 +198,25 @@ function TransactionLogContent() {
         <div className="flex items-center gap-2">
           <ExportButton exportType="transactions" queryParams={exportQueryParams} />
           {session?.user?.role !== 'viewer' && (
-            <Link href="/transactions/new">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Transaction
-              </Button>
-            </Link>
+            <>
+              <Link href="/transactions/drafts">
+                <Button variant="outline">
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Review Drafts
+                  {draftCount > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {draftCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+              <Link href="/transactions/new">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Transaction
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

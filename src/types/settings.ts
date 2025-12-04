@@ -21,6 +21,10 @@ export const companySettingsSchema = z.object({
   expiryEnforcementEnabled: z.boolean().default(false),
   expiryWarningDays: z.coerce.number().int().nonnegative().default(30),
   allowExpiredOverride: z.boolean().default(true),
+
+  // Draft transaction settings
+  draftAutoRejectDays: z.coerce.number().int().nonnegative().default(7),
+  enableDraftWorkflow: z.boolean().default(true),
 })
 
 export type CompanySettings = z.infer<typeof companySettingsSchema>
@@ -44,6 +48,8 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   expiryEnforcementEnabled: false,
   expiryWarningDays: 30,
   allowExpiredOverride: true,
+  draftAutoRejectDays: 7,
+  enableDraftWorkflow: true,
 }
 
 // Settings response type

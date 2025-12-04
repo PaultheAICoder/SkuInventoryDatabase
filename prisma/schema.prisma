@@ -112,6 +112,9 @@ model User {
   thresholdsCreated  DefectThreshold[] @relation("ThresholdCreatedBy")
   alertsAcknowledged DefectAlert[]     @relation("AlertAcknowledgedBy")
 
+  // Draft transaction review relation
+  transactionsReviewed Transaction[] @relation("TransactionReviewedBy")
+
   // Multi-company assignment
   userCompanies UserCompany[]
 
@@ -223,6 +226,12 @@ enum TransactionType {
   transfer
 }
 
+enum TransactionStatus {
+  draft
+  approved
+  rejected
+}
+
 enum ShopifyOrderStatus {
   pending // Newly synced, awaiting review
   approved // Ready for transaction posting
@@ -261,6 +270,13 @@ model Transaction {
   createdById    String
   createdBy      User            @relation(fields: [createdById], references: [id])
 
+  // Draft workflow fields
+  status         TransactionStatus @default(approved)
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewedBy     User?             @relation("TransactionReviewedBy", fields: [reviewedById], references: [id])
+  rejectReason   String?           @db.VarChar(500)
+
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
   defectAlerts       DefectAlert[]
@@ -276,6 +292,7 @@ model Transaction {
   @@index([fromLocationId])
   @@index([toLocationId])
   @@index([sourceType, sourceOrderId])
+  @@index([companyId, status])
 }
 
 model TransactionLine {

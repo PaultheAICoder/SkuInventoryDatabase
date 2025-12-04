@@ -31,7 +31,10 @@ describe('getComponentQuantity', () => {
     const result = await getComponentQuantity('comp-1')
     expect(result).toBe(150)
     expect(prisma.transactionLine.aggregate).toHaveBeenCalledWith({
-      where: { componentId: 'comp-1' },
+      where: {
+        componentId: 'comp-1',
+        transaction: { status: 'approved' },
+      },
       _sum: { quantityChange: true },
     })
   })
@@ -160,6 +163,7 @@ describe('getComponentQuantity with locationId', () => {
         transaction: {
           locationId: 'loc-1',
           type: { not: 'transfer' },
+          status: 'approved',
         },
       },
       _sum: { quantityChange: true },
@@ -292,6 +296,7 @@ describe('getComponentQuantities with locationId', () => {
         transaction: {
           locationId: 'loc-1',
           type: { not: 'transfer' },
+          status: 'approved',
         },
       },
       _sum: { quantityChange: true },

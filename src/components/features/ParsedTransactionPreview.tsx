@@ -23,6 +23,7 @@ interface ParsedTransactionPreviewProps {
   onConfirm: () => void
   onEdit: () => void
   onCancel: () => void
+  onSaveAsDraft?: () => void
   isSubmitting?: boolean
 }
 
@@ -51,6 +52,7 @@ export function ParsedTransactionPreview({
   onConfirm,
   onEdit,
   onCancel,
+  onSaveAsDraft,
   isSubmitting = false,
 }: ParsedTransactionPreviewProps) {
   const { parsed, suggestions } = result
@@ -219,6 +221,15 @@ export function ParsedTransactionPreview({
             <Edit2 className="mr-2 h-4 w-4" />
             Edit Manually
           </Button>
+          {onSaveAsDraft && (
+            <Button
+              variant="secondary"
+              onClick={onSaveAsDraft}
+              disabled={isSubmitting || !parsed.itemId.value}
+            >
+              Save as Draft
+            </Button>
+          )}
           <Button
             onClick={onConfirm}
             disabled={isSubmitting || !parsed.itemId.value}

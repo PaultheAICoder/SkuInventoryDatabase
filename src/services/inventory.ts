@@ -42,9 +42,12 @@ export async function getComponentQuantity(
   locationId?: string
 ): Promise<number> {
   if (!locationId) {
-    // Global total - sum all lines for this component
+    // Global total - sum all lines for this component (only approved transactions)
     const result = await prisma.transactionLine.aggregate({
-      where: { componentId },
+      where: {
+        componentId,
+        transaction: { status: 'approved' }, // Exclude drafts and rejected
+      },
       _sum: { quantityChange: true },
     })
     return result._sum.quantityChange?.toNumber() ?? 0
@@ -63,6 +66,7 @@ export async function getComponentQuantity(
       transaction: {
         locationId,
         type: { not: 'transfer' },
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },
@@ -76,6 +80,7 @@ export async function getComponentQuantity(
       transaction: {
         type: 'transfer',
         fromLocationId: locationId,
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },
@@ -89,6 +94,7 @@ export async function getComponentQuantity(
       transaction: {
         type: 'transfer',
         toLocationId: locationId,
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },
@@ -116,10 +122,13 @@ export async function getComponentQuantities(
   locationId?: string
 ): Promise<Map<string, number>> {
   if (!locationId) {
-    // Global totals - no location filtering needed
+    // Global totals - no location filtering needed (only approved transactions)
     const results = await prisma.transactionLine.groupBy({
       by: ['componentId'],
-      where: { componentId: { in: componentIds } },
+      where: {
+        componentId: { in: componentIds },
+        transaction: { status: 'approved' }, // Exclude drafts and rejected
+      },
       _sum: { quantityChange: true },
     })
 
@@ -154,6 +163,7 @@ export async function getComponentQuantities(
       transaction: {
         locationId,
         type: { not: 'transfer' },
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },
@@ -173,6 +183,7 @@ export async function getComponentQuantities(
       transaction: {
         type: 'transfer',
         fromLocationId: locationId,
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },
@@ -192,6 +203,7 @@ export async function getComponentQuantities(
       transaction: {
         type: 'transfer',
         toLocationId: locationId,
+        status: 'approved', // Exclude drafts and rejected
       },
     },
     _sum: { quantityChange: true },

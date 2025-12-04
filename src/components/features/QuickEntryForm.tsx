@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AlertTriangle } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
 import { salesChannels } from '@/types'
 import type { InsufficientInventoryItem } from '@/types/transaction'
@@ -64,6 +65,9 @@ export function QuickEntryForm() {
   // Build warnings
   const [insufficientItems, setInsufficientItems] = useState<InsufficientInventoryItem[]>([])
   const [showWarning, setShowWarning] = useState(false)
+
+  // Draft mode
+  const [saveAsDraft, setSaveAsDraft] = useState(false)
 
   // Data loading states
   const [isLoadingComponents, setIsLoadingComponents] = useState(true)
@@ -222,7 +226,47 @@ export function QuickEntryForm() {
       let endpoint: string
       let payload: Record<string, unknown>
 
-      if (transactionType === 'receipt') {
+      // If saving as draft, use the draft endpoint
+      if (saveAsDraft) {
+        endpoint = '/api/transactions/drafts'
+        if (transactionType === 'receipt') {
+          payload = {
+            type: 'receipt',
+            componentId: receiptFormData.componentId,
+            date: receiptFormData.date,
+            quantity: parseFloat(receiptFormData.quantity),
+            supplier: receiptFormData.supplier,
+            costPerUnit: receiptFormData.costPerUnit ? parseFloat(receiptFormData.costPerUnit) : undefined,
+            locationId: receiptFormData.locationId || undefined,
+            lotNumber: receiptFormData.lotNumber || undefined,
+            expiryDate: receiptFormData.expiryDate || undefined,
+            notes: receiptFormData.notes || null,
+          }
+        } else if (transactionType === 'build') {
+          payload = {
+            type: 'build',
+            skuId: buildFormData.skuId,
+            date: buildFormData.date,
+            unitsToBuild: parseInt(buildFormData.unitsToBuild),
+            salesChannel: buildFormData.salesChannel || undefined,
+            locationId: buildFormData.locationId || undefined,
+            notes: buildFormData.notes || null,
+          }
+        } else {
+          // adjustment
+          const quantity = parseFloat(adjustmentFormData.quantity)
+          const adjustedQuantity = adjustmentFormData.adjustmentType === 'subtract' ? -quantity : quantity
+          payload = {
+            type: 'adjustment',
+            componentId: adjustmentFormData.componentId,
+            date: adjustmentFormData.date,
+            quantity: adjustedQuantity,
+            reason: adjustmentFormData.reason,
+            locationId: adjustmentFormData.locationId || undefined,
+            notes: adjustmentFormData.notes || null,
+          }
+        }
+      } else if (transactionType === 'receipt') {
         endpoint = '/api/transactions/receipt'
         payload = {
           componentId: receiptFormData.componentId,
@@ -281,16 +325,23 @@ export function QuickEntryForm() {
 
       // Success
       let successText = 'Transaction recorded successfully!'
+      const isDraft = saveAsDraft
       if (transactionType === 'receipt') {
         const component = components.find((c) => c.id === receiptFormData.componentId)
-        successText = `Receipt recorded: +${receiptFormData.quantity} ${component?.name || 'component'}`
+        successText = isDraft
+          ? `Draft saved: Receipt for +${receiptFormData.quantity} ${component?.name || 'component'}`
+          : `Receipt recorded: +${receiptFormData.quantity} ${component?.name || 'component'}`
       } else if (transactionType === 'build') {
         const sku = skus.find((s) => s.id === buildFormData.skuId)
-        successText = `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
+        successText = isDraft
+          ? `Draft saved: Build for ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
+          : `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
       } else {
         const component = components.find((c) => c.id === adjustmentFormData.componentId)
         const sign = adjustmentFormData.adjustmentType === 'add' ? '+' : '-'
-        successText = `Adjustment recorded: ${sign}${adjustmentFormData.quantity} ${component?.name || 'component'}`
+        successText = isDraft
+          ? `Draft saved: Adjustment for ${sign}${adjustmentFormData.quantity} ${component?.name || 'component'}`
+          : `Adjustment recorded: ${sign}${adjustmentFormData.quantity} ${component?.name || 'component'}`
       }
 
       setSuccessMessage(successText)
@@ -888,25 +939,43 @@ export function QuickEntryForm() {
         </CardContent>
 
         {!showWarning && (
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.push('/transactions')}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                isLoading ||
-                (transactionType === 'receipt' && (!receiptFormData.componentId || !receiptFormData.quantity || !receiptFormData.supplier)) ||
-                (transactionType === 'build' && (!buildFormData.skuId || !buildFormData.unitsToBuild)) ||
-                (transactionType === 'adjustment' && (!adjustmentFormData.componentId || !adjustmentFormData.quantity || !adjustmentFormData.reason))
-              }
-            >
-              {isLoading ? 'Recording...' : 'Record Transaction'}
-            </Button>
+          <CardFooter className="flex flex-col gap-4">
+            {/* Save as Draft Option */}
+            <div className="w-full flex items-center space-x-2 border-t pt-4">
+              <Checkbox
+                id="saveAsDraft"
+                checked={saveAsDraft}
+                onCheckedChange={(checked) => setSaveAsDraft(checked as boolean)}
+              />
+              <label
+                htmlFor="saveAsDraft"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Save as draft (requires review before applying to inventory)
+              </label>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="w-full flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/transactions')}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  isLoading ||
+                  (transactionType === 'receipt' && (!receiptFormData.componentId || !receiptFormData.quantity || !receiptFormData.supplier)) ||
+                  (transactionType === 'build' && (!buildFormData.skuId || !buildFormData.unitsToBuild)) ||
+                  (transactionType === 'adjustment' && (!adjustmentFormData.componentId || !adjustmentFormData.quantity || !adjustmentFormData.reason))
+                }
+              >
+                {isLoading ? (saveAsDraft ? 'Saving...' : 'Recording...') : (saveAsDraft ? 'Save Draft' : 'Record Transaction')}
+              </Button>
+            </div>
           </CardFooter>
         )}
       </form>
