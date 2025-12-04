@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { salesChannelSchema } from './index'
+import type { SkuInventorySummary } from './finished-goods'
 
 // SKU create schema
 export const createSKUSchema = z.object({
@@ -57,6 +58,7 @@ export interface SKUResponse {
     unitCost: string
   } | null
   maxBuildableUnits?: number | null
+  finishedGoodsQuantity?: number | null
 }
 
 // SKU detail response (includes related data)
@@ -69,6 +71,7 @@ export interface SKUDetailResponse extends SKUResponse {
     unitsBuild: number | null
     createdAt: string
   }>
+  finishedGoodsInventory?: SkuInventorySummary | null
 }
 
 // BOM version summary for SKU detail

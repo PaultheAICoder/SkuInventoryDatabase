@@ -63,6 +63,9 @@ export const createBuildSchema = z.object({
   affectedUnits: z.coerce.number().int().nonnegative().optional().nullable(),
   allowInsufficientInventory: z.boolean().default(false),
   locationId: z.string().uuid('Invalid location ID').optional(),
+  // Finished goods output
+  outputLocationId: z.string().uuid('Invalid output location ID').optional(),
+  outputQuantity: z.coerce.number().int().positive().optional(),
 })
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>

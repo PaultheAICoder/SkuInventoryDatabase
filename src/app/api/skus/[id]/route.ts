@@ -13,6 +13,7 @@ import {
 } from '@/lib/api-response'
 import { updateSKUSchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnits } from '@/services/bom'
+import { getSkuInventorySummary } from '@/services/finished-goods'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -77,6 +78,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Calculate max buildable units (filtered by location if specified)
     const maxBuildableUnits = await calculateMaxBuildableUnits(id, locationId)
 
+    // Get finished goods inventory
+    const finishedGoodsInventory = await getSkuInventorySummary(id)
+
     // Find active BOM
     const activeBom = sku.bomVersions.find((v) => v.isActive)
     const activeBomCost = activeBom ? bomCosts.get(activeBom.id) ?? 0 : null
@@ -118,6 +122,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         unitsBuild: tx.unitsBuild,
         createdAt: tx.createdAt.toISOString(),
       })),
+      finishedGoodsInventory,
     })
   } catch (error) {
     console.error('Error getting SKU:', error)

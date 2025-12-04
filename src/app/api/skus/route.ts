@@ -14,6 +14,7 @@ import {
 } from '@/lib/api-response'
 import { createSKUSchema, skuListQuerySchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
+import { getSkuQuantities } from '@/services/finished-goods'
 
 // GET /api/skus - List SKUs with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -79,9 +80,10 @@ export async function GET(request: NextRequest) {
       .filter((s) => s.bomVersions[0])
       .map((s) => s.bomVersions[0].id)
 
-    const [bomCosts, buildableUnits] = await Promise.all([
+    const [bomCosts, buildableUnits, finishedGoodsQtys] = await Promise.all([
       activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
       skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, locationId) : new Map<string, number | null>(),
+      skuIds.length > 0 ? getSkuQuantities(skuIds, locationId) : new Map<string, number>(),
     ])
 
     // Transform response
@@ -108,6 +110,7 @@ export async function GET(request: NextRequest) {
             }
           : null,
         maxBuildableUnits: buildableUnits.get(sku.id) ?? null,
+        finishedGoodsQuantity: finishedGoodsQtys.get(sku.id) ?? 0,
       }
     })
 

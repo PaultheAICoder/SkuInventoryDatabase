@@ -177,6 +177,25 @@ export default function SKUDetailPage() {
               />
             </div>
 
+            {sku.finishedGoodsInventory && sku.finishedGoodsInventory.totalQuantity > 0 && (
+              <div>
+                <p className="text-sm text-muted-foreground">Finished Goods Inventory</p>
+                <p className="font-mono text-lg" suppressHydrationWarning>
+                  {sku.finishedGoodsInventory.totalQuantity.toLocaleString()} units
+                </p>
+                {sku.finishedGoodsInventory.byLocation.length > 1 && (
+                  <div className="mt-2 space-y-1">
+                    {sku.finishedGoodsInventory.byLocation.map((loc) => (
+                      <div key={loc.locationId} className="text-sm flex justify-between">
+                        <span className="text-muted-foreground">{loc.locationName}:</span>
+                        <span className="font-mono" suppressHydrationWarning>{loc.quantity.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {Object.keys(sku.externalIds).length > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground">External IDs</p>

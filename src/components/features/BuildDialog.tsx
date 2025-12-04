@@ -56,6 +56,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     defectNotes: '',
     affectedUnits: '',
     locationId: '',
+    outputLocationId: '',
+    outputQuantity: '',
   })
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
@@ -149,6 +151,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           affectedUnits: formData.affectedUnits ? parseInt(formData.affectedUnits) : null,
           allowInsufficientInventory: forceSubmit,
           locationId: formData.locationId || undefined,
+          outputLocationId: formData.outputLocationId || undefined,
+          outputQuantity: formData.outputQuantity ? parseInt(formData.outputQuantity) : undefined,
         }),
       })
 
@@ -183,6 +187,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         defectNotes: '',
         affectedUnits: '',
         locationId: '',
+        outputLocationId: '',
+        outputQuantity: '',
       })
       setInsufficientItems([])
       setShowWarning(false)
@@ -380,6 +386,49 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="outputLocation" className="text-right">
+                Output To
+              </Label>
+              <Select
+                value={formData.outputLocationId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, outputLocationId: value }))}
+                disabled={isLoadingLocations}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Select finished goods location (optional)'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No finished goods output</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.outputLocationId && (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="outputQuantity" className="text-right">
+                  Output Qty
+                </Label>
+                <Input
+                  id="outputQuantity"
+                  type="number"
+                  step="1"
+                  min="1"
+                  className="col-span-3"
+                  placeholder={`Defaults to ${formData.unitsToBuild || 'units built'}`}
+                  value={formData.outputQuantity}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, outputQuantity: e.target.value }))
+                  }
+                />
+              </div>
+            )}
 
             {/* Defect Tracking (collapsible) */}
             <details className="col-span-4">

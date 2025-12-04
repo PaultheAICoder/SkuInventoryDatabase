@@ -50,9 +50,10 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  transactions  Transaction[] @relation("TransactionLocation")
-  transfersFrom Transaction[] @relation("TransferFrom")
-  transfersTo   Transaction[] @relation("TransferTo")
+  transactions       Transaction[]       @relation("TransactionLocation")
+  transfersFrom      Transaction[]       @relation("TransferFrom")
+  transfersTo        Transaction[]       @relation("TransferTo")
+  finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsAtLocation")
 
   @@unique([companyId, name])
   @@index([companyId, isActive])
@@ -216,8 +217,9 @@ model Transaction {
   createdById    String
   createdBy      User            @relation(fields: [createdById], references: [id])
 
-  lines        TransactionLine[]
-  defectAlerts DefectAlert[]
+  lines              TransactionLine[]
+  finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
+  defectAlerts       DefectAlert[]
 
   @@index([companyId, createdAt(sort: Desc)])
   @@index([skuId])
@@ -237,6 +239,22 @@ model TransactionLine {
   costPerUnit    Decimal?    @db.Decimal(10, 4)
 
   @@index([componentId])
+}
+
+model FinishedGoodsLine {
+  id             String      @id @default(uuid())
+  transactionId  String
+  transaction    Transaction @relation("FinishedGoodsLines", fields: [transactionId], references: [id], onDelete: Cascade)
+  skuId          String
+  sku            SKU         @relation("FinishedGoodsLines", fields: [skuId], references: [id])
+  quantityChange Decimal     @db.Decimal(10, 4)
+  costPerUnit    Decimal?    @db.Decimal(10, 4)
+  locationId     String
+  location       Location    @relation("FinishedGoodsAtLocation", fields: [locationId], references: [id])
+
+  @@index([skuId])
+  @@index([locationId])
+  @@index([transactionId])
 }
 
 // ============================================
@@ -262,10 +280,11 @@ model SKU {
   updatedById  String
   updatedBy    User     @relation("SKUUpdatedBy", fields: [updatedById], references: [id])
 
-  bomVersions      BOMVersion[]
-  transactions     Transaction[]
-  defectThresholds DefectThreshold[]
-  defectAlerts     DefectAlert[]
+  bomVersions        BOMVersion[]
+  transactions       Transaction[]
+  defectThresholds   DefectThreshold[]
+  defectAlerts       DefectAlert[]
+  finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
 
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])

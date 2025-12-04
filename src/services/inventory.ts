@@ -578,6 +578,9 @@ export interface BuildTransactionResult {
     quantityChange: { toString(): string }
     costPerUnit: { toString(): string } | null
   }>
+  outputLocationId?: string | null
+  outputLocation?: { id: string; name: string } | null
+  outputQuantity?: number | null
 }
 
 /**
@@ -598,6 +601,8 @@ export async function createBuildTransaction(params: {
   createdById: string
   allowInsufficientInventory?: boolean
   locationId?: string
+  outputLocationId?: string
+  outputQuantity?: number
 }): Promise<{
   transaction: BuildTransactionResult
   insufficientItems: InsufficientInventoryItem[]
@@ -721,6 +726,42 @@ export async function createBuildTransaction(params: {
     },
   })
 
+  // Create finished goods line if outputLocationId is provided
+  let outputLocation: { id: string; name: string } | null = null
+  let outputQuantityActual: number | null = null
+
+  if (params.outputLocationId) {
+    const outputQty = params.outputQuantity ?? params.unitsToBuild
+    outputQuantityActual = outputQty
+
+    // Validate output location belongs to company
+    const outputLoc = await prisma.location.findFirst({
+      where: {
+        id: params.outputLocationId,
+        companyId: params.companyId,
+        isActive: true,
+      },
+      select: { id: true, name: true },
+    })
+
+    if (!outputLoc) {
+      throw new Error('Output location not found or not active')
+    }
+
+    outputLocation = outputLoc
+
+    // Create finished goods line
+    await prisma.finishedGoodsLine.create({
+      data: {
+        transactionId: transaction.id,
+        skuId: params.skuId,
+        locationId: params.outputLocationId,
+        quantityChange: new Prisma.Decimal(outputQty),
+        costPerUnit: new Prisma.Decimal(unitBomCost),
+      },
+    })
+  }
+
   // Evaluate defect threshold if defects were recorded
   if (defectCount && defectCount > 0 && unitsToBuild > 0) {
     const defectRate = (defectCount / unitsToBuild) * 100
@@ -739,8 +780,16 @@ export async function createBuildTransaction(params: {
     }
   }
 
+  // Construct the result with output info
+  const result: BuildTransactionResult = {
+    ...(transaction as unknown as BuildTransactionResult),
+    outputLocationId: params.outputLocationId ?? null,
+    outputLocation,
+    outputQuantity: outputQuantityActual,
+  }
+
   return {
-    transaction: transaction as unknown as BuildTransactionResult,
+    transaction: result,
     insufficientItems,
     warning: insufficientItems.length > 0,
   }

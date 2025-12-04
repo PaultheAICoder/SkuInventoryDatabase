@@ -151,12 +151,13 @@ export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
               <TableHead>Active BOM</TableHead>
               <TableHead className="text-right">Unit Cost</TableHead>
               <TableHead className="text-right">Buildable</TableHead>
+              <TableHead className="text-right">FG Qty</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {skus.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                   No SKUs found.
                 </TableCell>
               </TableRow>
@@ -191,6 +192,15 @@ export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
                     {sku.maxBuildableUnits != null ? (
                       <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''} suppressHydrationWarning>
                         {sku.maxBuildableUnits.toLocaleString()}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {sku.finishedGoodsQuantity != null ? (
+                      <span suppressHydrationWarning>
+                        {sku.finishedGoodsQuantity.toLocaleString()}
                       </span>
                     ) : (
                       '-'

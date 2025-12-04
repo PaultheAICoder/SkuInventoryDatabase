@@ -73,6 +73,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate output location if provided
+    if (data.outputLocationId) {
+      const outputLocation = await prisma.location.findFirst({
+        where: {
+          id: data.outputLocationId,
+          companyId: selectedCompanyId,
+          isActive: true,
+        },
+      })
+      if (!outputLocation) {
+        return notFound('Output Location')
+      }
+    }
+
     // Get company settings
     const settings = await getCompanySettings(selectedCompanyId)
 
@@ -96,6 +110,8 @@ export async function POST(request: NextRequest) {
         createdById: session.user.id,
         allowInsufficientInventory: allowInsufficient,
         locationId: data.locationId,
+        outputLocationId: data.outputLocationId,
+        outputQuantity: data.outputQuantity,
       })
 
       return created({
@@ -123,6 +139,9 @@ export async function POST(request: NextRequest) {
             quantityChange: line.quantityChange.toString(),
             costPerUnit: line.costPerUnit?.toString() ?? null,
           })),
+          outputLocationId: result.transaction.outputLocationId ?? null,
+          outputLocation: result.transaction.outputLocation ?? null,
+          outputQuantity: result.transaction.outputQuantity ?? null,
           warning: result.warning,
           insufficientItems: result.insufficientItems,
         },
