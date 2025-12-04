@@ -225,7 +225,7 @@ export async function DELETE(
       data: { isActive: false },
     })
 
-    return NextResponse.json({ message: 'Location deleted successfully' })
+    return NextResponse.json({ message: 'Location deactivated successfully' })
   } catch (error) {
     console.error('Error deleting location:', error)
     return NextResponse.json({ error: 'Failed to delete location' }, { status: 500 })

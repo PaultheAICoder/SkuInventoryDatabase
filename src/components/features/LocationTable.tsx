@@ -18,17 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Edit, Trash2, Star, Power, PowerOff } from 'lucide-react'
+import { MoreHorizontal, Edit, Star, Power, PowerOff } from 'lucide-react'
 import { LOCATION_TYPE_DISPLAY_NAMES } from '@/types/location'
 import type { LocationResponse } from '@/types/location'
 
@@ -38,8 +28,6 @@ interface LocationTableProps {
 }
 
 export function LocationTable({ locations, onRefresh }: LocationTableProps) {
-  const [locationToDelete, setLocationToDelete] = useState<LocationResponse | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
   const handleSetDefault = async (location: LocationResponse) => {
@@ -79,30 +67,6 @@ export function LocationTable({ locations, onRefresh }: LocationTableProps) {
       onRefresh()
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Failed to toggle location status')
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!locationToDelete) return
-
-    setIsDeleting(true)
-    setActionError(null)
-    try {
-      const res = await fetch(`/api/locations/${locationToDelete.id}`, {
-        method: 'DELETE',
-      })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to delete location')
-      }
-
-      onRefresh()
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : 'Failed to delete location')
-    } finally {
-      setIsDeleting(false)
-      setLocationToDelete(null)
     }
   }
 
@@ -206,13 +170,6 @@ export function LocationTable({ locations, onRefresh }: LocationTableProps) {
                               </>
                             )}
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => setLocationToDelete(location)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
                         </>
                       )}
                     </DropdownMenuContent>
@@ -223,28 +180,6 @@ export function LocationTable({ locations, onRefresh }: LocationTableProps) {
           </TableBody>
         </Table>
       </div>
-
-      <AlertDialog open={!!locationToDelete} onOpenChange={() => setLocationToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Location</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete <strong>{locationToDelete?.name}</strong>? This will
-              deactivate the location and it will no longer be available for inventory tracking.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }
