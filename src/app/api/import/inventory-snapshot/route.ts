@@ -34,18 +34,23 @@ export async function POST(request: NextRequest) {
       return unauthorized('Viewers cannot import data')
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
-    if (!user?.company.brands[0]) {
-      return error('No active brand found', 400)
+    // Use selected brand from session, or fall back to first active brand
+    let brandId = session.user.selectedBrandId
+
+    if (!brandId) {
+      const brand = await prisma.brand.findFirst({
+        where: { companyId: selectedCompanyId, isActive: true },
+      })
+      if (!brand) {
+        return error('No active brand found for selected company. Please select a brand from the sidebar or create one in Brand Management.', 400)
+      }
+      brandId = brand.id
     }
 
-    const brandId = user.company.brands[0].id
-    const companyId = user.companyId
+    const companyId = selectedCompanyId
 
     // Get company settings for default lead time
     const settings = await getCompanySettings(companyId)
