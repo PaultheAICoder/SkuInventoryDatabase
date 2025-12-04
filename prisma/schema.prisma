@@ -24,6 +24,11 @@ model Company {
   securityEvents   SecurityEvent[]
   defectThresholds DefectThreshold[]
   alertConfig      AlertConfig?
+
+  // Multi-company relations
+  userCompanies    UserCompany[] @relation("UserCompanies")
+  components       Component[] @relation("CompanyComponents")
+  skus             SKU[] @relation("CompanySKUs")
 }
 
 enum LocationType {
@@ -99,7 +104,24 @@ model User {
   thresholdsCreated  DefectThreshold[] @relation("ThresholdCreatedBy")
   alertsAcknowledged DefectAlert[]     @relation("AlertAcknowledgedBy")
 
+  // Multi-company assignment
+  userCompanies     UserCompany[]
+
   @@index([companyId, isActive])
+}
+
+model UserCompany {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId  String
+  company    Company  @relation("UserCompanies", fields: [companyId], references: [id], onDelete: Cascade)
+  role       UserRole @default(ops)
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
 }
 
 model SecurityEvent {
@@ -126,6 +148,8 @@ model Component {
   id            String   @id @default(uuid())
   brandId       String
   brand         Brand    @relation(fields: [brandId], references: [id])
+  companyId     String?
+  company       Company?  @relation("CompanyComponents", fields: [companyId], references: [id])
   name          String   @db.VarChar(100)
   skuCode       String   @db.VarChar(50)
   category      String?  @db.VarChar(50)
@@ -149,6 +173,7 @@ model Component {
   @@unique([brandId, name])
   @@unique([brandId, skuCode])
   @@index([brandId, isActive])
+  @@index([companyId, isActive])
 }
 
 enum TransactionType {
@@ -213,6 +238,8 @@ model SKU {
   id           String   @id @default(uuid())
   brandId      String
   brand        Brand    @relation(fields: [brandId], references: [id])
+  companyId    String?
+  company      Company?  @relation("CompanySKUs", fields: [companyId], references: [id])
   name         String   @db.VarChar(100)
   internalCode String   @db.VarChar(50)
   salesChannel String   @db.VarChar(50)
@@ -233,6 +260,7 @@ model SKU {
 
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
+  @@index([companyId, isActive])
 }
 
 model BOMVersion {
