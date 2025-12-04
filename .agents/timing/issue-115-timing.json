@@ -1,0 +1,45 @@
+{
+  "issueNumber": 115,
+  "issueTitle": "[Parent #13] Implement forecast service with consumption rate calculation",
+  "parentIssue": 13,
+  "scoutPlanStarted": "2025-12-04T16:00:00Z",
+  "scoutPlanCompleted": "2025-12-04T16:55:00Z",
+  "scoutPlanDurationMinutes": 55,
+  "planFile": ".agents/outputs/plan-115-120425.md",
+  "estimatedBuildTimeHours": "4-6",
+  "complexity": "Moderate",
+  "category": "NEW_FEATURE",
+  "testStrategy": "TARGETED",
+  "filesToCreate": [
+    "src/services/forecast.ts",
+    "tests/unit/forecast-service.test.ts"
+  ],
+  "filesToModify": [],
+  "dependencies": [
+    {
+      "issue": 112,
+      "description": "Types and schema must be defined first",
+      "status": "completed"
+    }
+  ],
+  "blockedBy": [],
+  "blocks": [
+    "sub-issue-3 (API endpoints)",
+    "sub-issue-4 (UI components)",
+    "sub-issue-6 (Export functionality)"
+  ],
+  "buildStarted": "2025-12-04T17:00:00Z",
+  "buildCompleted": "2025-12-04T19:45:00Z",
+  "buildDurationMinutes": 165,
+  "testStarted": "2025-12-04T19:45:00Z",
+  "testCompleted": "2025-12-04T19:50:00Z",
+  "testDurationMinutes": 5,
+  "status": "complete",
+  "testsAdded": 32,
+  "totalTestsPassed": 539,
+  "filesCreated": [
+    "src/services/forecast.ts",
+    "tests/unit/forecast-service.test.ts"
+  ],
+  "filesModified": []
+}
