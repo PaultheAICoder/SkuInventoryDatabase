@@ -572,3 +572,136 @@ describe('template generation with reference data', () => {
     expect(template).toContain('Test Location')
   })
 })
+
+describe('SKU template with BOM reference data', () => {
+  it('generates SKU template with BOM columns', () => {
+    const referenceData = {
+      companies: [{ name: 'Acme Corp' }],
+      brands: [{ name: 'Main Brand', companyName: 'Acme Corp' }],
+      locations: [],
+      categories: [],
+      components: [
+        { skuCode: 'BOX-001', name: 'Small Box', costPerUnit: '1.50' },
+        { skuCode: 'LABEL-001', name: 'Shipping Label', costPerUnit: '0.10' },
+      ],
+    }
+
+    const template = generateSKUTemplate(referenceData)
+
+    expect(template).toContain('BOM Component 1')
+    expect(template).toContain('BOM Qty 1')
+    expect(template).toContain('BOM Component 5')
+    expect(template).toContain('BOM Qty 5')
+    expect(template).toContain('# COMPONENTS (SKU Code -> Name [Cost]):')
+    expect(template).toContain('BOX-001 -> Small Box [$1.50]')
+    expect(template).toContain('LABEL-001 -> Shipping Label [$0.10]')
+  })
+
+  it('generates SKU template without component reference when none provided', () => {
+    const referenceData = {
+      companies: [{ name: 'Acme Corp' }],
+      brands: [{ name: 'Main Brand', companyName: 'Acme Corp' }],
+      locations: [],
+      categories: [],
+    }
+
+    const template = generateSKUTemplate(referenceData)
+
+    expect(template).toContain('BOM Component 1')
+    expect(template).not.toContain('# COMPONENTS (SKU Code')
+  })
+
+  it('populates example row with first component when available', () => {
+    const referenceData = {
+      companies: [{ name: 'Acme Corp' }],
+      brands: [{ name: 'Main Brand', companyName: 'Acme Corp' }],
+      locations: [],
+      categories: [],
+      components: [
+        { skuCode: 'BOX-001', name: 'Small Box', costPerUnit: '1.50' },
+      ],
+    }
+
+    const template = generateSKUTemplate(referenceData)
+    const lines = template.split('\n')
+    const exampleRow = lines[1]
+
+    // Example row should contain the first component SKU code
+    expect(exampleRow).toContain('BOX-001')
+    expect(exampleRow).toContain('1') // Default quantity of 1
+  })
+})
+
+describe('processSKUImport with BOM columns', () => {
+  it('parses CSV with BOM components', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1,BOM Component 2,BOM Qty 2
+Product X,PROD-X,Amazon,BOX-001,2,LABEL-001,1`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents).toHaveLength(2)
+    expect(result.results[0].data?.bomComponents?.[0]).toEqual({
+      componentSkuCode: 'BOX-001',
+      quantity: 2,
+    })
+    expect(result.results[0].data?.bomComponents?.[1]).toEqual({
+      componentSkuCode: 'LABEL-001',
+      quantity: 1,
+    })
+  })
+
+  it('handles empty BOM columns gracefully', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+Product Y,PROD-Y,Shopify,,`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents).toBeUndefined()
+  })
+
+  it('ignores BOM component without quantity', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+Product Z,PROD-Z,Generic,BOX-001,`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents).toBeUndefined()
+  })
+
+  it('ignores BOM quantity without component', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+Product A,PROD-A,Amazon,,5`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents).toBeUndefined()
+  })
+
+  it('parses multiple BOM components across all 5 slots', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1,BOM Component 2,BOM Qty 2,BOM Component 3,BOM Qty 3,BOM Component 4,BOM Qty 4,BOM Component 5,BOM Qty 5
+Full BOM,FULL-001,Amazon,COMP-A,1,COMP-B,2,COMP-C,3,COMP-D,4,COMP-E,5`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents).toHaveLength(5)
+    expect(result.results[0].data?.bomComponents?.[4]).toEqual({
+      componentSkuCode: 'COMP-E',
+      quantity: 5,
+    })
+  })
+
+  it('handles decimal quantities in BOM', () => {
+    const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+Decimal BOM,DEC-001,Generic,COMP-X,2.5`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.bomComponents?.[0].quantity).toBe(2.5)
+  })
+})

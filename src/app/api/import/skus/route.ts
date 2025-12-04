@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, serverError, error } from '@/lib/api-response'
 import { processSKUImport, type ImportSummary, type SKUImportWithLookups } from '@/services/import'
+import { createBOMVersion } from '@/services/bom'
 
 interface SKUImportResult {
   total: number
@@ -23,6 +24,7 @@ interface LookupMaps {
   companies: Map<string, string> // lowercase name -> id
   companyNames: Map<string, string> // id -> original name
   brands: Map<string, { id: string; companyId: string }> // "companyName|brandName" -> { id, companyId }
+  components: Map<string, { id: string; costPerUnit: number }> // lowercase skuCode -> { id, costPerUnit }
 }
 
 /**
@@ -40,7 +42,7 @@ async function buildLookupMaps(
   const companyIds = [selectedCompanyId, ...userCompanies.map((uc) => uc.companyId)]
   const uniqueCompanyIds = Array.from(new Set(companyIds))
 
-  const [companies, brands] = await Promise.all([
+  const [companies, brands, components] = await Promise.all([
     prisma.company.findMany({
       where: { id: { in: uniqueCompanyIds } },
       select: { id: true, name: true },
@@ -48,6 +50,10 @@ async function buildLookupMaps(
     prisma.brand.findMany({
       where: { companyId: { in: uniqueCompanyIds }, isActive: true },
       select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+    prisma.component.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, skuCode: true, costPerUnit: true },
     }),
   ])
 
@@ -58,6 +64,12 @@ async function buildLookupMaps(
       brands.map((b) => [
         `${b.company.name.toLowerCase()}|${b.name.toLowerCase()}`,
         { id: b.id, companyId: b.companyId },
+      ])
+    ),
+    components: new Map(
+      components.map((c) => [
+        c.skuCode.toLowerCase(),
+        { id: c.id, costPerUnit: c.costPerUnit.toNumber() },
       ])
     ),
   }
@@ -210,7 +222,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create SKU with resolved IDs
-        await prisma.sKU.create({
+        const newSku = await prisma.sKU.create({
           data: {
             brandId,
             companyId,
@@ -225,6 +237,56 @@ export async function POST(request: NextRequest) {
         })
 
         result.imported++
+
+        // Create BOM version if BOM components are provided
+        if (skuData.bomComponents && skuData.bomComponents.length > 0) {
+          // Validate and resolve components
+          const bomLines: Array<{ componentId: string; quantityPerUnit: number }> = []
+          let bomValid = true
+
+          for (const bomComp of skuData.bomComponents) {
+            const component = lookupMaps.components.get(bomComp.componentSkuCode.toLowerCase())
+            if (!component) {
+              result.errors.push({
+                rowNumber: row.rowNumber,
+                name: skuData.name,
+                errors: [`BOM component "${bomComp.componentSkuCode}" not found`],
+              })
+              bomValid = false
+              break
+            }
+            bomLines.push({
+              componentId: component.id,
+              quantityPerUnit: bomComp.quantity,
+            })
+          }
+
+          if (bomValid && bomLines.length > 0) {
+            // Use try-catch to not fail the whole import if BOM creation fails
+            try {
+              await createBOMVersion({
+                skuId: newSku.id,
+                versionName: 'v1-import',
+                effectiveStartDate: new Date(),
+                isActive: true,
+                notes: 'Created via CSV import',
+                lines: bomLines,
+                createdById: session.user.id,
+              })
+            } catch (bomError) {
+              console.error('Failed to create BOM during import:', bomError)
+              // SKU was created, just note the BOM failure in results
+              result.errors.push({
+                rowNumber: row.rowNumber,
+                name: skuData.name,
+                errors: [
+                  'SKU created but BOM creation failed: ' +
+                    (bomError instanceof Error ? bomError.message : 'Unknown error'),
+                ],
+              })
+            }
+          }
+        }
       } catch (err) {
         result.skipped++
         result.errors.push({

@@ -20,6 +20,7 @@ export interface TemplateReferenceData {
   brands: { name: string; companyName: string }[]
   locations: { name: string; companyName: string }[]
   categories: { name: string }[]
+  components?: { skuCode: string; name: string; costPerUnit: string }[]
 }
 
 /**
@@ -49,6 +50,11 @@ export interface SKUImportWithLookups {
   brand?: string // Brand name for lookup
   salesChannel: 'Amazon' | 'Shopify' | 'TikTok' | 'Generic'
   notes: string | null
+  // BOM component pairs (up to 5)
+  bomComponents?: Array<{
+    componentSkuCode: string
+    quantity: number
+  }>
 }
 
 export interface ImportSummary<T> {
@@ -169,6 +175,16 @@ const componentImportSchema = z.object({
     .transform((v) => v || null),
 })
 
+// Helper to create BOM column schemas (5 component pairs)
+function createBomColumnSchemas(): Record<string, z.ZodTypeAny> {
+  const schemas: Record<string, z.ZodTypeAny> = {}
+  for (let i = 1; i <= 5; i++) {
+    schemas[`bom_component_${i}`] = z.string().optional().transform((v) => v || undefined)
+    schemas[`bom_qty_${i}`] = z.string().optional().transform((v) => v ? parseFloat(v) : undefined)
+  }
+  return schemas
+}
+
 // SKU import schema with CSV field mappings
 const skuImportSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -186,6 +202,8 @@ const skuImportSchema = z.object({
     .string()
     .optional()
     .transform((v) => v || null),
+  // BOM columns (1-5)
+  ...createBomColumnSchemas(),
 })
 
 // Initial inventory import schema with CSV field mappings
@@ -280,6 +298,19 @@ function importSKURow(
     // Parse with CSV field schema first
     const csvParsed = skuImportSchema.parse(record)
 
+    // Extract BOM components from parsed data
+    const bomComponents: Array<{ componentSkuCode: string; quantity: number }> = []
+    for (let i = 1; i <= 5; i++) {
+      const skuCode = csvParsed[`bom_component_${i}` as keyof typeof csvParsed] as string | undefined
+      const qty = csvParsed[`bom_qty_${i}` as keyof typeof csvParsed] as number | undefined
+      if (skuCode && qty && !isNaN(qty)) {
+        bomComponents.push({
+          componentSkuCode: skuCode,
+          quantity: qty,
+        })
+      }
+    }
+
     // Transform to data with lookup fields
     const skuData: SKUImportWithLookups = {
       name: csvParsed.name,
@@ -288,6 +319,7 @@ function importSKURow(
       brand: csvParsed.brand,
       salesChannel: csvParsed.sales_channel,
       notes: csvParsed.notes,
+      bomComponents: bomComponents.length > 0 ? bomComponents : undefined,
     }
 
     return {
@@ -530,10 +562,27 @@ export function generateComponentTemplate(referenceData?: TemplateReferenceData)
 
 /**
  * Generate CSV template for SKUs
- * Optionally includes reference data section with valid companies and brands
+ * Optionally includes reference data section with valid companies, brands, and components
  */
 export function generateSKUTemplate(referenceData?: TemplateReferenceData): string {
-  const headers = ['Name', 'Internal Code', 'Company', 'Brand', 'Sales Channel', 'Notes']
+  const headers = [
+    'Name',
+    'Internal Code',
+    'Company',
+    'Brand',
+    'Sales Channel',
+    'BOM Component 1',
+    'BOM Qty 1',
+    'BOM Component 2',
+    'BOM Qty 2',
+    'BOM Component 3',
+    'BOM Qty 3',
+    'BOM Component 4',
+    'BOM Qty 4',
+    'BOM Component 5',
+    'BOM Qty 5',
+    'Notes',
+  ]
 
   const exampleRow = [
     'Example SKU',
@@ -541,6 +590,16 @@ export function generateSKUTemplate(referenceData?: TemplateReferenceData): stri
     referenceData?.companies[0]?.name || 'Company Name',
     referenceData?.brands[0]?.name || 'Brand Name',
     'Amazon',
+    referenceData?.components?.[0]?.skuCode || '', // BOM Component 1
+    referenceData?.components?.[0] ? '1' : '', // BOM Qty 1
+    '', // BOM Component 2
+    '', // BOM Qty 2
+    '', // BOM Component 3
+    '', // BOM Qty 3
+    '', // BOM Component 4
+    '', // BOM Qty 4
+    '', // BOM Component 5
+    '', // BOM Qty 5
     'Sample SKU for import',
   ]
 
@@ -563,6 +622,14 @@ export function generateSKUTemplate(referenceData?: TemplateReferenceData): stri
     lines.push('#')
     lines.push('# SALES CHANNELS:')
     lines.push('#   Amazon, Shopify, TikTok, Generic')
+    // Add COMPONENTS section if components are available
+    if (referenceData.components && referenceData.components.length > 0) {
+      lines.push('#')
+      lines.push('# COMPONENTS (SKU Code -> Name [Cost]):')
+      for (const component of referenceData.components) {
+        lines.push(`#   ${component.skuCode} -> ${component.name} [$${component.costPerUnit}]`)
+      }
+    }
     lines.push('# ===================================================================')
   }
 

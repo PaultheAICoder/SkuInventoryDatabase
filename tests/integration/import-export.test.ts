@@ -744,6 +744,145 @@ Bad Company SKU,BADCO-SKU-001,Nonexistent Company,Some Brand,Amazon`
     })
   })
 
+  describe('SKU Import with BOM', () => {
+    it('imports SKU and creates BOM version with components', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+
+      // Create test components first
+      const component1 = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Box Component',
+        skuCode: 'BOX-INT-001',
+      })
+      const component2 = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Label Component',
+        skuCode: 'LABEL-INT-001',
+      })
+
+      const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1,BOM Component 2,BOM Qty 2
+SKU With BOM,SKU-BOM-001,Amazon,BOX-INT-001,2,LABEL-INT-001,1`
+
+      const request = new Request('http://localhost/api/import/skus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: csv,
+      })
+
+      const response = await importSKUs(request as never)
+      const result = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(result.data.imported).toBe(1)
+
+      // Verify SKU was created
+      const sku = await prisma.sKU.findFirst({
+        where: { internalCode: 'SKU-BOM-001' },
+      })
+      expect(sku).not.toBeNull()
+
+      // Verify BOM version was created
+      const bomVersion = await prisma.bOMVersion.findFirst({
+        where: { skuId: sku!.id, isActive: true },
+        include: { lines: true },
+      })
+      expect(bomVersion).not.toBeNull()
+      expect(bomVersion!.lines).toHaveLength(2)
+
+      // Verify component quantities
+      const boxLine = bomVersion!.lines.find((l) => l.componentId === component1.id)
+      const labelLine = bomVersion!.lines.find((l) => l.componentId === component2.id)
+      expect(Number(boxLine!.quantityPerUnit)).toBe(2)
+      expect(Number(labelLine!.quantityPerUnit)).toBe(1)
+    })
+
+    it('imports SKU but reports error for invalid BOM component', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+
+      const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+SKU Bad BOM,SKU-BADBOM-001,Amazon,NONEXISTENT-COMP,1`
+
+      const request = new Request('http://localhost/api/import/skus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: csv,
+      })
+
+      const response = await importSKUs(request as never)
+      const result = await response.json()
+
+      expect(response.status).toBe(200)
+      // SKU should still be created, but with an error note about BOM
+      expect(result.data.imported).toBe(1)
+      expect(result.data.errors[0].errors[0]).toContain('BOM component "NONEXISTENT-COMP" not found')
+
+      // Verify SKU was created (without BOM)
+      const sku = await prisma.sKU.findFirst({
+        where: { internalCode: 'SKU-BADBOM-001' },
+      })
+      expect(sku).not.toBeNull()
+
+      // Verify no BOM was created
+      const bomVersion = await prisma.bOMVersion.findFirst({
+        where: { skuId: sku!.id },
+      })
+      expect(bomVersion).toBeNull()
+    })
+
+    it('template includes component reference for SKUs', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+
+      // Create test component
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Ref Component',
+        skuCode: 'REF-COMP-001',
+      })
+
+      const request = createTestRequest('/api/import/template/skus')
+      const response = await getTemplate(request, { params: Promise.resolve({ type: 'skus' }) })
+
+      expect(response.status).toBe(200)
+      const csv = await response.text()
+
+      expect(csv).toContain('BOM Component 1')
+      expect(csv).toContain('BOM Qty 1')
+      expect(csv).toContain('# COMPONENTS (SKU Code -> Name [Cost])')
+      expect(csv).toContain('REF-COMP-001')
+    })
+
+    it('imports SKU without BOM when BOM columns are empty', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+
+      const csv = `Name,Internal Code,Sales Channel,BOM Component 1,BOM Qty 1
+SKU No BOM,SKU-NOBOM-001,Amazon,,`
+
+      const request = new Request('http://localhost/api/import/skus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: csv,
+      })
+
+      const response = await importSKUs(request as never)
+      const result = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(result.data.imported).toBe(1)
+      expect(result.data.errors).toHaveLength(0)
+
+      // Verify SKU was created without BOM
+      const sku = await prisma.sKU.findFirst({
+        where: { internalCode: 'SKU-NOBOM-001' },
+      })
+      expect(sku).not.toBeNull()
+
+      const bomVersion = await prisma.bOMVersion.findFirst({
+        where: { skuId: sku!.id },
+      })
+      expect(bomVersion).toBeNull()
+    })
+  })
+
   describe('CSV Format', () => {
     it('export handles special characters correctly', async () => {
       setTestSession(TEST_SESSIONS.admin!)

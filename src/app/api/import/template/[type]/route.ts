@@ -17,11 +17,12 @@ interface RouteParams {
 }
 
 /**
- * Fetch reference data for templates (companies, brands, locations, categories)
+ * Fetch reference data for templates (companies, brands, locations, categories, and optionally components)
  */
 async function fetchReferenceData(
   userId: string,
-  selectedCompanyId: string
+  selectedCompanyId: string,
+  includeComponents: boolean = false
 ): Promise<TemplateReferenceData> {
   // Get user's accessible companies via UserCompany
   const userCompanies = await prisma.userCompany.findMany({
@@ -33,8 +34,17 @@ async function fetchReferenceData(
   const companyIds = [selectedCompanyId, ...userCompanies.map((uc) => uc.companyId)]
   const uniqueCompanyIds = Array.from(new Set(companyIds))
 
+  // Only fetch components for SKU template
+  const componentQuery = includeComponents
+    ? prisma.component.findMany({
+        where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+        select: { skuCode: true, name: true, costPerUnit: true },
+        orderBy: [{ name: 'asc' }],
+      })
+    : Promise.resolve([])
+
   // Fetch all reference data in parallel
-  const [companies, brands, locations, categories] = await Promise.all([
+  const [companies, brands, locations, categories, components] = await Promise.all([
     prisma.company.findMany({
       where: { id: { in: uniqueCompanyIds } },
       select: { name: true },
@@ -55,6 +65,7 @@ async function fetchReferenceData(
       select: { name: true },
       orderBy: { name: 'asc' },
     }),
+    componentQuery,
   ])
 
   return {
@@ -62,6 +73,11 @@ async function fetchReferenceData(
     brands: brands.map((b) => ({ name: b.name, companyName: b.company.name })),
     locations: locations.map((l) => ({ name: l.name, companyName: l.company.name })),
     categories: categories.map((c) => ({ name: c.name })),
+    components: components.map((c) => ({
+      skuCode: c.skuCode,
+      name: c.name,
+      costPerUnit: c.costPerUnit.toString(),
+    })),
   }
 }
 
@@ -80,9 +96,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const { type } = await params
 
   // Fetch reference data for components and skus templates
+  // For SKUs, also include components for BOM reference
   let referenceData: TemplateReferenceData | undefined
-  if (type === 'components' || type === 'skus') {
-    referenceData = await fetchReferenceData(session.user.id, session.user.selectedCompanyId)
+  if (type === 'components') {
+    referenceData = await fetchReferenceData(session.user.id, session.user.selectedCompanyId, false)
+  } else if (type === 'skus') {
+    referenceData = await fetchReferenceData(session.user.id, session.user.selectedCompanyId, true)
   }
 
   let csvContent: string
