@@ -9,7 +9,7 @@ interface ExportButtonProps {
   /**
    * The type of data to export
    */
-  exportType: 'components' | 'skus' | 'transactions'
+  exportType: 'components' | 'skus' | 'transactions' | 'lots'
   /**
    * Optional query parameters to pass to the export endpoint
    */

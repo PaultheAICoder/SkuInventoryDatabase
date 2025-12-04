@@ -173,9 +173,40 @@ export const transactionExportColumns: CSVColumn<TransactionExportData>[] = [
 ]
 
 /**
+ * Lot export columns definition
+ */
+export interface LotExportData {
+  id: string
+  lotNumber: string
+  componentName: string
+  componentSkuCode: string
+  expiryDate: string | null
+  receivedQuantity: string
+  balance: string
+  supplier: string | null
+  status: string
+  notes: string | null
+  createdAt: string
+}
+
+export const lotExportColumns: CSVColumn<LotExportData>[] = [
+  { header: 'ID', accessor: (l) => l.id },
+  { header: 'Lot Number', accessor: (l) => l.lotNumber },
+  { header: 'Component Name', accessor: (l) => l.componentName },
+  { header: 'Component SKU', accessor: (l) => l.componentSkuCode },
+  { header: 'Expiry Date', accessor: (l) => l.expiryDate },
+  { header: 'Received Quantity', accessor: (l) => l.receivedQuantity },
+  { header: 'Current Balance', accessor: (l) => l.balance },
+  { header: 'Supplier', accessor: (l) => l.supplier },
+  { header: 'Status', accessor: (l) => l.status },
+  { header: 'Notes', accessor: (l) => l.notes },
+  { header: 'Created At', accessor: (l) => l.createdAt },
+]
+
+/**
  * Generate a filename for export
  */
-export function generateExportFilename(type: 'components' | 'skus' | 'transactions'): string {
+export function generateExportFilename(type: 'components' | 'skus' | 'transactions' | 'lots'): string {
   const date = new Date().toISOString().split('T')[0]
   return `${type}-export-${date}.csv`
 }
