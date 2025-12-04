@@ -1,5 +1,21 @@
 import { test, expect } from '@playwright/test';
 
+// Helper to close a GitHub issue via API
+async function closeGitHubIssue(page: import('@playwright/test').Page, issueNumber: number) {
+  try {
+    const response = await page.request.patch(`/api/github/issues/${issueNumber}`, {
+      data: { state: 'closed' }
+    });
+    if (response.ok()) {
+      console.log(`Closed test issue #${issueNumber}`);
+    } else {
+      console.warn(`Failed to close issue #${issueNumber}: ${response.status()}`);
+    }
+  } catch (e) {
+    console.warn(`Error closing issue #${issueNumber}:`, e);
+  }
+}
+
 test('test feedback API submission', async ({ browser }) => {
   const context = await browser.newContext({
     ignoreHTTPSErrors: true,
@@ -40,6 +56,9 @@ test('test feedback API submission', async ({ browser }) => {
   expect(body.data.issueNumber).toBeGreaterThan(0);
 
   console.log('SUCCESS! Created issue:', body.data.issueUrl);
+
+  // Clean up: close the test issue so we don't leave orphan issues
+  await closeGitHubIssue(page, body.data.issueNumber);
 
   await context.close();
 });

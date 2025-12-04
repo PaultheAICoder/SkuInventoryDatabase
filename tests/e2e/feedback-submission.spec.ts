@@ -12,6 +12,28 @@ import { test, expect } from '@playwright/test'
  * - Dialog close/reset behavior
  */
 
+// Helper to close a GitHub issue via API (for test cleanup)
+async function closeGitHubIssue(page: import('@playwright/test').Page, issueNumber: number) {
+  try {
+    const response = await page.request.patch(`/api/github/issues/${issueNumber}`, {
+      data: { state: 'closed' }
+    });
+    if (response.ok()) {
+      console.log(`Closed test issue #${issueNumber}`);
+    } else {
+      console.warn(`Failed to close issue #${issueNumber}: ${response.status()}`);
+    }
+  } catch (e) {
+    console.warn(`Error closing issue #${issueNumber}:`, e);
+  }
+}
+
+// Helper to extract issue number from GitHub URL
+function extractIssueNumber(url: string): number | null {
+  const match = url.match(/\/issues\/(\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 // Helper to open feedback dialog
 async function openFeedbackDialog(page: import('@playwright/test').Page) {
   // The feedback button is in the header (MessageSquare icon with title="Submit Feedback")
@@ -142,12 +164,21 @@ test.describe('Feedback Submission', () => {
       // Wait for max 60 seconds for API response
       await expect(successText.or(errorText)).toBeVisible({ timeout: 60000 })
 
-      // If we got success, verify the issue URL
+      // If we got success, verify the issue URL and clean up
       if (await successText.isVisible()) {
         // Verify issue URL is displayed
         const issueLink = dialog.locator('a:has-text("View Issue")')
         await expect(issueLink).toBeVisible()
-        expect(await issueLink.getAttribute('href')).toContain('github.com')
+        const issueUrl = await issueLink.getAttribute('href')
+        expect(issueUrl).toContain('github.com')
+
+        // Clean up: close the test issue so we don't leave orphan issues
+        if (issueUrl) {
+          const issueNumber = extractIssueNumber(issueUrl)
+          if (issueNumber) {
+            await closeGitHubIssue(page, issueNumber)
+          }
+        }
 
         // Close dialog - use first() since there's both a Close button and X button
         await dialog.locator('button:has-text("Close")').first().click()
@@ -226,12 +257,21 @@ test.describe('Feedback Submission', () => {
       // Wait for max 60 seconds for API response
       await expect(successText.or(errorText)).toBeVisible({ timeout: 60000 })
 
-      // If we got success, verify the issue URL
+      // If we got success, verify the issue URL and clean up
       if (await successText.isVisible()) {
         // Verify issue URL is displayed
         const issueLink = dialog.locator('a:has-text("View Issue")')
         await expect(issueLink).toBeVisible()
-        expect(await issueLink.getAttribute('href')).toContain('github.com')
+        const issueUrl = await issueLink.getAttribute('href')
+        expect(issueUrl).toContain('github.com')
+
+        // Clean up: close the test issue so we don't leave orphan issues
+        if (issueUrl) {
+          const issueNumber = extractIssueNumber(issueUrl)
+          if (issueNumber) {
+            await closeGitHubIssue(page, issueNumber)
+          }
+        }
 
         // Close dialog - use first() since there's both a Close button and X button
         await dialog.locator('button:has-text("Close")').first().click()
