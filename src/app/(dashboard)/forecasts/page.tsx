@@ -118,6 +118,21 @@ export default function ForecastsPage() {
     setRefreshKey((prev) => prev + 1) // Force refetch forecasts
   }
 
+  // Handle export button click
+  const handleExport = () => {
+    // Build export URL with current lookback if overridden
+    const params = new URLSearchParams()
+    const lookbackDays = searchParams.get('lookbackDays')
+    if (lookbackDays) {
+      params.set('lookbackDays', lookbackDays)
+    }
+    const queryString = params.toString()
+    const exportUrl = `/api/export/forecasts${queryString ? `?${queryString}` : ''}`
+
+    // Trigger download
+    window.location.href = exportUrl
+  }
+
   // Compute stats from the response data
   const stats = useMemo(() => {
     if (!response?.data) {
@@ -185,6 +200,7 @@ export default function ForecastsPage() {
           config={config}
           onLookbackChange={handleLookbackChange}
           onOpenSettings={() => setSettingsOpen(true)}
+          onExport={handleExport}
           disabled={isLoading}
           canEdit={canEdit}
         />

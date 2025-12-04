@@ -206,9 +206,46 @@ export const lotExportColumns: CSVColumn<LotExportData>[] = [
 ]
 
 /**
+ * Forecast export columns definition
+ */
+export interface ForecastExportData {
+  componentName: string
+  skuCode: string
+  category: string | null
+  quantityOnHand: number
+  dailyConsumption: string
+  daysUntilRunout: number | null
+  runoutDate: string | null
+  recommendedReorderQty: number
+  reorderByDate: string | null
+  leadTimeDays: number
+  status: string // 'critical' | 'warning' | 'ok' | 'na'
+  lookbackDays: number
+  safetyDays: number
+}
+
+export const forecastExportColumns: CSVColumn<ForecastExportData>[] = [
+  { header: 'Component Name', accessor: (f) => f.componentName },
+  { header: 'SKU Code', accessor: (f) => f.skuCode },
+  { header: 'Category', accessor: (f) => f.category },
+  { header: 'On-Hand Qty', accessor: (f) => f.quantityOnHand },
+  { header: 'Daily Consumption', accessor: (f) => f.dailyConsumption },
+  { header: 'Days Until Runout', accessor: (f) => f.daysUntilRunout },
+  { header: 'Runout Date', accessor: (f) => f.runoutDate },
+  { header: 'Recommended Reorder Qty', accessor: (f) => f.recommendedReorderQty },
+  { header: 'Reorder By Date', accessor: (f) => f.reorderByDate },
+  { header: 'Lead Time (Days)', accessor: (f) => f.leadTimeDays },
+  { header: 'Status', accessor: (f) => f.status },
+  { header: 'Lookback Days', accessor: (f) => f.lookbackDays },
+  { header: 'Safety Days', accessor: (f) => f.safetyDays },
+]
+
+/**
  * Generate a filename for export
  */
-export function generateExportFilename(type: 'components' | 'skus' | 'transactions' | 'lots'): string {
+export function generateExportFilename(
+  type: 'components' | 'skus' | 'transactions' | 'lots' | 'forecasts'
+): string {
   const date = new Date().toISOString().split('T')[0]
   return `${type}-export-${date}.csv`
 }

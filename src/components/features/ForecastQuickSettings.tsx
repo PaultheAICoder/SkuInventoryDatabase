@@ -8,13 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Settings2 } from 'lucide-react'
+import { Settings2, Download } from 'lucide-react'
 import type { ForecastConfigResponse } from '@/types/forecast'
 
 interface ForecastQuickSettingsProps {
   config: ForecastConfigResponse | null
   onLookbackChange: (days: number) => void
   onOpenSettings: () => void
+  onExport: () => void
   disabled?: boolean
   canEdit?: boolean
 }
@@ -25,6 +26,7 @@ export function ForecastQuickSettings({
   config,
   onLookbackChange,
   onOpenSettings,
+  onExport,
   disabled = false,
   canEdit = false,
 }: ForecastQuickSettingsProps) {
@@ -64,6 +66,18 @@ export function ForecastQuickSettings({
         <span>Excludes: {excludedSummary}</span>
       </div>
 
+      {/* Export Button - always visible */}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onExport}
+        disabled={disabled}
+        className={canEdit ? '' : 'ml-auto'}
+      >
+        <Download className="mr-2 h-4 w-4" />
+        Export
+      </Button>
+
       {/* Settings Button (Admin only) */}
       {canEdit && (
         <Button
@@ -71,7 +85,6 @@ export function ForecastQuickSettings({
           size="sm"
           onClick={onOpenSettings}
           disabled={disabled}
-          className="ml-auto"
         >
           <Settings2 className="mr-2 h-4 w-4" />
           Settings

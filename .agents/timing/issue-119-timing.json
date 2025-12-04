@@ -1,0 +1,64 @@
+{
+  "issue": 119,
+  "title": "Add forecast export functionality and comprehensive tests",
+  "parentIssue": 13,
+  "status": "complete",
+  "phases": {
+    "scout": {
+      "startTime": "2025-12-04T14:00:00Z",
+      "endTime": "2025-12-04T14:15:00Z",
+      "durationMinutes": 15
+    },
+    "plan": {
+      "startTime": "2025-12-04T14:15:00Z",
+      "endTime": "2025-12-04T14:40:00Z",
+      "durationMinutes": 25
+    },
+    "build": {
+      "startTime": "2025-12-04T14:40:00Z",
+      "endTime": "2025-12-04T14:55:00Z",
+      "durationMinutes": 15,
+      "estimatedHours": "6-8"
+    },
+    "cleanup": {
+      "startTime": "2025-12-04T14:58:00Z",
+      "endTime": "2025-12-04T15:05:00Z",
+      "durationMinutes": 7
+    }
+  },
+  "planOutput": ".agents/outputs/plan-119-120425.md",
+  "buildOutput": ".agents/outputs/build-119-120425.md",
+  "cleanupOutput": ".agents/outputs/cleanup-119-120425.md",
+  "complexity": "Medium",
+  "taskCategory": "NEW_FEATURE",
+  "testStrategy": "TARGETED",
+  "filesIdentified": {
+    "create": [
+      "src/app/api/export/forecasts/route.ts",
+      "tests/integration/forecasts.test.ts"
+    ],
+    "modify": [
+      "src/services/export.ts",
+      "src/components/features/ForecastQuickSettings.tsx",
+      "src/app/(dashboard)/forecasts/page.tsx"
+    ]
+  },
+  "dependencies": {
+    "completed": [115, 116, 117],
+    "blocks": []
+  },
+  "validation": {
+    "typescript": "PASS",
+    "build": "PASS",
+    "lint": "PASS",
+    "tests": {
+      "total": 539,
+      "passed": 539,
+      "failed": 0,
+      "duration": "18.52s"
+    }
+  },
+  "createdAt": "2025-12-04T14:40:00Z",
+  "updatedAt": "2025-12-04T15:05:00Z",
+  "completedAt": "2025-12-04T15:05:00Z"
+}
