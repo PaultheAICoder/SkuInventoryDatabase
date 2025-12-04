@@ -26,6 +26,9 @@ import {
   Bell,
   BellOff,
   MessageSquare,
+  Mail,
+  Plus,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -60,11 +63,25 @@ export function AlertConfigForm({ config, onRefresh }: AlertConfigFormProps) {
     error?: string
   } | null>(null)
 
+  // Email state
+  const [emailAddresses, setEmailAddresses] = useState<string[]>(config?.emailAddresses ?? [])
+  const [enableEmail, setEnableEmail] = useState(config?.enableEmail ?? false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [isTestingEmail, setIsTestingEmail] = useState(false)
+  const [emailTestResult, setEmailTestResult] = useState<{
+    success: boolean
+    message?: string
+    error?: string
+  } | null>(null)
+
   // Sync form state when config changes
   useEffect(() => {
     if (config) {
       setEnableSlack(config.enableSlack)
       setAlertMode(config.alertMode)
+      setEmailAddresses(config.emailAddresses)
+      setEnableEmail(config.enableEmail)
     }
   }, [config])
 
@@ -105,12 +122,78 @@ export function AlertConfigForm({ config, onRefresh }: AlertConfigFormProps) {
     }
   }
 
+  const handleTestEmail = async () => {
+    if (emailAddresses.length === 0) {
+      setEmailTestResult({
+        success: false,
+        error: 'Add at least one email address first',
+      })
+      return
+    }
+
+    setIsTestingEmail(true)
+    setEmailTestResult(null)
+
+    try {
+      const res = await fetch('/api/settings/alerts/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'email', email: emailAddresses[0] }),
+      })
+
+      if (res.status === 403) {
+        toast.error('You do not have permission to test email')
+        return
+      }
+
+      const data = await res.json()
+
+      setEmailTestResult(data.data)
+      if (data.data?.success) {
+        toast.success(`Test email sent to ${emailAddresses[0]}!`)
+      } else {
+        toast.error(data.data?.error || 'Test failed')
+      }
+    } catch {
+      toast.error('Failed to test email')
+    } finally {
+      setIsTestingEmail(false)
+    }
+  }
+
+  const addEmail = () => {
+    setEmailError(null)
+    const email = newEmail.trim().toLowerCase()
+
+    if (!email) return
+
+    // Simple email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setEmailError('Please enter a valid email address')
+      return
+    }
+
+    if (emailAddresses.includes(email)) {
+      setEmailError('This email is already added')
+      return
+    }
+
+    setEmailAddresses([...emailAddresses, email])
+    setNewEmail('')
+  }
+
+  const removeEmail = (email: string) => {
+    setEmailAddresses(emailAddresses.filter((e) => e !== email))
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
 
     try {
       const payload: Record<string, unknown> = {
         enableSlack,
+        enableEmail,
+        emailAddresses,
         alertMode,
       }
 
@@ -138,6 +221,7 @@ export function AlertConfigForm({ config, onRefresh }: AlertConfigFormProps) {
       toast.success('Alert settings saved')
       setWebhookUrl('') // Clear webhook field
       setTestResult(null)
+      setEmailTestResult(null)
       onRefresh()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save settings')
@@ -146,10 +230,10 @@ export function AlertConfigForm({ config, onRefresh }: AlertConfigFormProps) {
     }
   }
 
-  const isLoading = isSaving || isTesting
+  const isLoading = isSaving || isTesting || isTestingEmail
   const hasStoredWebhook = config?.hasWebhook ?? false
   const canTest = webhookUrl || hasStoredWebhook
-  const canSave = webhookUrl || hasStoredWebhook
+  const canSave = webhookUrl || hasStoredWebhook || emailAddresses.length > 0
 
   return (
     <div className="space-y-6">
@@ -345,17 +429,168 @@ export function AlertConfigForm({ config, onRefresh }: AlertConfigFormProps) {
         </CardContent>
       </Card>
 
-      {/* Email Configuration Card (Placeholder) */}
-      <Card className="opacity-50">
+      {/* Email Configuration Card */}
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Email Alerts</CardTitle>
-            <Badge variant="secondary">Coming Soon</Badge>
+            <CardTitle className="flex items-center gap-2">
+              {enableEmail ? (
+                <Bell className="h-5 w-5 text-green-600" />
+              ) : (
+                <BellOff className="h-5 w-5 text-muted-foreground" />
+              )}
+              Email Alerts
+            </CardTitle>
+            <Badge variant={enableEmail && emailAddresses.length > 0 ? 'default' : 'secondary'}>
+              {enableEmail && emailAddresses.length > 0 ? 'Enabled' : 'Disabled'}
+            </Badge>
           </div>
           <CardDescription>
-            Email alert configuration will be available in a future update
+            {enableEmail && emailAddresses.length > 0
+              ? `Low-stock alerts will be sent to ${emailAddresses.length} email address${emailAddresses.length > 1 ? 'es' : ''}`
+              : 'Configure email addresses to receive alerts'}
           </CardDescription>
         </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Enable Toggle */}
+          <div className="flex items-center space-x-2">
+            <input
+              id="enableEmail"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={enableEmail}
+              onChange={(e) => setEnableEmail(e.target.checked)}
+              disabled={isLoading}
+            />
+            <div>
+              <Label htmlFor="enableEmail" className="font-normal">
+                Enable Email Alerts
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Receive low-stock notifications via email
+              </p>
+            </div>
+          </div>
+
+          {/* Email Addresses */}
+          <div className="space-y-2">
+            <Label>Email Addresses</Label>
+
+            {/* Existing emails */}
+            {emailAddresses.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {emailAddresses.map((email) => (
+                  <div
+                    key={email}
+                    className="flex items-center gap-1 bg-secondary px-2 py-1 rounded-md text-sm"
+                  >
+                    <Mail className="h-3 w-3" />
+                    <span>{email}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeEmail(email)}
+                      className="ml-1 hover:text-destructive"
+                      disabled={isLoading}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add new email */}
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="alerts@example.com"
+                value={newEmail}
+                onChange={(e) => {
+                  setNewEmail(e.target.value)
+                  setEmailError(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addEmail()
+                  }
+                }}
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={addEmail}
+                disabled={isLoading || !newEmail}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {emailError && (
+              <p className="text-xs text-destructive">{emailError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Add email addresses to receive low-stock alerts
+            </p>
+          </div>
+
+          {/* Email Test Result Display */}
+          {emailTestResult && (
+            <div
+              className={`rounded-md p-4 ${
+                emailTestResult.success
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-destructive/10 border border-destructive/20'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                {emailTestResult.success ? (
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-destructive mt-0.5" />
+                )}
+                <div>
+                  <p
+                    className={`font-medium ${
+                      emailTestResult.success ? 'text-green-800' : 'text-destructive'
+                    }`}
+                  >
+                    {emailTestResult.success ? 'Test Successful' : 'Test Failed'}
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {emailTestResult.success
+                      ? emailTestResult.message
+                      : emailTestResult.error}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Test Email Button */}
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleTestEmail}
+              disabled={emailAddresses.length === 0 || isLoading}
+            >
+              {isTestingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Test Email
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

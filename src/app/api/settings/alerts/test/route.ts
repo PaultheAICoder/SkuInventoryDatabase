@@ -14,9 +14,17 @@ import {
   isValidSlackWebhookUrl,
   SlackWebhookError,
 } from '@/lib/slack'
+import {
+  sendEmail,
+  formatTestEmail,
+  isEmailConfigured,
+  isValidEmail,
+  EmailDeliveryError,
+} from '@/lib/email'
 
 /**
- * POST /api/settings/alerts/test - Test Slack webhook (admin only)
+ * POST /api/settings/alerts/test - Test Slack webhook or email (admin only)
+ * Body: { type: 'slack' | 'email', webhookUrl?: string, email?: string }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,51 +38,96 @@ export async function POST(request: NextRequest) {
       return forbidden()
     }
 
-    // Check for provided URL or use stored
     const body = await request.json().catch(() => ({}))
-    let webhookUrl: string | null = null
+    const testType = body.type || 'slack' // Default to slack for backward compatibility
 
-    if (body.webhookUrl) {
-      // Use provided URL for testing before saving
-      webhookUrl = body.webhookUrl
+    if (testType === 'email') {
+      // Email test
+      const testEmail = body.email as string | undefined
+
+      if (!testEmail) {
+        return success({
+          success: false,
+          error: 'No email address provided for test',
+        })
+      }
+
+      if (!isValidEmail(testEmail)) {
+        return success({
+          success: false,
+          error: 'Invalid email address format',
+        })
+      }
+
+      if (!isEmailConfigured()) {
+        return success({
+          success: false,
+          error: 'Email provider not configured. Set RESEND_API_KEY environment variable.',
+        })
+      }
+
+      try {
+        const message = formatTestEmail()
+        message.to = [testEmail]
+        await sendEmail(message)
+        return success({
+          success: true,
+          message: `Test email sent to ${testEmail}`,
+        })
+      } catch (error) {
+        const message =
+          error instanceof EmailDeliveryError
+            ? error.message
+            : 'Failed to send test email'
+        return success({
+          success: false,
+          error: message,
+        })
+      }
     } else {
-      // Use stored config
-      const config = await getAlertConfig(session.user.selectedCompanyId)
-      webhookUrl = config?.slackWebhookUrl ?? null
-    }
+      // Slack test (existing logic)
+      let webhookUrl: string | null = null
 
-    if (!webhookUrl) {
-      return success({
-        success: false,
-        error: 'No webhook URL configured',
-      })
-    }
+      if (body.webhookUrl) {
+        webhookUrl = body.webhookUrl
+      } else {
+        const config = await getAlertConfig(session.user.selectedCompanyId)
+        webhookUrl = config?.slackWebhookUrl ?? null
+      }
 
-    if (!isValidSlackWebhookUrl(webhookUrl)) {
-      return success({
-        success: false,
-        error: 'Invalid Slack webhook URL format. URL must start with https://hooks.slack.com/services/',
-      })
-    }
+      if (!webhookUrl) {
+        return success({
+          success: false,
+          error: 'No webhook URL configured',
+        })
+      }
 
-    try {
-      await sendSlackMessage(webhookUrl, formatTestMessage())
-      return success({
-        success: true,
-        message: 'Test message sent successfully',
-      })
-    } catch (error) {
-      const message =
-        error instanceof SlackWebhookError
-          ? error.message
-          : 'Failed to send test message'
-      return success({
-        success: false,
-        error: message,
-      })
+      if (!isValidSlackWebhookUrl(webhookUrl)) {
+        return success({
+          success: false,
+          error: 'Invalid Slack webhook URL format. URL must start with https://hooks.slack.com/services/',
+        })
+      }
+
+      try {
+        await sendSlackMessage(webhookUrl, formatTestMessage())
+        return success({
+          success: true,
+          message: 'Test message sent successfully',
+        })
+      } catch (error) {
+        const message =
+          error instanceof SlackWebhookError
+            ? error.message
+            : 'Failed to send test message'
+        return success({
+          success: false,
+          error: message,
+        })
+      }
     }
   } catch (error) {
-    console.error('Error testing Slack webhook:', error)
+    console.error('Error testing alert channel:', error)
     return serverError()
   }
 }

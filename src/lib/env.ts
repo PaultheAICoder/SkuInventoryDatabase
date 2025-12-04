@@ -11,6 +11,10 @@ const envSchema = z.object({
   SHOPIFY_ENCRYPTION_KEY: z.string().min(32).optional(),
   // Cron job secret - required for /api/cron/alerts endpoint authentication
   CRON_SECRET: z.string().min(16).optional(),
+  // Email configuration - Resend API key (recommended for serverless)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  // Email "From" address (optional, defaults to alerts@example.com)
+  EMAIL_FROM: z.string().email().optional(),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -10,6 +10,12 @@ import {
   formatDigestMessage,
   type LowStockAlertData,
 } from '@/lib/slack'
+import {
+  sendEmail,
+  formatLowStockAlertEmail,
+  formatDigestEmail,
+  type LowStockEmailData,
+} from '@/lib/email'
 import type { ReorderStatus } from '@/types'
 import type {
   AlertConfigResponse,
@@ -410,6 +416,76 @@ export async function sendSlackAlerts(
 }
 
 /**
+ * Send low-stock alerts via email
+ * Used by scheduler to deliver alerts
+ */
+export async function sendEmailAlerts(
+  companyId: string,
+  alerts: ComponentAlertNeeded[],
+  baseUrl: string
+): Promise<{ sent: number; errors: string[] }> {
+  const config = await getAlertConfig(companyId)
+
+  if (!config || !config.enableEmail || config.emailAddresses.length === 0) {
+    return { sent: 0, errors: [] }
+  }
+
+  // Get company name for email footer
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { name: true },
+  })
+
+  const errors: string[] = []
+
+  // Convert alerts to LowStockEmailData format
+  const alertData: LowStockEmailData[] = alerts.map((alert) => ({
+    componentName: alert.componentName,
+    skuCode: alert.skuCode,
+    brandName: alert.brandName,
+    currentStatus: alert.currentStatus as 'warning' | 'critical',
+    quantityOnHand: alert.quantityOnHand,
+    reorderPoint: alert.reorderPoint,
+    leadTimeDays: alert.leadTimeDays,
+    componentId: alert.componentId,
+    baseUrl,
+    companyName: company?.name,
+  }))
+
+  try {
+    if (config.alertMode === 'daily_digest') {
+      // Send single digest email
+      const message = formatDigestEmail(alertData, baseUrl, company?.name)
+      message.to = config.emailAddresses
+      await sendEmail(message)
+      await updateLastDigestSent(companyId)
+      return { sent: alerts.length, errors: [] }
+    } else {
+      // Send individual alerts (per_transition mode)
+      let sent = 0
+      for (const data of alertData) {
+        try {
+          const message = formatLowStockAlertEmail(data)
+          message.to = config.emailAddresses
+          await sendEmail(message)
+          sent++
+        } catch (error) {
+          errors.push(
+            `Failed to send email for ${data.componentName}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          )
+        }
+      }
+      return { sent, errors }
+    }
+  } catch (error) {
+    errors.push(
+      `Email delivery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+    return { sent: 0, errors }
+  }
+}
+
+/**
  * Result of alert evaluation run for a single company
  */
 export interface AlertEvaluationResult {
@@ -481,14 +557,18 @@ export async function runAlertEvaluation(
     result.slackErrors = slackResult.errors
   }
 
-  // Email delivery will be added in Issue #107
-  // if (config.enableEmail && config.emailAddresses.length > 0) {
-  //   const emailResult = await sendEmailAlerts(...)
-  //   result.emailSent = emailResult.sent
-  //   result.emailErrors = emailResult.errors
-  // }
+  // Send email alerts if enabled
+  if (config.enableEmail && config.emailAddresses.length > 0) {
+    const emailResult = await sendEmailAlerts(
+      companyId,
+      evaluation.componentsNeedingAlert,
+      baseUrl
+    )
+    result.emailSent = emailResult.sent
+    result.emailErrors = emailResult.errors
+  }
 
-  console.log(`[Alerts] Company ${companyId}: ${result.alertsTriggered} alerts, ${result.slackSent} Slack sent`)
+  console.log(`[Alerts] Company ${companyId}: ${result.alertsTriggered} alerts, ${result.slackSent} Slack sent, ${result.emailSent} emails sent`)
 
   return result
 }
