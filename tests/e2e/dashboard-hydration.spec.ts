@@ -16,8 +16,8 @@ test.describe('Dashboard Hydration', () => {
       }
     });
 
-    // Go to login page
-    await page.goto('http://172.16.20.50:4545/login');
+    // Go to login page (uses baseURL from playwright.config.ts)
+    await page.goto('/login');
     await page.waitForLoadState('networkidle');
 
     // Login
@@ -76,7 +76,7 @@ test.describe('Dashboard Hydration', () => {
       }
     });
 
-    await page.goto('http://172.16.20.50:4545/login');
+    await page.goto('/login');
     await page.waitForLoadState('networkidle');
 
     await page.fill('#email', 'admin@tonsil.tech');

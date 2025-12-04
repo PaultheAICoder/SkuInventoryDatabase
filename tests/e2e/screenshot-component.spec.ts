@@ -1,16 +1,16 @@
 import { test } from '@playwright/test'
 
 test('screenshot component detail page', async ({ page }) => {
-  // Login
-  await page.goto('http://172.16.20.50:4545/login')
+  // Login (uses baseURL from playwright.config.ts)
+  await page.goto('/login')
   await page.waitForSelector('#email')
   await page.fill('#email', 'admin@tonsil.tech')
   await page.fill('#password', 'changeme123')
   await page.click('button[type="submit"]')
   await page.waitForURL('**/', { timeout: 15000 })
 
-  // Go to components page
-  await page.goto('http://172.16.20.50:4545/components')
+  // Go to components page (uses baseURL from playwright.config.ts)
+  await page.goto('/components')
   await page.waitForSelector('table', { timeout: 10000 })
 
   // Click on first component if exists

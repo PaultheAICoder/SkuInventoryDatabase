@@ -107,8 +107,8 @@ test.describe('Defect Analytics Dashboard', () => {
     const cookies = await page.context().cookies()
     const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
-    // Make API request with session cookies
-    const response = await request.get('http://172.16.20.50:4545/api/analytics/defects', {
+    // Make API request with session cookies (uses baseURL from playwright.config.ts)
+    const response = await request.get('/api/analytics/defects', {
       headers: {
         Cookie: cookieHeader,
       },
@@ -137,14 +137,12 @@ test.describe('Defect Analytics Dashboard', () => {
     const cookies = await page.context().cookies()
     const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
 
-    const response = await request.get(
-      'http://172.16.20.50:4545/api/analytics/defects?filters=true',
-      {
-        headers: {
-          Cookie: cookieHeader,
-        },
-      }
-    )
+    // Uses baseURL from playwright.config.ts
+    const response = await request.get('/api/analytics/defects?filters=true', {
+      headers: {
+        Cookie: cookieHeader,
+      },
+    })
 
     expect(response.ok()).toBeTruthy()
     const data = await response.json()

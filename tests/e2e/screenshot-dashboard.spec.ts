@@ -7,8 +7,8 @@ test('screenshot dashboard', async ({ browser }) => {
   });
   const page = await context.newPage();
 
-  // Go to login page
-  await page.goto('http://172.16.20.50:4545/login');
+  // Go to login page (uses baseURL from playwright.config.ts)
+  await page.goto('/login');
   await page.waitForLoadState('networkidle');
 
   // Login - use id selectors

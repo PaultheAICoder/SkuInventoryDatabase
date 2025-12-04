@@ -7,8 +7,8 @@ test('test feedback API submission', async ({ browser }) => {
   });
   const page = await context.newPage();
 
-  // Login first
-  await page.goto('http://172.16.20.50:4545/login');
+  // Login first (uses baseURL from playwright.config.ts)
+  await page.goto('/login');
   await page.waitForLoadState('networkidle');
   await page.fill('#email', 'admin@tonsil.tech');
   await page.fill('#password', 'changeme123');
@@ -16,8 +16,8 @@ test('test feedback API submission', async ({ browser }) => {
   await page.waitForURL('**/', { timeout: 15000 });
   await page.waitForLoadState('networkidle');
 
-  // Now call the feedback API directly
-  const response = await page.request.post('http://172.16.20.50:4545/api/feedback', {
+  // Now call the feedback API directly (uses baseURL from playwright.config.ts)
+  const response = await page.request.post('/api/feedback', {
     data: {
       type: 'bug',
       description: 'TEST ISSUE - Please close. Testing feedback API via Playwright.',

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { login } from './helpers/login'
 
 /**
  * Reorder Hints E2E Tests
@@ -9,13 +10,7 @@ import { test, expect } from '@playwright/test'
  */
 test.describe('Reorder Lead-Time Hints', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as admin
-    await page.goto('/login')
-    await page.waitForSelector('#email', { timeout: 10000 })
-    await page.fill('#email', 'admin@tonsil.tech')
-    await page.fill('#password', 'changeme123')
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/', { timeout: 15000 })
+    await login(page)
   })
 
   test('Dashboard API returns leadTimeDays in criticalComponents', async ({ page }) => {
@@ -200,13 +195,7 @@ test.describe('Reorder Lead-Time Hints', () => {
 
 test.describe('Reorder Hints with Different Time Ranges', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as admin
-    await page.goto('/login')
-    await page.waitForSelector('#email', { timeout: 10000 })
-    await page.fill('#email', 'admin@tonsil.tech')
-    await page.fill('#password', 'changeme123')
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/', { timeout: 15000 })
+    await login(page)
   })
 
   test('Dashboard API returns leadTimeDays with days filter', async ({ page }) => {
@@ -254,19 +243,21 @@ test.describe('Reorder Hints with Different Time Ranges', () => {
     await selectTrigger.click()
     await page.locator('[role="option"]:has-text("Last 7 days")').click()
 
-    // Wait for network idle after API call completes
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(500)
+    // Wait for the dashboard API response after filter change
+    await page.waitForResponse(
+      response => response.url().includes('/api/dashboard') && response.status() === 200,
+      { timeout: 10000 }
+    )
+
+    // Wait for DOM to update after API response
+    await page.waitForLoadState('domcontentloaded')
 
     // Verify Lead Time header still exists (or no critical components)
-    const afterChangeCount = await leadTimeHeader.count()
-    // Check for empty state message (exact text from CriticalComponentsList)
-    const noComponentsMessage = page.locator('text=No critical components. All inventory levels are healthy.')
-    const hasNoComponents = await noComponentsMessage.count()
+    // Use a more robust check that waits for either condition
+    const leadTimeHeaderVisible = leadTimeHeader.first()
+    const noComponentsMessage = page.locator('text=No critical components')
 
-    // Test passes if either:
-    // 1. The Lead Time header is present (has critical components)
-    // 2. The "No critical components" message is shown (no critical components for time range)
-    expect(afterChangeCount > 0 || hasNoComponents > 0).toBe(true)
+    // Wait for either the Lead Time header OR the no components message to be visible
+    await expect(leadTimeHeaderVisible.or(noComponentsMessage.first())).toBeVisible({ timeout: 5000 })
   })
 })
