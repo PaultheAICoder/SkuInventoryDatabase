@@ -76,29 +76,15 @@ export async function GET(request: NextRequest) {
       ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
       : null
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
-
-    if (!user?.company.brands[0]) {
-      return success<DashboardResponse>({
-        componentStats: { total: 0, critical: 0, warning: 0, ok: 0 },
-        criticalComponents: [],
-        topBuildableSkus: [],
-        recentTransactions: [],
-      })
-    }
-
-    const brandId = user.company.brands[0].id
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
-    // Get all active components
+    // Get all active components for selected company
     const components = await prisma.component.findMany({
-      where: { brandId, isActive: true },
+      where: { companyId: selectedCompanyId, isActive: true },
       select: {
         id: true,
         name: true,
@@ -150,9 +136,9 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 10)
 
-    // Get active SKUs with their active BOMs
+    // Get active SKUs with their active BOMs for selected company
     const skus = await prisma.sKU.findMany({
-      where: { brandId, isActive: true },
+      where: { companyId: selectedCompanyId, isActive: true },
       include: {
         bomVersions: {
           where: { isActive: true },
@@ -193,10 +179,10 @@ export async function GET(request: NextRequest) {
       .slice(0, 10)
       .map(({ hasBom: _hasBom, ...sku }) => sku)
 
-    // Get recent transactions (with optional date filtering)
+    // Get recent transactions (with optional date filtering) for selected company
     const recentTransactions = await prisma.transaction.findMany({
       where: {
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
         ...(startDate && { date: { gte: startDate } }),
       },
       orderBy: { createdAt: 'desc' },

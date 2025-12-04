@@ -24,13 +24,14 @@ export async function POST(request: NextRequest) {
 
     const data = bodyResult.data
 
-    // Verify SKU exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Verify SKU exists and belongs to user's selected company
     const sku = await prisma.sKU.findFirst({
       where: {
         id: data.skuId,
-        brand: {
-          company: { id: session.user.companyId },
-        },
+        companyId: selectedCompanyId,
       },
       include: {
         bomVersions: {
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
       const location = await prisma.location.findFirst({
         where: {
           id: data.locationId,
-          companyId: session.user.companyId,
+          companyId: selectedCompanyId,
           isActive: true,
         },
       })
@@ -73,16 +74,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
     // Determine if we allow insufficient inventory
     // If settings.allowNegativeInventory is true, OR if user explicitly allows it
     const allowInsufficient = settings.allowNegativeInventory || data.allowInsufficientInventory
 
     try {
-      // Create the build transaction
+      // Create the build transaction for the selected company
       const result = await createBuildTransaction({
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
         skuId: data.skuId,
         bomVersionId: selectedBomVersionId,
         unitsToBuild: data.unitsToBuild,

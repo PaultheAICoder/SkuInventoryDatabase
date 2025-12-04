@@ -229,3 +229,14 @@ export const SECURITY_EVENTS = {
   SETTINGS_CHANGED: 'settings_changed',
   COMPANY_SWITCH: 'company_switch',
 } as const
+
+/**
+ * Validate that a user has access to a specific company
+ * Checks both UserCompany assignments and primary company
+ */
+export function validateCompanyAccess(
+  session: { user: { companies: Array<{ id: string }> } },
+  companyId: string
+): boolean {
+  return session.user.companies.some((c) => c.id === companyId)
+}

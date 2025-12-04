@@ -23,10 +23,13 @@ export async function GET(
 
     const { id } = await params
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const location = await prisma.location.findUnique({
       where: {
         id,
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
       },
       select: {
         id: true,
@@ -76,6 +79,9 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const validation = updateLocationSchema.safeParse(body)
 
     if (!validation.success) {
@@ -85,11 +91,11 @@ export async function PATCH(
       )
     }
 
-    // Check if location exists and belongs to the same company
+    // Check if location exists and belongs to the selected company
     const existingLocation = await prisma.location.findUnique({
       where: {
         id,
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
       },
     })
 
@@ -101,7 +107,7 @@ export async function PATCH(
     if (validation.data.name && validation.data.name !== existingLocation.name) {
       const nameExists = await prisma.location.findFirst({
         where: {
-          companyId: session.user.companyId,
+          companyId: selectedCompanyId,
           name: validation.data.name,
           id: { not: id },
         },
@@ -117,7 +123,7 @@ export async function PATCH(
 
     // Check if trying to deactivate
     if (validation.data.isActive === false && existingLocation.isActive) {
-      const check = await canDeactivateLocation(session.user.companyId, id)
+      const check = await canDeactivateLocation(selectedCompanyId, id)
       if (!check.canDeactivate) {
         return NextResponse.json({ error: check.reason }, { status: 400 })
       }
@@ -141,7 +147,7 @@ export async function PATCH(
 
     // Handle setting as default
     if (validation.data.isDefault === true && !existingLocation.isDefault) {
-      await setDefaultLocation(session.user.companyId, id)
+      await setDefaultLocation(selectedCompanyId, id)
     }
 
     // Update location
@@ -192,11 +198,14 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if location exists and belongs to the same company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check if location exists and belongs to the selected company
     const existingLocation = await prisma.location.findUnique({
       where: {
         id,
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
       },
     })
 

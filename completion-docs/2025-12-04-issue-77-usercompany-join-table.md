@@ -134,5 +134,7 @@ This issue unblocks:
 
 ## Git Information
 
-**Commit**: feat(issue #77): add UserCompany join table and companyId to Component/SKU
-**Files Changed**: 2 (schema.prisma, migration.sql)
+**Commit**: b060182 - feat(issue #77): add UserCompany join table and companyId to Component/SKU
+**Files Changed**: 7 (schema.prisma, migration.sql, agent outputs, completion docs)
+**Push Status**: SUCCESS
+**GitHub Issue**: #77 - Closed

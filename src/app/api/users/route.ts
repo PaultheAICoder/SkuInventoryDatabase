@@ -31,9 +31,12 @@ export async function GET(request: NextRequest) {
 
     const { page, pageSize, search, role, isActive, sortBy, sortOrder } = validation.data
 
-    // Build where clause
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Build where clause - scope by selected company
     const where: Prisma.UserWhereInput = {
-      companyId: session.user.companyId,
+      companyId: selectedCompanyId,
     }
 
     if (search) {
@@ -131,10 +134,13 @@ export async function POST(request: NextRequest) {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // Create user
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Create user in the selected company
     const user = await prisma.user.create({
       data: {
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
         email,
         passwordHash,
         name,

@@ -32,13 +32,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { includeInactive } = queryResult.data
 
-    // Check SKU exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check SKU exists and belongs to user's selected company
     const sku = await prisma.sKU.findFirst({
       where: {
         id: skuId,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 
@@ -138,13 +139,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const data = bodyResult.data
 
-    // Check SKU exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check SKU exists and belongs to user's selected company
     const sku = await prisma.sKU.findFirst({
       where: {
         id: skuId,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 
@@ -152,15 +154,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return notFound('SKU')
     }
 
-    // Verify all components exist, are active, and belong to user's company
+    // Verify all components exist, are active, and belong to user's selected company
     const componentIds = data.lines.map((l) => l.componentId)
     const components = await prisma.component.findMany({
       where: {
         id: { in: componentIds },
         isActive: true,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 

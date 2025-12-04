@@ -20,7 +20,7 @@ interface SearchParams {
   sortOrder?: string
 }
 
-async function getSKUs(searchParams: SearchParams, userId: string) {
+async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
   const search = searchParams.search
@@ -28,21 +28,9 @@ async function getSKUs(searchParams: SearchParams, userId: string) {
   const sortBy = (searchParams.sortBy || 'createdAt') as keyof Prisma.SKUOrderByWithRelationInput
   const sortOrder = (searchParams.sortOrder || 'desc') as 'asc' | 'desc'
 
-  // Get user's brand
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-  })
-
-  if (!user?.company.brands[0]) {
-    return { data: [], meta: { total: 0, page: 1, pageSize: 50 } }
-  }
-
-  const brandId = user.company.brands[0].id
-
-  // Build where clause
+  // Build where clause - scope by companyId
   const where: Prisma.SKUWhereInput = {
-    brandId,
+    companyId: selectedCompanyId,
     ...(salesChannel && { salesChannel }),
     ...(search && {
       OR: [
@@ -126,7 +114,10 @@ export default async function SKUsPage({
   }
 
   const params = await searchParams
-  const { data: skus, meta } = await getSKUs(params, session.user.id)
+
+  // Use selected company for scoping
+  const selectedCompanyId = session.user.selectedCompanyId
+  const { data: skus, meta } = await getSKUs(params, selectedCompanyId)
 
   return (
     <div className="space-y-6">

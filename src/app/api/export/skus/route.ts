@@ -14,28 +14,12 @@ export async function GET() {
       return unauthorized()
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
-    if (!user?.company.brands[0]) {
-      // Return empty CSV
-      const csv = toCSV([], skuExportColumns)
-      return new NextResponse(csv, {
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename="${generateExportFilename('skus')}"`,
-        },
-      })
-    }
-
-    const brandId = user.company.brands[0].id
-
-    // Get all SKUs for the brand with active BOM versions
+    // Get all SKUs for the selected company with active BOM versions
     const skus = await prisma.sKU.findMany({
-      where: { brandId },
+      where: { companyId: selectedCompanyId },
       orderBy: { name: 'asc' },
       include: {
         bomVersions: {

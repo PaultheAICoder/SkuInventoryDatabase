@@ -35,17 +35,8 @@ export async function POST(request: NextRequest) {
       return unauthorized('Viewers cannot import data')
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
-
-    if (!user?.company.brands[0]) {
-      return error('No active brand found', 400)
-    }
-
-    const brandId = user.company.brands[0].id
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
     // Parse multipart form data or raw CSV
     const contentType = request.headers.get('content-type') || ''
@@ -104,10 +95,10 @@ export async function POST(request: NextRequest) {
       const rowData = row.data
 
       try {
-        // Look up component by SKU code
+        // Look up component by SKU code within the selected company
         const component = await prisma.component.findFirst({
           where: {
-            brandId,
+            companyId: selectedCompanyId,
             skuCode: rowData.componentSkuCode,
           },
         })
@@ -156,9 +147,9 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create initial transaction
+        // Create initial transaction for the selected company
         await createInitialTransaction({
-          companyId: session.user.companyId,
+          companyId: selectedCompanyId,
           componentId: component.id,
           quantity: rowData.quantity,
           date: rowData.date,

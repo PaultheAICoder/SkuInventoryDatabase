@@ -19,31 +19,15 @@ export async function GET() {
       return unauthorized()
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
-
-    if (!user?.company.brands[0]) {
-      // Return empty CSV
-      const csv = toCSV([], componentExportColumns)
-      return new NextResponse(csv, {
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename="${generateExportFilename('components')}"`,
-        },
-      })
-    }
-
-    const brandId = user.company.brands[0].id
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
-    // Get all components for the brand
+    // Get all components for the selected company
     const components = await prisma.component.findMany({
-      where: { brandId },
+      where: { companyId: selectedCompanyId },
       orderBy: { name: 'asc' },
     })
 

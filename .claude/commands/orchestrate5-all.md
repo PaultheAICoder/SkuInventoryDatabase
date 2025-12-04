@@ -1,10 +1,10 @@
 ---
-command: "/orchestrate-all"
+command: "/orchestrate5-all"
 category: "Project Orchestration"
-purpose: "Process ALL open GitHub issues sequentially until none remain unprocessed"
+purpose: "Process ALL open GitHub issues sequentially using 5-agent workflow until none remain unprocessed"
 ---
 
-# Orchestrate All - Batch Issue Processor
+# Orchestrate5 All - Batch Issue Processor (5-Agent Workflow)
 
 Process every open GitHub issue using the 5-agent workflow until ALL are either closed or have comments.
 
@@ -54,7 +54,7 @@ Sort unprocessed issues by number (ascending). Report:
 For EACH issue in the queue:
 
 1. Report: `🚀 Starting issue #N (M of Z remaining)`
-2. Run: `/orchestrate #N` (full 5-agent workflow) - update the gh issue after each agent runs so we can track progress
+2. Run: `/orchestrate5 #N` (full 5-agent workflow) - update the gh issue after each agent runs so we can track progress
 3. When complete, **IMMEDIATELY** proceed to next issue
 4. DO NOT wait for user input
 5. DO NOT ask if you should continue

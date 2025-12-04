@@ -21,9 +21,12 @@ export async function GET(request: NextRequest) {
     const { page, pageSize, type, componentId, skuId, salesChannel, dateFrom, dateTo, sortBy, sortOrder } =
       queryResult.data
 
-    // Build where clause
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Build where clause - scope by selected company
     const where: Prisma.TransactionWhereInput = {
-      companyId: session.user.companyId,
+      companyId: selectedCompanyId,
       ...(type && { type }),
       ...(skuId && { skuId }),
       ...(salesChannel && { salesChannel }),

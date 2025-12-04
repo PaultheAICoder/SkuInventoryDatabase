@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import {
-  success,
   created,
   paginated,
   unauthorized,
@@ -31,24 +30,15 @@ export async function GET(request: NextRequest) {
     const { page, pageSize, search, category, isActive, reorderStatus, sortBy, sortOrder } =
       queryResult.data
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-    })
-
-    if (!user?.company.brands[0]) {
-      return success([])
-    }
-
-    const brandId = user.company.brands[0].id
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
 
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
-    // Build where clause
+    // Build where clause - scope by companyId
     const where: Prisma.ComponentWhereInput = {
-      brandId,
+      companyId: selectedCompanyId,
       ...(isActive !== undefined && { isActive }),
       ...(category && { category }),
       ...(search && {
@@ -173,25 +163,25 @@ export async function POST(request: NextRequest) {
 
     const data = bodyResult.data
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Get active brand for the selected company (still needed for brandId relation)
+    const brand = await prisma.brand.findFirst({
+      where: { companyId: selectedCompanyId, isActive: true },
     })
 
-    if (!user?.company.brands[0]) {
-      return serverError('No active brand found')
+    if (!brand) {
+      return serverError('No active brand found for selected company')
     }
 
-    const brandId = user.company.brands[0].id
-
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
-    // Check for duplicate name or skuCode
+    // Check for duplicate name or skuCode within the selected company
     const existing = await prisma.component.findFirst({
       where: {
-        brandId,
+        companyId: selectedCompanyId,
         OR: [{ name: data.name }, { skuCode: data.skuCode }],
       },
     })
@@ -205,7 +195,8 @@ export async function POST(request: NextRequest) {
 
     const component = await prisma.component.create({
       data: {
-        brandId,
+        brandId: brand.id,
+        companyId: selectedCompanyId,
         name: data.name,
         skuCode: data.skuCode,
         category: data.category,

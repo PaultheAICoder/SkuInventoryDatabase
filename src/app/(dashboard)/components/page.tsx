@@ -24,8 +24,7 @@ interface PageProps {
 }
 
 async function getComponents(
-  brandId: string,
-  companyId: string,
+  selectedCompanyId: string,
   params: {
     page: number
     pageSize: number
@@ -37,10 +36,11 @@ async function getComponents(
   }
 ) {
   // Get company settings
-  const settings = await getCompanySettings(companyId)
+  const settings = await getCompanySettings(selectedCompanyId)
 
+  // Build where clause - scope by companyId
   const where = {
-    brandId,
+    companyId: selectedCompanyId,
     isActive: true,
     ...(params.category && { category: params.category }),
     ...(params.search && {
@@ -163,27 +163,13 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
 
   const params = await searchParams
 
-  // Get user's brand
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
-  })
-
-  if (!user?.company.brands[0]) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Components</h1>
-        <p className="text-muted-foreground">No active brand found. Please contact an administrator.</p>
-      </div>
-    )
-  }
-
-  const brandId = user.company.brands[0].id
+  // Use selected company for scoping
+  const selectedCompanyId = session.user.selectedCompanyId
 
   const page = parseInt(params.page ?? '1', 10)
   const pageSize = parseInt(params.pageSize ?? '50', 10)
 
-  const { components, total } = await getComponents(brandId, session.user.companyId, {
+  const { components, total } = await getComponents(selectedCompanyId, {
     page,
     pageSize,
     search: params.search,

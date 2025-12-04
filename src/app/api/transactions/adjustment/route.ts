@@ -24,13 +24,14 @@ export async function POST(request: NextRequest) {
 
     const data = bodyResult.data
 
-    // Verify component exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Verify component exists and belongs to user's selected company
     const component = await prisma.component.findFirst({
       where: {
         id: data.componentId,
-        brand: {
-          company: { id: session.user.companyId },
-        },
+        companyId: selectedCompanyId,
       },
     })
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
       const location = await prisma.location.findFirst({
         where: {
           id: data.locationId,
-          companyId: session.user.companyId,
+          companyId: selectedCompanyId,
           isActive: true,
         },
       })
@@ -52,9 +53,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the adjustment transaction
+    // Create the adjustment transaction for the selected company
     const transaction = await createAdjustmentTransaction({
-      companyId: session.user.companyId,
+      companyId: selectedCompanyId,
       componentId: data.componentId,
       quantity: data.quantity,
       date: data.date,

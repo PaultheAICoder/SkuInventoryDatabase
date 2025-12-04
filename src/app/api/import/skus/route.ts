@@ -30,17 +30,19 @@ export async function POST(request: NextRequest) {
       return unauthorized('Viewers cannot import data')
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Get active brand for the selected company (still needed for brandId relation)
+    const brand = await prisma.brand.findFirst({
+      where: { companyId: selectedCompanyId, isActive: true },
     })
 
-    if (!user?.company.brands[0]) {
-      return error('No active brand found', 400)
+    if (!brand) {
+      return error('No active brand found for selected company', 400)
     }
 
-    const brandId = user.company.brands[0].id
+    const brandId = brand.id
 
     // Parse multipart form data or raw CSV
     const contentType = request.headers.get('content-type') || ''
@@ -89,10 +91,10 @@ export async function POST(request: NextRequest) {
       const skuData = row.data
 
       try {
-        // Check for duplicate internal code
+        // Check for duplicate internal code within the selected company
         const existing = await prisma.sKU.findFirst({
           where: {
-            brandId,
+            companyId: selectedCompanyId,
             internalCode: skuData.internalCode,
           },
         })
@@ -107,10 +109,11 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create SKU
+        // Create SKU with companyId
         await prisma.sKU.create({
           data: {
             brandId,
+            companyId: selectedCompanyId,
             name: skuData.name,
             internalCode: skuData.internalCode,
             salesChannel: skuData.salesChannel,

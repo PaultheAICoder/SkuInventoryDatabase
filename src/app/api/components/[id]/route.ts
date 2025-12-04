@@ -127,15 +127,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const trendDaysParam = searchParams.get('trendDays')
     const trendDays = trendDaysParam ? parseInt(trendDaysParam, 10) : null
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
     const component = await prisma.component.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
       include: {
         createdBy: { select: { id: true, name: true } },
@@ -252,21 +253,22 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     // Get company settings
-    const settings = await getCompanySettings(session.user.companyId)
+    const settings = await getCompanySettings(selectedCompanyId)
 
     const bodyResult = await parseBody(request, updateComponentSchema)
     if (bodyResult.error) return bodyResult.error
 
     const data = bodyResult.data
 
-    // Check component exists and belongs to user's company
+    // Check component exists and belongs to user's selected company
     const existing = await prisma.component.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 
@@ -351,13 +353,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Check component exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check component exists and belongs to user's selected company
     const existing = await prisma.component.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 

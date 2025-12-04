@@ -22,8 +22,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const company = await prisma.company.findUnique({
-      where: { id: session.user.companyId },
+      where: { id: selectedCompanyId },
       select: {
         id: true,
         name: true,
@@ -71,6 +74,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const body = await request.json()
     const validation = updateSettingsSchema.safeParse(body)
 
@@ -83,7 +89,7 @@ export async function PATCH(request: NextRequest) {
 
     // Get current company settings
     const company = await prisma.company.findUnique({
-      where: { id: session.user.companyId },
+      where: { id: selectedCompanyId },
       select: {
         id: true,
         name: true,
@@ -101,7 +107,7 @@ export async function PATCH(request: NextRequest) {
 
     // Update company settings
     const updatedCompany = await prisma.company.update({
-      where: { id: session.user.companyId },
+      where: { id: selectedCompanyId },
       data: {
         settings: newSettings,
       },

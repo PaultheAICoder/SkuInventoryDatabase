@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardStats } from '@/components/features/DashboardStats'
@@ -54,14 +55,17 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timeFilter, setTimeFilter] = useState<number | null>(30)
 
+  // Refetch when company changes or time filter changes
   useEffect(() => {
     async function fetchDashboard() {
       try {
+        setIsLoading(true)
         const url = timeFilter ? `/api/dashboard?days=${timeFilter}` : '/api/dashboard'
         const res = await fetch(url)
         if (!res.ok) {
@@ -75,8 +79,10 @@ export default function DashboardPage() {
         setIsLoading(false)
       }
     }
-    fetchDashboard()
-  }, [timeFilter])
+    if (session?.user?.selectedCompanyId) {
+      fetchDashboard()
+    }
+  }, [timeFilter, session?.user?.selectedCompanyId])
 
   if (isLoading) {
     return (

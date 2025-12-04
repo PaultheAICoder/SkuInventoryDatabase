@@ -1,16 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSession } from 'next-auth/react'
 import { SettingsForm } from '@/components/features/SettingsForm'
 import type { SettingsResponse, CompanySettings } from '@/types/settings'
 
 export default function SettingsPage() {
+  const { data: session } = useSession()
   const [settings, setSettings] = useState<SettingsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
+      setIsLoading(true)
       const res = await fetch('/api/settings')
       if (!res.ok) {
         throw new Error('Failed to load settings')
@@ -22,11 +25,14 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  useEffect(() => {
-    fetchSettings()
   }, [])
+
+  // Refetch when company changes
+  useEffect(() => {
+    if (session?.user?.selectedCompanyId) {
+      fetchSettings()
+    }
+  }, [session?.user?.selectedCompanyId, fetchSettings])
 
   const handleSave = async (newSettings: Partial<CompanySettings>) => {
     const res = await fetch('/api/settings', {

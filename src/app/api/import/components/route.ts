@@ -31,17 +31,19 @@ export async function POST(request: NextRequest) {
       return unauthorized('Viewers cannot import data')
     }
 
-    // Get user's brand
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { include: { brands: { where: { isActive: true }, take: 1 } } } },
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Get active brand for the selected company (still needed for brandId relation)
+    const brand = await prisma.brand.findFirst({
+      where: { companyId: selectedCompanyId, isActive: true },
     })
 
-    if (!user?.company.brands[0]) {
-      return error('No active brand found', 400)
+    if (!brand) {
+      return error('No active brand found for selected company', 400)
     }
 
-    const brandId = user.company.brands[0].id
+    const brandId = brand.id
 
     // Parse multipart form data or raw CSV
     const contentType = request.headers.get('content-type') || ''
@@ -90,10 +92,10 @@ export async function POST(request: NextRequest) {
       const componentData = row.data
 
       try {
-        // Check for duplicate name or skuCode
+        // Check for duplicate name or skuCode within the selected company
         const existing = await prisma.component.findFirst({
           where: {
-            brandId,
+            companyId: selectedCompanyId,
             OR: [{ name: componentData.name }, { skuCode: componentData.skuCode }],
           },
         })
@@ -112,10 +114,11 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create component
+        // Create component with companyId
         await prisma.component.create({
           data: {
             brandId,
+            companyId: selectedCompanyId,
             name: componentData.name,
             skuCode: componentData.skuCode,
             category: componentData.category ?? null,

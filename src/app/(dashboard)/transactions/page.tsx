@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useSession } from 'next-auth/react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +36,7 @@ const TRANSACTION_TYPES = [
 ]
 
 function TransactionLogContent() {
+  const { data: session } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -71,6 +73,7 @@ function TransactionLogContent() {
     router.push(`/transactions?${newParams.toString()}`)
   }
 
+  // Refetch when page changes or filters change
   const fetchTransactions = useCallback(async () => {
     setIsLoading(true)
     setError(null)
@@ -100,9 +103,10 @@ function TransactionLogContent() {
     }
   }, [page, pageSize, filters])
 
+  // Refetch when company changes or fetchTransactions changes
   useEffect(() => {
     fetchTransactions()
-  }, [fetchTransactions])
+  }, [fetchTransactions, session?.user?.selectedCompanyId])
 
   const handleApplyFilters = () => {
     updateFilters(filters)

@@ -30,9 +30,12 @@ export async function GET(request: NextRequest) {
 
     const { page, pageSize, search, type, isActive, sortBy, sortOrder } = validation.data
 
-    // Build where clause
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Build where clause - scope by selected company
     const where: Prisma.LocationWhereInput = {
-      companyId: session.user.companyId,
+      companyId: selectedCompanyId,
     }
 
     if (search) {
@@ -114,10 +117,13 @@ export async function POST(request: NextRequest) {
 
     const { name, type, isDefault, notes } = validation.data
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     // Check if name already exists for this company
     const existingLocation = await prisma.location.findFirst({
       where: {
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
         name,
       },
     })
@@ -133,17 +139,17 @@ export async function POST(request: NextRequest) {
     if (isDefault) {
       await prisma.location.updateMany({
         where: {
-          companyId: session.user.companyId,
+          companyId: selectedCompanyId,
           isDefault: true,
         },
         data: { isDefault: false },
       })
     }
 
-    // Create location
+    // Create location in the selected company
     const location = await prisma.location.create({
       data: {
-        companyId: session.user.companyId,
+        companyId: selectedCompanyId,
         name,
         type,
         isDefault: isDefault ?? false,

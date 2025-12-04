@@ -26,12 +26,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const sku = await prisma.sKU.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
       include: {
         createdBy: { select: { id: true, name: true } },
@@ -131,13 +132,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const data = bodyResult.data
 
-    // Check SKU exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check SKU exists and belongs to user's selected company
     const existing = await prisma.sKU.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 
@@ -226,13 +228,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Check SKU exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Check SKU exists and belongs to user's selected company
     const existing = await prisma.sKU.findFirst({
       where: {
         id,
-        brand: {
-          companyId: session.user.companyId,
-        },
+        companyId: selectedCompanyId,
       },
     })
 

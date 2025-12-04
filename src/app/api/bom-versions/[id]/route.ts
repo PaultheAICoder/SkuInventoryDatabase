@@ -22,13 +22,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
     const bomVersion = await prisma.bOMVersion.findFirst({
       where: {
         id,
         sku: {
-          brand: {
-            companyId: session.user.companyId,
-          },
+          companyId: selectedCompanyId,
         },
       },
       include: {

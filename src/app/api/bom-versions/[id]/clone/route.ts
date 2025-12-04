@@ -30,14 +30,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { versionName } = bodyResult.data
 
-    // Verify BOM version exists and belongs to user's company
+    // Use selected company for scoping
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // Verify BOM version exists and belongs to user's selected company
     const existingBom = await prisma.bOMVersion.findFirst({
       where: {
         id,
         sku: {
-          brand: {
-            companyId: session.user.companyId,
-          },
+          companyId: selectedCompanyId,
         },
       },
     })
