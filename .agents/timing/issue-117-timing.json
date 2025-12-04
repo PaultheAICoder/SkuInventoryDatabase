@@ -1,0 +1,59 @@
+{
+  "issueNumber": 117,
+  "issueTitle": "[Parent #13] Build forecast dashboard UI with read-only table view",
+  "parentIssue": 13,
+  "phases": {
+    "scout": {
+      "startTime": "2025-12-04T15:00:00Z",
+      "endTime": "2025-12-04T15:15:00Z",
+      "durationMinutes": 15
+    },
+    "plan": {
+      "startTime": "2025-12-04T15:15:00Z",
+      "endTime": "2025-12-04T15:30:00Z",
+      "durationMinutes": 15
+    },
+    "build": {
+      "startTime": "2025-12-04T15:30:00Z",
+      "endTime": "2025-12-04T16:45:00Z",
+      "durationMinutes": 25,
+      "estimatedHours": "6-8"
+    },
+    "cleanup": {
+      "startTime": "2025-12-04T16:45:00Z",
+      "endTime": "2025-12-04T16:55:00Z",
+      "durationMinutes": 10
+    }
+  },
+  "planFile": ".agents/outputs/plan-117-120425.md",
+  "buildFile": ".agents/outputs/build-117-120425.md",
+  "cleanupFile": ".agents/outputs/cleanup-117-120425.md",
+  "complexity": "Moderate",
+  "category": "NEW_FEATURE",
+  "filesToCreate": [
+    "src/app/(dashboard)/forecasts/page.tsx",
+    "src/components/features/ForecastTable.tsx",
+    "src/components/features/ForecastStatusBadge.tsx"
+  ],
+  "filesToModify": [
+    "src/app/(dashboard)/layout.tsx"
+  ],
+  "dependencies": {
+    "blockedBy": [116],
+    "blocks": []
+  },
+  "validation": {
+    "typescript": "PASS",
+    "build": "PASS",
+    "lint": "PASS",
+    "tests": {
+      "total": 539,
+      "passed": 539,
+      "failed": 0,
+      "duration": "18.71s"
+    }
+  },
+  "status": "complete",
+  "createdAt": "2025-12-04T15:30:00Z",
+  "completedAt": "2025-12-04T16:55:00Z"
+}
