@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ForecastTable } from '@/components/features/ForecastTable'
+import { ForecastSettingsDialog } from '@/components/features/ForecastSettingsDialog'
+import { ForecastQuickSettings } from '@/components/features/ForecastQuickSettings'
 import { getForecastStatus } from '@/components/features/ForecastStatusBadge'
 import { AlertCircle, AlertTriangle, TrendingDown, Package } from 'lucide-react'
-import type { ComponentForecastResponse } from '@/types/forecast'
+import type { ComponentForecastResponse, ForecastConfigResponse } from '@/types/forecast'
 
 interface ForecastListResponse {
   data: ComponentForecastResponse[]
@@ -22,9 +24,38 @@ interface ForecastListResponse {
 export default function ForecastsPage() {
   const { data: session } = useSession()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [response, setResponse] = useState<ForecastListResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Config state for settings dialog
+  const [config, setConfig] = useState<ForecastConfigResponse | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Check if user is admin
+  const canEdit = session?.user?.role === 'admin'
+
+  // Fetch config when company changes
+  const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/forecasts/config')
+      if (res.ok) {
+        const result = await res.json()
+        setConfig(result.data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch forecast config:', err)
+    }
+  }, [])
+
+  // Fetch config on mount and when company changes
+  useEffect(() => {
+    if (session?.user?.selectedCompanyId) {
+      fetchConfig()
+    }
+  }, [session?.user?.selectedCompanyId, fetchConfig])
 
   // Build query params from searchParams
   const queryString = useMemo(() => {
@@ -34,6 +65,7 @@ export default function ForecastsPage() {
     const sortBy = searchParams.get('sortBy') || 'runoutDate'
     const sortOrder = searchParams.get('sortOrder') || 'asc'
     const showOnlyAtRisk = searchParams.get('showOnlyAtRisk')
+    const lookbackDays = searchParams.get('lookbackDays')
 
     params.set('page', page)
     params.set('pageSize', pageSize)
@@ -41,6 +73,9 @@ export default function ForecastsPage() {
     params.set('sortOrder', sortOrder)
     if (showOnlyAtRisk === 'true') {
       params.set('showOnlyAtRisk', 'true')
+    }
+    if (lookbackDays) {
+      params.set('lookbackDays', lookbackDays)
     }
 
     return params.toString()
@@ -67,7 +102,21 @@ export default function ForecastsPage() {
     if (session?.user?.selectedCompanyId) {
       fetchForecasts()
     }
-  }, [queryString, session?.user?.selectedCompanyId])
+  }, [queryString, session?.user?.selectedCompanyId, refreshKey])
+
+  // Handle lookback change from quick settings
+  const handleLookbackChange = (days: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('lookbackDays', String(days))
+    params.set('page', '1') // Reset to page 1
+    router.push(`/forecasts?${params.toString()}`)
+  }
+
+  // Handle config saved - refresh config and forecasts
+  const handleConfigSaved = async () => {
+    await fetchConfig()
+    setRefreshKey((prev) => prev + 1) // Force refetch forecasts
+  }
 
   // Compute stats from the response data
   const stats = useMemo(() => {
@@ -123,11 +172,22 @@ export default function ForecastsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Forecasts</h1>
-        <p className="text-muted-foreground">
-          Component runout predictions and reorder recommendations
-        </p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Forecasts</h1>
+          <p className="text-muted-foreground">
+            Component runout predictions and reorder recommendations
+          </p>
+        </div>
+
+        {/* Quick Settings Bar */}
+        <ForecastQuickSettings
+          config={config}
+          onLookbackChange={handleLookbackChange}
+          onOpenSettings={() => setSettingsOpen(true)}
+          disabled={isLoading}
+          canEdit={canEdit}
+        />
       </div>
 
       {/* Stats Cards */}
@@ -184,6 +244,16 @@ export default function ForecastsPage() {
         page={response.meta.page}
         pageSize={response.meta.pageSize}
       />
+
+      {/* Settings Dialog */}
+      {config && (
+        <ForecastSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          config={config}
+          onSaved={handleConfigSaved}
+        />
+      )}
     </div>
   )
 }
