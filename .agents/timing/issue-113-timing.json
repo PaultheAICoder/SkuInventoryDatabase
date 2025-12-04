@@ -1,0 +1,50 @@
+{
+  "issue": 113,
+  "title": "Conversational AI Transaction Parser",
+  "parent_issue": 98,
+  "created_at": "2025-12-04T16:30:00Z",
+  "phases": {
+    "scout_plan": {
+      "started_at": "2025-12-04T16:00:00Z",
+      "completed_at": "2025-12-04T16:55:00Z",
+      "duration_minutes": 55
+    },
+    "build": {
+      "started_at": "2025-12-04T12:19:00Z",
+      "completed_at": "2025-12-04T12:58:00Z",
+      "duration_minutes": 39,
+      "estimated_minutes": 600
+    },
+    "test_cleanup": {
+      "started_at": "2025-12-04T17:10:00Z",
+      "completed_at": "2025-12-04T17:15:00Z",
+      "duration_minutes": 5
+    }
+  },
+  "estimated_total_hours": 12,
+  "actual_total_minutes": 99,
+  "complexity": "high",
+  "files_created": [
+    "src/types/parser.ts",
+    "src/lib/transaction-parser.ts",
+    "src/app/api/transactions/parse/route.ts",
+    "src/components/features/ConversationalInput.tsx",
+    "src/components/features/ParsedTransactionPreview.tsx",
+    "src/components/features/QuickEntryWrapper.tsx"
+  ],
+  "files_modified": [
+    "src/app/(dashboard)/transactions/new/page.tsx",
+    "package.json"
+  ],
+  "dependencies_added": [
+    "fuse.js@7.1.0"
+  ],
+  "status": "complete",
+  "validation": {
+    "typescript_errors": 0,
+    "build_errors": 0,
+    "lint_warnings": 0,
+    "tests_passed": 507,
+    "tests_failed": 0
+  }
+}

@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { QuickEntryForm } from '@/components/features/QuickEntryForm'
+import { QuickEntryWrapper } from '@/components/features/QuickEntryWrapper'
 
 export default async function QuickEntryPage() {
   const session = await getServerSession(authOptions)
@@ -19,10 +19,10 @@ export default async function QuickEntryPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Quick Entry</h1>
-        <p className="text-muted-foreground">Record a new transaction</p>
+        <p className="text-muted-foreground">Record a new transaction using forms or natural language</p>
       </div>
       <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
-        <QuickEntryForm />
+        <QuickEntryWrapper />
       </Suspense>
     </div>
   )
