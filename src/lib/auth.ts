@@ -38,6 +38,16 @@ export const authOptions: NextAuthOptions = {
           },
         })
 
+        // Fetch brands for the user's primary company
+        const brands = user ? await prisma.brand.findMany({
+          where: {
+            companyId: user.companyId,
+            isActive: true,
+          },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        }) : []
+
         if (!user || !user.isActive) {
           throw new Error('Invalid email or password')
         }
@@ -99,6 +109,9 @@ export const authOptions: NextAuthOptions = {
           companies,
           selectedCompanyId,
           selectedCompanyName,
+          brands: brands.map(b => ({ id: b.id, name: b.name })),
+          selectedBrandId: brands[0]?.id ?? null,
+          selectedBrandName: brands[0]?.name ?? null,
         }
       },
     }),
@@ -113,6 +126,9 @@ export const authOptions: NextAuthOptions = {
         token.companies = user.companies
         token.selectedCompanyId = user.selectedCompanyId
         token.selectedCompanyName = user.selectedCompanyName
+        token.brands = user.brands
+        token.selectedBrandId = user.selectedBrandId
+        token.selectedBrandName = user.selectedBrandName
       }
 
       // Handle session update (for company switching)
@@ -130,6 +146,25 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      // Handle brand refresh when company changes (includes new brand list)
+      if (trigger === 'update' && session?.brands !== undefined) {
+        token.brands = session.brands
+        token.selectedBrandId = session.selectedBrandId
+        token.selectedBrandName = session.selectedBrandName
+      }
+
+      // Handle brand switch (within same company)
+      if (trigger === 'update' && session?.selectedBrandId !== undefined && session?.brands === undefined) {
+        // Verify brand belongs to selected company
+        const hasAccess = session.selectedBrandId === null || (token.brands as Array<{ id: string }>)?.some(
+          b => b.id === session.selectedBrandId
+        )
+        if (hasAccess) {
+          token.selectedBrandId = session.selectedBrandId
+          token.selectedBrandName = session.selectedBrandName
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -141,6 +176,9 @@ export const authOptions: NextAuthOptions = {
         session.user.companies = token.companies as Array<{ id: string; name: string; role?: string }>
         session.user.selectedCompanyId = token.selectedCompanyId as string
         session.user.selectedCompanyName = token.selectedCompanyName as string
+        session.user.brands = token.brands as Array<{ id: string; name: string }>
+        session.user.selectedBrandId = token.selectedBrandId as string | null
+        session.user.selectedBrandName = token.selectedBrandName as string | null
       }
       return session
     },
@@ -157,6 +195,9 @@ declare module 'next-auth' {
     companies: Array<{ id: string; name: string; role?: string }>
     selectedCompanyId: string
     selectedCompanyName: string
+    brands: Array<{ id: string; name: string }>
+    selectedBrandId: string | null
+    selectedBrandName: string | null
   }
 
   interface Session {
@@ -168,6 +209,9 @@ declare module 'next-auth' {
       companies: Array<{ id: string; name: string; role?: string }>
       selectedCompanyId: string
       selectedCompanyName: string
+      brands: Array<{ id: string; name: string }>
+      selectedBrandId: string | null
+      selectedBrandName: string | null
     }
   }
 }
@@ -181,6 +225,9 @@ declare module 'next-auth/jwt' {
     companies: Array<{ id: string; name: string; role?: string }>
     selectedCompanyId: string
     selectedCompanyName: string
+    brands: Array<{ id: string; name: string }>
+    selectedBrandId: string | null
+    selectedBrandName: string | null
   }
 }
 

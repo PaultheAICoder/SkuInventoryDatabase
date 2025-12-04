@@ -39,6 +39,22 @@ async function main() {
   })
   console.log('Created brand:', brand.name)
 
+  // Create second brand for testing multi-brand
+  const brand2 = await prisma.brand.upsert({
+    where: {
+      companyId_name: {
+        companyId: company.id,
+        name: 'Mela Vitamins',
+      },
+    },
+    update: {},
+    create: {
+      companyId: company.id,
+      name: 'Mela Vitamins',
+    },
+  })
+  console.log('Created brand:', brand2.name)
+
   // Create admin user
   const adminPassword = await hash('changeme123', 12)
   const admin = await prisma.user.upsert({

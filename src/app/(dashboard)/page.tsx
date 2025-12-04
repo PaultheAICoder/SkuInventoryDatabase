@@ -82,7 +82,7 @@ export default function DashboardPage() {
     if (session?.user?.selectedCompanyId) {
       fetchDashboard()
     }
-  }, [timeFilter, session?.user?.selectedCompanyId])
+  }, [timeFilter, session?.user?.selectedCompanyId, session?.user?.selectedBrandId])
 
   if (isLoading) {
     return (

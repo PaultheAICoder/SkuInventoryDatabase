@@ -40,10 +40,13 @@ export function CompanySelector() {
 
       const data = await res.json()
 
-      // Update session with new company info
+      // Update session with new company info AND new brand info
       await updateSession({
         selectedCompanyId: data.data.selectedCompanyId,
         selectedCompanyName: data.data.selectedCompanyName,
+        brands: data.data.brands,
+        selectedBrandId: data.data.selectedBrandId,
+        selectedBrandName: data.data.selectedBrandName,
       })
 
       toast.success('Company switched', {

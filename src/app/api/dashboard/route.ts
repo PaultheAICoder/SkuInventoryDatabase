@@ -80,12 +80,19 @@ export async function GET(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
+    // Get selected brand (may be null for "all brands")
+    const selectedBrandId = session.user.selectedBrandId
+
     // Get company settings
     const settings = await getCompanySettings(selectedCompanyId)
 
-    // Get all active components for selected company
+    // Get all active components for selected company (and optionally brand)
     const components = await prisma.component.findMany({
-      where: { companyId: selectedCompanyId, isActive: true },
+      where: {
+        companyId: selectedCompanyId,
+        isActive: true,
+        ...(selectedBrandId && { brandId: selectedBrandId }),
+      },
       select: {
         id: true,
         name: true,
@@ -137,9 +144,13 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 10)
 
-    // Get active SKUs with their active BOMs for selected company
+    // Get active SKUs with their active BOMs for selected company (and optionally brand)
     const skus = await prisma.sKU.findMany({
-      where: { companyId: selectedCompanyId, isActive: true },
+      where: {
+        companyId: selectedCompanyId,
+        isActive: true,
+        ...(selectedBrandId && { brandId: selectedBrandId }),
+      },
       include: {
         bomVersions: {
           where: { isActive: true },

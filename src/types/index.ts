@@ -72,6 +72,12 @@ export interface SessionCompany {
   role?: 'admin' | 'ops' | 'viewer'
 }
 
+// Brand info for session
+export interface SessionBrand {
+  id: string
+  name: string
+}
+
 // Session user type (matches NextAuth)
 export interface SessionUser {
   id: string
@@ -83,4 +89,7 @@ export interface SessionUser {
   companies: SessionCompany[]  // All accessible companies
   selectedCompanyId: string  // Currently selected company
   selectedCompanyName: string  // Currently selected company name
+  selectedBrandId: string | null  // Currently selected brand (null if company has no brands)
+  selectedBrandName: string | null  // Currently selected brand name
+  brands: SessionBrand[]  // Brands for the selected company
 }

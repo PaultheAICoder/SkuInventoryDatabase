@@ -33,12 +33,17 @@ export async function GET(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
+    // Get selected brand (may be null for "all brands")
+    const selectedBrandId = session.user.selectedBrandId
+
     // Get company settings
     const settings = await getCompanySettings(selectedCompanyId)
 
-    // Build where clause - scope by companyId
+    // Build where clause - scope by companyId and optionally brandId
     const where: Prisma.ComponentWhereInput = {
       companyId: selectedCompanyId,
+      // Only add brandId filter if a specific brand is selected
+      ...(selectedBrandId && { brandId: selectedBrandId }),
       ...(isActive !== undefined && { isActive }),
       ...(category && { category }),
       ...(search && {
@@ -166,13 +171,18 @@ export async function POST(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // Get active brand for the selected company (still needed for brandId relation)
-    const brand = await prisma.brand.findFirst({
-      where: { companyId: selectedCompanyId, isActive: true },
-    })
+    // Use selected brand from session, or fall back to first active brand
+    let brandId = session.user.selectedBrandId
 
-    if (!brand) {
-      return serverError('No active brand found for selected company')
+    if (!brandId) {
+      // Fall back to first active brand if none selected
+      const brand = await prisma.brand.findFirst({
+        where: { companyId: selectedCompanyId, isActive: true },
+      })
+      if (!brand) {
+        return serverError('No active brand found for selected company')
+      }
+      brandId = brand.id
     }
 
     // Get company settings
@@ -195,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     const component = await prisma.component.create({
       data: {
-        brandId: brand.id,
+        brandId,
         companyId: selectedCompanyId,
         name: data.name,
         skuCode: data.skuCode,

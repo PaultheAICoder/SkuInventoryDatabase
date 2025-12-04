@@ -57,6 +57,19 @@ export async function POST(request: NextRequest) {
       return forbidden('You do not have access to this company')
     }
 
+    // Fetch brands for the new company
+    const brands = await prisma.brand.findMany({
+      where: {
+        companyId: company.id,
+        isActive: true,
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
+    const selectedBrandId = brands[0]?.id ?? null
+    const selectedBrandName = brands[0]?.name ?? null
+
     // Log the company switch event
     await logSecurityEvent({
       companyId: session.user.selectedCompanyId, // Log from the OLD company
@@ -74,6 +87,9 @@ export async function POST(request: NextRequest) {
     return success({
       selectedCompanyId: company.id,
       selectedCompanyName: company.name,
+      brands: brands.map(b => ({ id: b.id, name: b.name })),
+      selectedBrandId,
+      selectedBrandName,
       message: `Switched to ${company.name}`,
     })
   } catch (error) {

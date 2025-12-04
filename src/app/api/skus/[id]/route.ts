@@ -33,10 +33,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
+    // Get selected brand (may be null for "all brands")
+    const selectedBrandId = session.user.selectedBrandId
+
     const sku = await prisma.sKU.findFirst({
       where: {
         id,
         companyId: selectedCompanyId,
+        ...(selectedBrandId && { brandId: selectedBrandId }),
       },
       include: {
         createdBy: { select: { id: true, name: true } },

@@ -21,9 +21,15 @@ export async function GET(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // Get all SKUs for the selected company with active BOM versions
+    // Get selected brand (may be null for "all brands")
+    const selectedBrandId = session.user.selectedBrandId
+
+    // Get all SKUs for the selected company (and optionally brand) with active BOM versions
     const skus = await prisma.sKU.findMany({
-      where: { companyId: selectedCompanyId },
+      where: {
+        companyId: selectedCompanyId,
+        ...(selectedBrandId && { brandId: selectedBrandId }),
+      },
       orderBy: { name: 'asc' },
       include: {
         bomVersions: {

@@ -34,16 +34,18 @@ export async function POST(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // Get active brand for the selected company (still needed for brandId relation)
-    const brand = await prisma.brand.findFirst({
-      where: { companyId: selectedCompanyId, isActive: true },
-    })
+    // Use selected brand from session, or fall back to first active brand
+    let brandId = session.user.selectedBrandId
 
-    if (!brand) {
-      return error('No active brand found for selected company', 400)
+    if (!brandId) {
+      const brand = await prisma.brand.findFirst({
+        where: { companyId: selectedCompanyId, isActive: true },
+      })
+      if (!brand) {
+        return error('No active brand found for selected company', 400)
+      }
+      brandId = brand.id
     }
-
-    const brandId = brand.id
 
     // Parse multipart form data or raw CSV
     const contentType = request.headers.get('content-type') || ''
