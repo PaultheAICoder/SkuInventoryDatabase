@@ -122,10 +122,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
-    // Parse optional trendDays query parameter
+    // Parse optional query parameters
     const { searchParams } = new URL(request.url)
     const trendDaysParam = searchParams.get('trendDays')
     const trendDays = trendDaysParam ? parseInt(trendDaysParam, 10) : null
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -172,14 +173,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFound('Component')
     }
 
-    const quantityOnHand = await getComponentQuantity(id)
+    const quantityOnHand = await getComponentQuantity(id, locationId)
 
     // Get SKU IDs that use this component
     const skuIds = component.bomLines.map((line) => line.bomVersion.sku.id)
 
-    // Calculate max buildable units for these SKUs
+    // Calculate max buildable units for these SKUs (filtered by location if specified)
     const buildableUnits = skuIds.length > 0
-      ? await calculateMaxBuildableUnitsForSKUs(skuIds)
+      ? await calculateMaxBuildableUnitsForSKUs(skuIds, locationId)
       : new Map<string, number | null>()
 
     // Find constrained SKUs (ones where this component limits buildable units)

@@ -26,6 +26,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
+
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
@@ -66,8 +70,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const bomVersionIds = sku.bomVersions.map((v) => v.id)
     const bomCosts = await calculateBOMUnitCosts(bomVersionIds)
 
-    // Calculate max buildable units
-    const maxBuildableUnits = await calculateMaxBuildableUnits(id)
+    // Calculate max buildable units (filtered by location if specified)
+    const maxBuildableUnits = await calculateMaxBuildableUnits(id, locationId)
 
     // Find active BOM
     const activeBom = sku.bomVersions.find((v) => v.isActive)

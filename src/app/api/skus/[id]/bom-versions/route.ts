@@ -31,6 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (queryResult.error) return queryResult.error
 
     const { includeInactive } = queryResult.data
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -72,14 +73,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     })
 
-    // Get component quantities for all components in all versions
+    // Get component quantities for all components in all versions (filtered by location if specified)
     const allComponentIds = new Set<string>()
     for (const version of bomVersions) {
       for (const line of version.lines) {
         allComponentIds.add(line.componentId)
       }
     }
-    const quantities = await getComponentQuantities(Array.from(allComponentIds))
+    const quantities = await getComponentQuantities(Array.from(allComponentIds), locationId)
 
     // Transform response
     const data = bomVersions.map((version) => {
@@ -134,6 +135,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id: skuId } = await params
 
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
+
     const bodyResult = await parseBody(request, createBOMVersionSchema)
     if (bodyResult.error) return bodyResult.error
 
@@ -184,8 +189,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Calculate unit cost
     const unitCost = await calculateBOMUnitCost(bomVersion.id)
 
-    // Get component quantities
-    const quantities = await getComponentQuantities(componentIds)
+    // Get component quantities (filtered by location if specified)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     return created({
       id: bomVersion.id,

@@ -68,13 +68,14 @@ export async function GET(request: NextRequest) {
       return unauthorized()
     }
 
-    // Parse optional days query parameter for filtering recent transactions
+    // Parse optional query parameters
     const { searchParams } = new URL(request.url)
     const daysParam = searchParams.get('days')
     const days = daysParam ? parseInt(daysParam, 10) : null
     const startDate = days
       ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
       : null
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -94,9 +95,9 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Get quantities for all components
+    // Get quantities for all components (filtered by location if specified)
     const componentIds = components.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     // Calculate stats
     let critical = 0
@@ -154,7 +155,7 @@ export async function GET(request: NextRequest) {
       .map((s) => s.bomVersions[0].id)
 
     const [buildableUnits, bomCosts] = await Promise.all([
-      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds) : new Map<string, number | null>(),
+      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, locationId) : new Map<string, number | null>(),
       activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
     ])
 

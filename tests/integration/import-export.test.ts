@@ -45,7 +45,7 @@ describe('Import/Export API', () => {
         // Create test component
         await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
 
-        const response = await exportComponents()
+        const response = await exportComponents(createTestRequest('/api/export/components'))
 
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toBe('text/csv')
@@ -59,7 +59,7 @@ describe('Import/Export API', () => {
       it('returns empty CSV when no components exist', async () => {
         setTestSession(TEST_SESSIONS.admin!)
 
-        const response = await exportComponents()
+        const response = await exportComponents(createTestRequest('/api/export/components'))
 
         expect(response.status).toBe(200)
         const csv = await response.text()
@@ -70,7 +70,7 @@ describe('Import/Export API', () => {
       it('unauthenticated request returns 401', async () => {
         clearTestSession()
 
-        const response = await exportComponents()
+        const response = await exportComponents(createTestRequest('/api/export/components'))
         const json = await response.json()
 
         expect(response.status).toBe(401)
@@ -106,7 +106,7 @@ describe('Import/Export API', () => {
           },
         })
 
-        const response = await exportComponents()
+        const response = await exportComponents(createTestRequest('/api/export/components'))
         const csv = await response.text()
 
         // Should include quantity column with value
@@ -117,7 +117,7 @@ describe('Import/Export API', () => {
       it('viewer can export components', async () => {
         setTestSession(TEST_SESSIONS.viewer!)
 
-        const response = await exportComponents()
+        const response = await exportComponents(createTestRequest('/api/export/components'))
 
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toBe('text/csv')
@@ -130,7 +130,7 @@ describe('Import/Export API', () => {
 
         await createTestSKUInDb(TEST_SESSIONS.admin!.user.companyId)
 
-        const response = await exportSKUs()
+        const response = await exportSKUs(createTestRequest('/api/export/skus'))
 
         expect(response.status).toBe(200)
         expect(response.headers.get('content-type')).toBe('text/csv')
@@ -144,7 +144,7 @@ describe('Import/Export API', () => {
       it('unauthenticated request returns 401', async () => {
         clearTestSession()
 
-        const response = await exportSKUs()
+        const response = await exportSKUs(createTestRequest('/api/export/skus'))
 
         expect(response.status).toBe(401)
       })
@@ -574,7 +574,7 @@ ALREADY-001,999,20.00`
         },
       })
 
-      const response = await exportComponents()
+      const response = await exportComponents(createTestRequest('/api/export/components'))
       const csv = await response.text()
 
       // Proper CSV escaping should handle quotes and commas

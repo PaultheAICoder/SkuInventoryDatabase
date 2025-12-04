@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
@@ -12,12 +12,16 @@ import {
 } from '@/services/export'
 
 // GET /api/export/components - Export all components to CSV
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
     }
+
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -31,9 +35,9 @@ export async function GET() {
       orderBy: { name: 'asc' },
     })
 
-    // Get quantities for all components
+    // Get quantities for all components (filtered by location if specified)
     const componentIds = components.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     // Transform to export format
     const exportData: ComponentExportData[] = components.map((component) => {

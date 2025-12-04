@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     if (queryResult.error) return queryResult.error
 
     const { page, pageSize, search, salesChannel, isActive, sortBy, sortOrder } = queryResult.data
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     const [bomCosts, buildableUnits] = await Promise.all([
       activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
-      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds) : new Map<string, number | null>(),
+      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, locationId) : new Map<string, number | null>(),
     ])
 
     // Transform response

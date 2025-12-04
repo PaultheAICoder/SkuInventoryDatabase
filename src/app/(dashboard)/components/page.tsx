@@ -20,6 +20,7 @@ interface PageProps {
     reorderStatus?: string
     sortBy?: string
     sortOrder?: string
+    locationId?: string
   }>
 }
 
@@ -33,6 +34,7 @@ async function getComponents(
     reorderStatus?: string
     sortBy: string
     sortOrder: 'asc' | 'desc'
+    locationId?: string
   }
 ) {
   // Get company settings
@@ -66,9 +68,9 @@ async function getComponents(
       },
     })
 
-    // Get quantities for ALL components
+    // Get quantities for ALL components (filtered by location if specified)
     const componentIds = allComponents.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, params.locationId)
 
     // Transform and compute reorder status for ALL
     const allWithStatus: ComponentResponse[] = allComponents.map((component) => {
@@ -121,9 +123,9 @@ async function getComponents(
     }),
   ])
 
-  // Get quantities
+  // Get quantities (filtered by location if specified)
   const componentIds = components.map((c) => c.id)
-  const quantities = await getComponentQuantities(componentIds)
+  const quantities = await getComponentQuantities(componentIds, params.locationId)
 
   // Transform response with computed fields
   const data: ComponentResponse[] = components.map((component) => {
@@ -177,6 +179,7 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
     reorderStatus: params.reorderStatus,
     sortBy: params.sortBy ?? 'name',
     sortOrder: (params.sortOrder as 'asc' | 'desc') ?? 'asc',
+    locationId: params.locationId,
   })
 
   const canCreate = session.user.role !== 'viewer'

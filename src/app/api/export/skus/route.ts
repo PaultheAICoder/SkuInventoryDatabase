@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
@@ -7,12 +7,16 @@ import { calculateBOMUnitCost, calculateMaxBuildableUnits } from '@/services/bom
 import { toCSV, skuExportColumns, generateExportFilename, type SKUExportData } from '@/services/export'
 
 // GET /api/export/skus - Export all SKUs to CSV
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
     }
+
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -45,7 +49,7 @@ export async function GET() {
 
         if (activeBom) {
           bomCost = await calculateBOMUnitCost(activeBom.id).then((c) => c?.toString() ?? null)
-          maxBuildableUnits = await calculateMaxBuildableUnits(sku.id)
+          maxBuildableUnits = await calculateMaxBuildableUnits(sku.id, locationId)
         }
 
         return {

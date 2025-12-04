@@ -28,10 +28,23 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
 
 /**
  * Calculate the on-hand quantity for a component by summing all transaction lines
+ * Optionally filter by location - if locationId is omitted, returns global total
  */
-export async function getComponentQuantity(componentId: string): Promise<number> {
+export async function getComponentQuantity(
+  componentId: string,
+  locationId?: string
+): Promise<number> {
+  const whereClause: Prisma.TransactionLineWhereInput = {
+    componentId,
+  }
+
+  // Add location filter via join to Transaction
+  if (locationId) {
+    whereClause.transaction = { locationId }
+  }
+
   const result = await prisma.transactionLine.aggregate({
-    where: { componentId },
+    where: whereClause,
     _sum: { quantityChange: true },
   })
   return result._sum.quantityChange?.toNumber() ?? 0
@@ -39,13 +52,24 @@ export async function getComponentQuantity(componentId: string): Promise<number>
 
 /**
  * Calculate quantities for multiple components at once
+ * Optionally filter by location - if locationId is omitted, returns global totals
  */
 export async function getComponentQuantities(
-  componentIds: string[]
+  componentIds: string[],
+  locationId?: string
 ): Promise<Map<string, number>> {
+  const whereClause: Prisma.TransactionLineWhereInput = {
+    componentId: { in: componentIds },
+  }
+
+  // Add location filter via join to Transaction
+  if (locationId) {
+    whereClause.transaction = { locationId }
+  }
+
   const results = await prisma.transactionLine.groupBy({
     by: ['componentId'],
-    where: { componentId: { in: componentIds } },
+    where: whereClause,
     _sum: { quantityChange: true },
   })
 
@@ -359,12 +383,14 @@ export interface InsufficientInventoryItem {
 /**
  * Check if there's sufficient inventory to build a SKU
  * Returns list of components with insufficient inventory, or empty array if sufficient
+ * Optionally filter by location - if locationId is omitted, checks global inventory
  */
 export async function checkInsufficientInventory(params: {
   bomVersionId: string
   unitsToBuild: number
+  locationId?: string
 }): Promise<InsufficientInventoryItem[]> {
-  const { bomVersionId, unitsToBuild } = params
+  const { bomVersionId, unitsToBuild, locationId } = params
 
   // Get BOM lines with components
   const bomLines = await prisma.bOMLine.findMany({
@@ -384,9 +410,9 @@ export async function checkInsufficientInventory(params: {
     return []
   }
 
-  // Get component quantities
+  // Get component quantities (filtered by location if specified)
   const componentIds = bomLines.map((line) => line.componentId)
-  const quantities = await getComponentQuantities(componentIds)
+  const quantities = await getComponentQuantities(componentIds, locationId)
 
   const insufficientItems: InsufficientInventoryItem[] = []
 
@@ -479,10 +505,11 @@ export async function createBuildTransaction(params: {
 
   const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
-  // Check for insufficient inventory
+  // Check for insufficient inventory (at the target location if specified)
   const insufficientItems = await checkInsufficientInventory({
     bomVersionId,
     unitsToBuild,
+    locationId: locationIdToUse ?? undefined,
   })
 
   if (insufficientItems.length > 0 && !allowInsufficientInventory) {

@@ -56,8 +56,12 @@ export async function calculateBOMUnitCosts(
 /**
  * Calculate max buildable units for a SKU based on component inventory and active BOM
  * Returns the minimum of (component quantity / required per unit) across all BOM lines
+ * Optionally filter by location - if locationId is omitted, uses global inventory
  */
-export async function calculateMaxBuildableUnits(skuId: string): Promise<number | null> {
+export async function calculateMaxBuildableUnits(
+  skuId: string,
+  locationId?: string
+): Promise<number | null> {
   // Get active BOM for this SKU
   const activeBom = await prisma.bOMVersion.findFirst({
     where: {
@@ -79,9 +83,9 @@ export async function calculateMaxBuildableUnits(skuId: string): Promise<number 
     return null
   }
 
-  // Get component quantities
+  // Get component quantities (filtered by location if specified)
   const componentIds = activeBom.lines.map((line) => line.component.id)
-  const quantities = await getComponentQuantities(componentIds)
+  const quantities = await getComponentQuantities(componentIds, locationId)
 
   // Calculate max buildable for each line, return minimum
   let minBuildable = Infinity
@@ -98,9 +102,11 @@ export async function calculateMaxBuildableUnits(skuId: string): Promise<number 
 
 /**
  * Calculate max buildable units for multiple SKUs at once
+ * Optionally filter by location - if locationId is omitted, uses global inventory
  */
 export async function calculateMaxBuildableUnitsForSKUs(
-  skuIds: string[]
+  skuIds: string[],
+  locationId?: string
 ): Promise<Map<string, number | null>> {
   // Get all active BOMs for these SKUs
   const activeBoms = await prisma.bOMVersion.findMany({
@@ -133,8 +139,8 @@ export async function calculateMaxBuildableUnitsForSKUs(
     }
   }
 
-  // Get all component quantities at once
-  const quantities = await getComponentQuantities(Array.from(allComponentIds))
+  // Get all component quantities at once (filtered by location if specified)
+  const quantities = await getComponentQuantities(Array.from(allComponentIds), locationId)
 
   // Calculate max buildable for each SKU
   const result = new Map<string, number | null>()

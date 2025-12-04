@@ -44,6 +44,7 @@ export const componentListQuerySchema = z.object({
   reorderStatus: z.enum(['critical', 'warning', 'ok']).optional(),
   sortBy: z.enum(['name', 'skuCode', 'category', 'costPerUnit', 'reorderPoint', 'createdAt']).default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  locationId: z.string().uuid().optional(),
 })
 
 export type ComponentListQuery = z.infer<typeof componentListQuerySchema>

@@ -22,6 +22,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
+
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
@@ -61,9 +65,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFound('BOM version')
     }
 
-    // Get component quantities
+    // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     // Calculate unit cost
     const unitCost = bomVersion.lines.reduce((sum, line) => {

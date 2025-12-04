@@ -18,6 +18,7 @@ interface SearchParams {
   salesChannel?: string
   sortBy?: string
   sortOrder?: string
+  locationId?: string
 }
 
 async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
@@ -27,6 +28,7 @@ async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
   const salesChannel = searchParams.salesChannel
   const sortBy = (searchParams.sortBy || 'createdAt') as keyof Prisma.SKUOrderByWithRelationInput
   const sortOrder = (searchParams.sortOrder || 'desc') as 'asc' | 'desc'
+  const locationId = searchParams.locationId
 
   // Build where clause - scope by companyId
   const where: Prisma.SKUWhereInput = {
@@ -70,7 +72,7 @@ async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
 
   const [bomCosts, buildableUnits] = await Promise.all([
     activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
-    skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds) : new Map<string, number | null>(),
+    skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, locationId) : new Map<string, number | null>(),
   ])
 
   // Transform response

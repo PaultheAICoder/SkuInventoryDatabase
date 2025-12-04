@@ -25,6 +25,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
+
     const bodyResult = await parseBody(request, cloneBOMVersionSchema)
     if (bodyResult.error) return bodyResult.error
 
@@ -56,9 +60,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Calculate unit cost
     const unitCost = await calculateBOMUnitCost(newBomVersion.id)
 
-    // Get component quantities
+    // Get component quantities (filtered by location if specified)
     const componentIds = newBomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     return created({
       id: newBomVersion.id,

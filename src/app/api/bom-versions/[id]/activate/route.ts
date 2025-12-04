@@ -23,6 +23,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params
 
+    // Parse optional locationId query parameter
+    const { searchParams } = new URL(request.url)
+    const locationId = searchParams.get('locationId') ?? undefined
+
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
@@ -45,9 +49,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Calculate unit cost
     const unitCost = await calculateBOMUnitCost(bomVersion.id)
 
-    // Get component quantities
+    // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds)
+    const quantities = await getComponentQuantities(componentIds, locationId)
 
     return success({
       id: bomVersion.id,
