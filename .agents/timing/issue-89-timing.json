@@ -1,0 +1,28 @@
+{
+  "issue": "89",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-04T08:10:05.000Z",
+  "plan_start": "2025-12-04T08:10:05.000Z",
+  "plan_end": "2025-12-04T08:15:00.000Z",
+  "build_start": "2025-12-04T08:17:00.000Z",
+  "build_end": "2025-12-04T08:30:00.000Z",
+  "cleanup_start": "2025-12-04T08:19:30.000Z",
+  "cleanup_end": "2025-12-04T08:22:30.000Z",
+  "workflow_end": "2025-12-04T08:22:30.000Z",
+  "phases": {
+    "plan": {
+      "duration_minutes": 5,
+      "status": "complete"
+    },
+    "build": {
+      "duration_minutes": 13,
+      "status": "complete"
+    },
+    "cleanup": {
+      "duration_minutes": 3,
+      "status": "complete"
+    }
+  },
+  "total_duration_minutes": 21,
+  "status": "complete"
+}

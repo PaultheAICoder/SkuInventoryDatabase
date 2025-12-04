@@ -98,6 +98,7 @@ export interface SKUExportData {
   isActive: boolean
   bomCost: string | null
   maxBuildableUnits: number | null
+  finishedGoodsOnHand: number
   createdAt: string
   updatedAt: string
 }
@@ -109,6 +110,7 @@ export const skuExportColumns: CSVColumn<SKUExportData>[] = [
   { header: 'Sales Channel', accessor: (s) => s.salesChannel },
   { header: 'BOM Cost', accessor: (s) => s.bomCost },
   { header: 'Max Buildable Units', accessor: (s) => s.maxBuildableUnits },
+  { header: 'Finished Goods On Hand', accessor: (s) => s.finishedGoodsOnHand },
   { header: 'Notes', accessor: (s) => s.notes },
   { header: 'Active', accessor: (s) => (s.isActive ? 'Yes' : 'No') },
   { header: 'Created At', accessor: (s) => s.createdAt },

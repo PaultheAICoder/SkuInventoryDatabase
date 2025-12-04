@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { unauthorized, serverError } from '@/lib/api-response'
 import { calculateBOMUnitCost, calculateMaxBuildableUnits } from '@/services/bom'
 import { toCSV, skuExportColumns, generateExportFilename, type SKUExportData } from '@/services/export'
+import { getSkuQuantities } from '@/services/finished-goods'
 
 // GET /api/export/skus - Export all SKUs to CSV
 export async function GET(request: NextRequest) {
@@ -46,6 +47,10 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    // Get all SKU IDs and fetch FG quantities
+    const skuIds = skus.map((sku) => sku.id)
+    const fgQuantities = await getSkuQuantities(skuIds, locationId)
+
     // Transform to export format
     const exportData: SKUExportData[] = await Promise.all(
       skus.map(async (sku) => {
@@ -58,6 +63,9 @@ export async function GET(request: NextRequest) {
           maxBuildableUnits = await calculateMaxBuildableUnits(sku.id, locationId)
         }
 
+        // Get FG balance (0 if none)
+        const finishedGoodsOnHand = fgQuantities.get(sku.id) ?? 0
+
         return {
           id: sku.id,
           name: sku.name,
@@ -67,6 +75,7 @@ export async function GET(request: NextRequest) {
           isActive: sku.isActive,
           bomCost,
           maxBuildableUnits,
+          finishedGoodsOnHand,
           createdAt: sku.createdAt.toISOString(),
           updatedAt: sku.updatedAt.toISOString(),
         }
