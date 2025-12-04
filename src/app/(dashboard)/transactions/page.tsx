@@ -22,8 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
+import Link from 'next/link'
 import { LocationFilter } from '@/components/features/LocationFilter'
 import type { TransactionResponse } from '@/types/transaction'
 import { salesChannels } from '@/types'
@@ -179,7 +180,17 @@ function TransactionLogContent() {
           <h1 className="text-3xl font-bold">Transactions</h1>
           <p className="text-muted-foreground">View all inventory transactions</p>
         </div>
-        <ExportButton exportType="transactions" queryParams={exportQueryParams} />
+        <div className="flex items-center gap-2">
+          <ExportButton exportType="transactions" queryParams={exportQueryParams} />
+          {session?.user?.role !== 'viewer' && (
+            <Link href="/transactions/new">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Transaction
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
