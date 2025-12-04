@@ -1,0 +1,31 @@
+{
+  "issue": 106,
+  "title": "Scheduled job for alert evaluation and daily digest",
+  "phases": {
+    "scout": {
+      "started": "2025-12-04T12:00:00Z",
+      "completed": "2025-12-04T12:25:00Z",
+      "durationMinutes": 25
+    },
+    "build": {
+      "started": "2025-12-04T12:25:00Z",
+      "completed": "2025-12-04T12:40:00Z",
+      "durationMinutes": 15
+    },
+    "test": {
+      "started": "2025-12-04T12:40:00Z",
+      "completed": "2025-12-04T12:50:00Z",
+      "durationMinutes": 10
+    }
+  },
+  "status": "complete",
+  "planFile": ".agents/outputs/plan-106-120425.md",
+  "buildFile": ".agents/outputs/build-106-120425.md",
+  "cleanupFile": ".agents/outputs/cleanup-106-120425.md",
+  "estimatedBuildHours": 5,
+  "actualBuildMinutes": 50,
+  "filesCreated": 1,
+  "filesModified": 4,
+  "testsRun": 107,
+  "testsPassed": 107
+}

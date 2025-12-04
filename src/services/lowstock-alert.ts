@@ -408,3 +408,171 @@ export async function sendSlackAlerts(
     return { sent: 0, errors }
   }
 }
+
+/**
+ * Result of alert evaluation run for a single company
+ */
+export interface AlertEvaluationResult {
+  companyId: string
+  evaluated: boolean
+  componentsEvaluated: number
+  alertsTriggered: number
+  slackSent: number
+  slackErrors: string[]
+  emailSent: number
+  emailErrors: string[]
+  skipped: boolean
+  skipReason?: string
+}
+
+/**
+ * Run alert evaluation for a single company
+ * Orchestrates evaluation and delivery
+ */
+export async function runAlertEvaluation(
+  companyId: string,
+  baseUrl: string
+): Promise<AlertEvaluationResult> {
+  const result: AlertEvaluationResult = {
+    companyId,
+    evaluated: false,
+    componentsEvaluated: 0,
+    alertsTriggered: 0,
+    slackSent: 0,
+    slackErrors: [],
+    emailSent: 0,
+    emailErrors: [],
+    skipped: false,
+  }
+
+  // Get config
+  const config = await getAlertConfig(companyId)
+  if (!config) {
+    result.skipped = true
+    result.skipReason = 'No alert config'
+    return result
+  }
+
+  if (!config.enableSlack && !config.enableEmail) {
+    result.skipped = true
+    result.skipReason = 'All channels disabled'
+    return result
+  }
+
+  // Run evaluation
+  const evaluation = await evaluateLowStockAlerts(companyId)
+  result.evaluated = true
+  result.componentsEvaluated = evaluation.totalComponents
+  result.alertsTriggered = evaluation.componentsNeedingAlert.length
+
+  if (evaluation.componentsNeedingAlert.length === 0) {
+    console.log(`[Alerts] Company ${companyId}: No alerts needed`)
+    return result
+  }
+
+  // Send Slack alerts if enabled
+  if (config.enableSlack && config.slackWebhookUrl) {
+    const slackResult = await sendSlackAlerts(
+      companyId,
+      evaluation.componentsNeedingAlert,
+      baseUrl
+    )
+    result.slackSent = slackResult.sent
+    result.slackErrors = slackResult.errors
+  }
+
+  // Email delivery will be added in Issue #107
+  // if (config.enableEmail && config.emailAddresses.length > 0) {
+  //   const emailResult = await sendEmailAlerts(...)
+  //   result.emailSent = emailResult.sent
+  //   result.emailErrors = emailResult.errors
+  // }
+
+  console.log(`[Alerts] Company ${companyId}: ${result.alertsTriggered} alerts, ${result.slackSent} Slack sent`)
+
+  return result
+}
+
+/**
+ * Summary of all company alert runs
+ */
+export interface AlertRunSummary {
+  executedAt: string
+  companiesProcessed: number
+  companiesWithAlerts: number
+  totalAlertsTriggered: number
+  totalSlackSent: number
+  totalEmailSent: number
+  errors: Array<{ companyId: string; error: string }>
+  results: AlertEvaluationResult[]
+}
+
+/**
+ * Run alert evaluation for all companies with alerts enabled
+ * Called by cron endpoint
+ */
+export async function runAllCompanyAlerts(
+  baseUrl: string
+): Promise<AlertRunSummary> {
+  const executedAt = new Date().toISOString()
+  console.log(`[Alerts] Starting alert run at ${executedAt}`)
+
+  // Find all companies with alerts enabled
+  const configs = await prisma.alertConfig.findMany({
+    where: {
+      OR: [
+        { enableSlack: true },
+        { enableEmail: true },
+      ],
+    },
+    select: { companyId: true },
+  })
+
+  const summary: AlertRunSummary = {
+    executedAt,
+    companiesProcessed: configs.length,
+    companiesWithAlerts: 0,
+    totalAlertsTriggered: 0,
+    totalSlackSent: 0,
+    totalEmailSent: 0,
+    errors: [],
+    results: [],
+  }
+
+  if (configs.length === 0) {
+    console.log('[Alerts] No companies with alerts enabled')
+    return summary
+  }
+
+  // Process each company
+  for (const { companyId } of configs) {
+    try {
+      const result = await runAlertEvaluation(companyId, baseUrl)
+      summary.results.push(result)
+
+      if (result.alertsTriggered > 0) {
+        summary.companiesWithAlerts++
+      }
+      summary.totalAlertsTriggered += result.alertsTriggered
+      summary.totalSlackSent += result.slackSent
+      summary.totalEmailSent += result.emailSent
+
+      if (result.slackErrors.length > 0) {
+        summary.errors.push({
+          companyId,
+          error: `Slack: ${result.slackErrors.join(', ')}`,
+        })
+      }
+    } catch (error) {
+      console.error(`[Alerts] Error processing company ${companyId}:`, error)
+      summary.errors.push({
+        companyId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+
+  console.log(`[Alerts] Run complete: ${summary.companiesProcessed} companies, ${summary.totalAlertsTriggered} alerts, ${summary.errors.length} errors`)
+
+  return summary
+}
