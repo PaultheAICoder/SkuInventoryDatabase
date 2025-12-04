@@ -24,6 +24,7 @@ model Company {
   securityEvents   SecurityEvent[]
   defectThresholds DefectThreshold[]
   alertConfig      AlertConfig?
+  forecastConfig   ForecastConfig?
 
   // Multi-company relations
   userCompanies UserCompany[] @relation("UserCompanies")
@@ -455,6 +456,24 @@ model ComponentAlertState {
   component     Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
   lastStatus    String    @db.VarChar(20) // 'ok' | 'warning' | 'critical'
   lastAlertSent DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Forecast Configuration
+// ============================================
+
+model ForecastConfig {
+  id        String  @id @default(uuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Forecast parameters
+  lookbackDays             Int      @default(30)
+  safetyDays               Int      @default(7)
+  excludedTransactionTypes String[] @default(["initial", "adjustment"])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
