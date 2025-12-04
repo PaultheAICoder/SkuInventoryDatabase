@@ -542,6 +542,205 @@ ALREADY-001,999,20.00`
 
         expect(response.status).toBe(401)
       })
+
+      it('component template includes reference data section', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+
+        const request = createTestRequest('/api/import/template/components')
+        const response = await getTemplate(request, { params: Promise.resolve({ type: 'components' }) })
+
+        expect(response.status).toBe(200)
+        const csv = await response.text()
+        expect(csv).toContain('Company')
+        expect(csv).toContain('Brand')
+        expect(csv).toContain('Location')
+        expect(csv).toContain('# === VALID OPTIONS REFERENCE')
+        expect(csv).toContain('# COMPANIES:')
+        expect(csv).toContain('# BRANDS (Company -> Brand):')
+      })
+
+      it('SKU template includes reference data section', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+
+        const request = createTestRequest('/api/import/template/skus')
+        const response = await getTemplate(request, { params: Promise.resolve({ type: 'skus' }) })
+
+        expect(response.status).toBe(200)
+        const csv = await response.text()
+        expect(csv).toContain('Company')
+        expect(csv).toContain('Brand')
+        expect(csv).toContain('# === VALID OPTIONS REFERENCE')
+        expect(csv).toContain('# SALES CHANNELS:')
+      })
+    })
+
+    describe('Component import with company/brand lookup', () => {
+      it('imports components with company and brand names', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+        const prisma = getIntegrationPrisma()
+
+        // Get actual company and brand names from test session
+        const company = await prisma.company.findUnique({
+          where: { id: TEST_SESSIONS.admin!.user.companyId },
+        })
+        const brand = await prisma.brand.findFirst({
+          where: { companyId: TEST_SESSIONS.admin!.user.companyId, isActive: true },
+        })
+
+        const csv = `Name,SKU Code,Company,Brand,Category
+Lookup Component,LOOKUP-001,${company!.name},${brand!.name},Test Category`
+
+        const request = new Request('http://localhost/api/import/components', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importComponents(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(1)
+
+        // Verify component was created with correct brand
+        const component = await prisma.component.findFirst({
+          where: { skuCode: 'LOOKUP-001' },
+        })
+        expect(component).not.toBeNull()
+        expect(component!.brandId).toBe(brand!.id)
+      })
+
+      it('returns clear error for invalid company name', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+
+        const csv = `Name,SKU Code,Company,Brand,Category
+Bad Company Component,BADCO-001,Nonexistent Company,Some Brand,Electronics`
+
+        const request = new Request('http://localhost/api/import/components', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importComponents(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(0)
+        expect(result.data.skipped).toBe(1)
+        expect(result.data.errors[0].errors[0]).toContain('Company "Nonexistent Company" not found')
+      })
+
+      it('returns clear error for invalid brand name', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+        const prisma = getIntegrationPrisma()
+
+        const company = await prisma.company.findUnique({
+          where: { id: TEST_SESSIONS.admin!.user.companyId },
+        })
+
+        const csv = `Name,SKU Code,Company,Brand,Category
+Bad Brand Component,BADBR-001,${company!.name},Nonexistent Brand,Electronics`
+
+        const request = new Request('http://localhost/api/import/components', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importComponents(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(0)
+        expect(result.data.skipped).toBe(1)
+        expect(result.data.errors[0].errors[0]).toContain('Brand "Nonexistent Brand" not found')
+      })
+
+      it('uses session defaults when company/brand not specified', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+        const prisma = getIntegrationPrisma()
+
+        const csv = `Name,SKU Code,Category
+Default Company Component,DEFCO-001,Electronics`
+
+        const request = new Request('http://localhost/api/import/components', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importComponents(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(1)
+
+        // Verify component was created with session's company
+        const component = await prisma.component.findFirst({
+          where: { skuCode: 'DEFCO-001' },
+        })
+        expect(component).not.toBeNull()
+        expect(component!.companyId).toBe(TEST_SESSIONS.admin!.user.companyId)
+      })
+    })
+
+    describe('SKU import with company/brand lookup', () => {
+      it('imports SKUs with company and brand names', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+        const prisma = getIntegrationPrisma()
+
+        // Get actual company and brand names from test session
+        const company = await prisma.company.findUnique({
+          where: { id: TEST_SESSIONS.admin!.user.companyId },
+        })
+        const brand = await prisma.brand.findFirst({
+          where: { companyId: TEST_SESSIONS.admin!.user.companyId, isActive: true },
+        })
+
+        const csv = `Name,Internal Code,Company,Brand,Sales Channel
+Lookup SKU,LOOKUP-SKU-001,${company!.name},${brand!.name},Amazon`
+
+        const request = new Request('http://localhost/api/import/skus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importSKUs(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(1)
+
+        // Verify SKU was created with correct brand
+        const sku = await prisma.sKU.findFirst({
+          where: { internalCode: 'LOOKUP-SKU-001' },
+        })
+        expect(sku).not.toBeNull()
+        expect(sku!.brandId).toBe(brand!.id)
+      })
+
+      it('returns clear error for invalid company name in SKU import', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+
+        const csv = `Name,Internal Code,Company,Brand,Sales Channel
+Bad Company SKU,BADCO-SKU-001,Nonexistent Company,Some Brand,Amazon`
+
+        const request = new Request('http://localhost/api/import/skus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: csv,
+        })
+
+        const response = await importSKUs(request as never)
+        const result = await response.json()
+
+        expect(response.status).toBe(200)
+        expect(result.data.imported).toBe(0)
+        expect(result.data.skipped).toBe(1)
+        expect(result.data.errors[0].errors[0]).toContain('Company "Nonexistent Company" not found')
+      })
     })
   })
 

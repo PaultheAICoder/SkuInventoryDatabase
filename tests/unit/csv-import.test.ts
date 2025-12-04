@@ -3,7 +3,14 @@
  * Tests parseCSV, processComponentImport, processSKUImport, and processInitialInventoryImport
  */
 import { describe, it, expect } from 'vitest'
-import { parseCSV, processComponentImport, processSKUImport, processInitialInventoryImport } from '@/services/import'
+import {
+  parseCSV,
+  processComponentImport,
+  processSKUImport,
+  processInitialInventoryImport,
+  generateComponentTemplate,
+  generateSKUTemplate,
+} from '@/services/import'
 
 describe('parseCSV', () => {
   it('parses simple CSV correctly', () => {
@@ -404,5 +411,164 @@ COMP-001,100,10.50,2025-01-01,`
 
     expect(result.successful).toBe(1)
     expect(result.results[0].data?.notes).toBeNull()
+  })
+})
+
+describe('processComponentImport with lookup fields', () => {
+  it('parses CSV with company, brand, location columns', () => {
+    const csv = `Name,SKU Code,Company,Brand,Location,Category
+Widget A,WIDGET-001,Acme Corp,Main Brand,Warehouse 1,Electronics`
+
+    const result = processComponentImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data).toMatchObject({
+      name: 'Widget A',
+      skuCode: 'WIDGET-001',
+      company: 'Acme Corp',
+      brand: 'Main Brand',
+      location: 'Warehouse 1',
+      category: 'Electronics',
+    })
+  })
+
+  it('handles missing optional lookup fields', () => {
+    const csv = `Name,SKU Code,Category
+Widget B,WIDGET-002,Electronics`
+
+    const result = processComponentImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.company).toBeUndefined()
+    expect(result.results[0].data?.brand).toBeUndefined()
+    expect(result.results[0].data?.location).toBeUndefined()
+  })
+
+  it('parses empty string lookup fields as undefined', () => {
+    const csv = `Name,SKU Code,Company,Brand,Location,Category
+Widget C,WIDGET-003,,,,"Raw Materials"`
+
+    const result = processComponentImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.company).toBeUndefined()
+    expect(result.results[0].data?.brand).toBeUndefined()
+    expect(result.results[0].data?.location).toBeUndefined()
+  })
+})
+
+describe('processSKUImport with lookup fields', () => {
+  it('parses CSV with company, brand columns', () => {
+    const csv = `Name,Internal Code,Company,Brand,Sales Channel
+Product X,PROD-X,Acme Corp,Main Brand,Amazon`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data).toMatchObject({
+      name: 'Product X',
+      internalCode: 'PROD-X',
+      company: 'Acme Corp',
+      brand: 'Main Brand',
+      salesChannel: 'Amazon',
+    })
+  })
+
+  it('handles missing optional lookup fields', () => {
+    const csv = `Name,Internal Code,Sales Channel
+Product Y,PROD-Y,Shopify`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.company).toBeUndefined()
+    expect(result.results[0].data?.brand).toBeUndefined()
+  })
+
+  it('parses empty string lookup fields as undefined', () => {
+    const csv = `Name,Internal Code,Company,Brand,Sales Channel
+Product Z,PROD-Z,,,TikTok`
+
+    const result = processSKUImport(csv)
+
+    expect(result.successful).toBe(1)
+    expect(result.results[0].data?.company).toBeUndefined()
+    expect(result.results[0].data?.brand).toBeUndefined()
+  })
+})
+
+describe('template generation with reference data', () => {
+  it('generates component template with reference section', () => {
+    const referenceData = {
+      companies: [{ name: 'Acme Corp' }],
+      brands: [{ name: 'Main Brand', companyName: 'Acme Corp' }],
+      locations: [{ name: 'Warehouse 1', companyName: 'Acme Corp' }],
+      categories: [{ name: 'Electronics' }],
+    }
+
+    const template = generateComponentTemplate(referenceData)
+
+    expect(template).toContain('Company')
+    expect(template).toContain('Brand')
+    expect(template).toContain('Location')
+    expect(template).toContain('# COMPANIES:')
+    expect(template).toContain('Acme Corp')
+    expect(template).toContain('# BRANDS (Company -> Brand):')
+    expect(template).toContain('Acme Corp -> Main Brand')
+    expect(template).toContain('# LOCATIONS (Company -> Location):')
+    expect(template).toContain('Acme Corp -> Warehouse 1')
+    expect(template).toContain('# CATEGORIES:')
+    expect(template).toContain('Electronics')
+  })
+
+  it('generates SKU template with reference section', () => {
+    const referenceData = {
+      companies: [{ name: 'Acme Corp' }],
+      brands: [{ name: 'Main Brand', companyName: 'Acme Corp' }],
+      locations: [],
+      categories: [],
+    }
+
+    const template = generateSKUTemplate(referenceData)
+
+    expect(template).toContain('Company')
+    expect(template).toContain('Brand')
+    expect(template).toContain('Sales Channel')
+    expect(template).toContain('# COMPANIES:')
+    expect(template).toContain('Acme Corp')
+    expect(template).toContain('# SALES CHANNELS:')
+    expect(template).toContain('Amazon, Shopify, TikTok, Generic')
+  })
+
+  it('generates template without reference section when no data provided', () => {
+    const template = generateComponentTemplate()
+
+    expect(template).not.toContain('# ===')
+    expect(template).toContain('Name')
+    expect(template).toContain('SKU Code')
+    expect(template).toContain('Company')
+    expect(template).toContain('Brand')
+  })
+
+  it('uses placeholder values in example row when no reference data', () => {
+    const template = generateComponentTemplate()
+
+    expect(template).toContain('Company Name')
+    expect(template).toContain('Brand Name')
+  })
+
+  it('uses actual names in example row when reference data provided', () => {
+    const referenceData = {
+      companies: [{ name: 'Test Company' }],
+      brands: [{ name: 'Test Brand', companyName: 'Test Company' }],
+      locations: [{ name: 'Test Location', companyName: 'Test Company' }],
+      categories: [{ name: 'Test Category' }],
+    }
+
+    const template = generateComponentTemplate(referenceData)
+
+    expect(template).toContain('Test Company')
+    expect(template).toContain('Test Brand')
+    expect(template).toContain('Test Location')
   })
 })

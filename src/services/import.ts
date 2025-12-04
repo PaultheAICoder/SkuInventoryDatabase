@@ -4,14 +4,51 @@
  */
 
 import { z } from 'zod'
-import { createComponentSchema } from '@/types/component'
-import { createSKUSchema } from '@/types/sku'
 
 export interface ImportResult<T> {
   success: boolean
   rowNumber: number
   data: T | null
   errors: string[]
+}
+
+/**
+ * Reference data for template generation
+ */
+export interface TemplateReferenceData {
+  companies: { name: string }[]
+  brands: { name: string; companyName: string }[]
+  locations: { name: string; companyName: string }[]
+  categories: { name: string }[]
+}
+
+/**
+ * Component import data with lookup fields
+ */
+export interface ComponentImportWithLookups {
+  name: string
+  skuCode: string
+  company?: string // Company name for lookup
+  brand?: string // Brand name for lookup
+  location?: string // Location name for lookup (optional)
+  category: string | null
+  unitOfMeasure: string
+  costPerUnit: number
+  reorderPoint: number
+  leadTimeDays: number
+  notes: string | null
+}
+
+/**
+ * SKU import data with lookup fields
+ */
+export interface SKUImportWithLookups {
+  name: string
+  internalCode: string
+  company?: string // Company name for lookup
+  brand?: string // Brand name for lookup
+  salesChannel: 'Amazon' | 'Shopify' | 'TikTok' | 'Generic'
+  notes: string | null
 }
 
 export interface ImportSummary<T> {
@@ -97,20 +134,58 @@ function rowToRecord(headers: string[], row: string[]): Record<string, string> {
 const componentImportSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   sku_code: z.string().min(1, 'SKU code is required'),
-  category: z.string().optional().transform((v) => v || null),
+  company: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  brand: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  location: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  category: z
+    .string()
+    .optional()
+    .transform((v) => v || null),
   unit_of_measure: z.string().optional().default('each'),
-  cost_per_unit: z.string().optional().transform((v) => (v ? parseFloat(v) : 0)),
-  reorder_point: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 0)),
-  lead_time_days: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 0)),
-  notes: z.string().optional().transform((v) => v || null),
+  cost_per_unit: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseFloat(v) : 0)),
+  reorder_point: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : 0)),
+  lead_time_days: z
+    .string()
+    .optional()
+    .transform((v) => (v ? parseInt(v, 10) : 0)),
+  notes: z
+    .string()
+    .optional()
+    .transform((v) => v || null),
 })
 
 // SKU import schema with CSV field mappings
 const skuImportSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   internal_code: z.string().min(1, 'Internal code is required'),
+  company: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
+  brand: z
+    .string()
+    .optional()
+    .transform((v) => v || undefined),
   sales_channel: z.enum(['Amazon', 'Shopify', 'TikTok', 'Generic']),
-  notes: z.string().optional().transform((v) => v || null),
+  notes: z
+    .string()
+    .optional()
+    .transform((v) => v || null),
 })
 
 // Initial inventory import schema with CSV field mappings
@@ -144,19 +219,23 @@ const initialInventoryImportSchema = z.object({
 
 /**
  * Import component from CSV row
+ * Returns ComponentImportWithLookups with lookup fields for API route to resolve
  */
 function importComponentRow(
   record: Record<string, string>,
   rowNumber: number
-): ImportResult<z.infer<typeof createComponentSchema>> {
+): ImportResult<ComponentImportWithLookups> {
   try {
     // Parse with CSV field schema first
     const csvParsed = componentImportSchema.parse(record)
 
-    // Transform to API schema
-    const componentData = {
+    // Transform to data with lookup fields
+    const componentData: ComponentImportWithLookups = {
       name: csvParsed.name,
       skuCode: csvParsed.sku_code,
+      company: csvParsed.company,
+      brand: csvParsed.brand,
+      location: csvParsed.location,
       category: csvParsed.category,
       unitOfMeasure: csvParsed.unit_of_measure,
       costPerUnit: csvParsed.cost_per_unit,
@@ -165,13 +244,10 @@ function importComponentRow(
       notes: csvParsed.notes,
     }
 
-    // Validate with actual API schema
-    const validated = createComponentSchema.parse(componentData)
-
     return {
       success: true,
       rowNumber,
-      data: validated,
+      data: componentData,
       errors: [],
     }
   } catch (err) {
@@ -194,31 +270,30 @@ function importComponentRow(
 
 /**
  * Import SKU from CSV row
+ * Returns SKUImportWithLookups with lookup fields for API route to resolve
  */
 function importSKURow(
   record: Record<string, string>,
   rowNumber: number
-): ImportResult<z.infer<typeof createSKUSchema>> {
+): ImportResult<SKUImportWithLookups> {
   try {
     // Parse with CSV field schema first
     const csvParsed = skuImportSchema.parse(record)
 
-    // Transform to API schema
-    const skuData = {
+    // Transform to data with lookup fields
+    const skuData: SKUImportWithLookups = {
       name: csvParsed.name,
       internalCode: csvParsed.internal_code,
-      salesChannel: csvParsed.sales_channel as 'Amazon' | 'Shopify' | 'TikTok' | 'Generic',
-      externalIds: {},
+      company: csvParsed.company,
+      brand: csvParsed.brand,
+      salesChannel: csvParsed.sales_channel,
       notes: csvParsed.notes,
     }
-
-    // Validate with actual API schema
-    const validated = createSKUSchema.parse(skuData)
 
     return {
       success: true,
       rowNumber,
-      data: validated,
+      data: skuData,
       errors: [],
     }
   } catch (err) {
@@ -294,7 +369,7 @@ function importInitialInventoryRow(
  */
 export function processComponentImport(
   csvContent: string
-): ImportSummary<z.infer<typeof createComponentSchema>> {
+): ImportSummary<ComponentImportWithLookups> {
   const rows = parseCSV(csvContent)
 
   if (rows.length < 2) {
@@ -327,7 +402,7 @@ export function processComponentImport(
  */
 export function processSKUImport(
   csvContent: string
-): ImportSummary<z.infer<typeof createSKUSchema>> {
+): ImportSummary<SKUImportWithLookups> {
   const rows = parseCSV(csvContent)
 
   if (rows.length < 2) {
@@ -390,11 +465,15 @@ export function processInitialInventoryImport(
 
 /**
  * Generate CSV template for components
+ * Optionally includes reference data section with valid companies, brands, locations, categories
  */
-export function generateComponentTemplate(): string {
+export function generateComponentTemplate(referenceData?: TemplateReferenceData): string {
   const headers = [
     'Name',
     'SKU Code',
+    'Company',
+    'Brand',
+    'Location',
     'Category',
     'Unit of Measure',
     'Cost Per Unit',
@@ -406,6 +485,9 @@ export function generateComponentTemplate(): string {
   const exampleRow = [
     'Example Component',
     'COMP-001',
+    referenceData?.companies[0]?.name || 'Company Name',
+    referenceData?.brands[0]?.name || 'Brand Name',
+    referenceData?.locations[0]?.name || '',
     'Electronics',
     'each',
     '10.50',
@@ -414,18 +496,77 @@ export function generateComponentTemplate(): string {
     'Sample component for import',
   ]
 
-  return [headers.join(','), exampleRow.join(',')].join('\n')
+  const lines = [headers.join(','), exampleRow.join(',')]
+
+  // Add reference section if data provided
+  if (referenceData) {
+    lines.push('')
+    lines.push('# === VALID OPTIONS REFERENCE (delete these lines before importing) ===')
+    lines.push('#')
+    lines.push('# COMPANIES:')
+    for (const company of referenceData.companies) {
+      lines.push(`#   ${company.name}`)
+    }
+    lines.push('#')
+    lines.push('# BRANDS (Company -> Brand):')
+    for (const brand of referenceData.brands) {
+      lines.push(`#   ${brand.companyName} -> ${brand.name}`)
+    }
+    lines.push('#')
+    lines.push('# LOCATIONS (Company -> Location):')
+    for (const location of referenceData.locations) {
+      lines.push(`#   ${location.companyName} -> ${location.name}`)
+    }
+    lines.push('#')
+    lines.push('# CATEGORIES:')
+    for (const category of referenceData.categories) {
+      lines.push(`#   ${category.name}`)
+    }
+    lines.push('# ===================================================================')
+  }
+
+  return lines.join('\n')
 }
 
 /**
  * Generate CSV template for SKUs
+ * Optionally includes reference data section with valid companies and brands
  */
-export function generateSKUTemplate(): string {
-  const headers = ['Name', 'Internal Code', 'Sales Channel', 'Notes']
+export function generateSKUTemplate(referenceData?: TemplateReferenceData): string {
+  const headers = ['Name', 'Internal Code', 'Company', 'Brand', 'Sales Channel', 'Notes']
 
-  const exampleRow = ['Example SKU', 'SKU-001', 'Amazon', 'Sample SKU for import']
+  const exampleRow = [
+    'Example SKU',
+    'SKU-001',
+    referenceData?.companies[0]?.name || 'Company Name',
+    referenceData?.brands[0]?.name || 'Brand Name',
+    'Amazon',
+    'Sample SKU for import',
+  ]
 
-  return [headers.join(','), exampleRow.join(',')].join('\n')
+  const lines = [headers.join(','), exampleRow.join(',')]
+
+  // Add reference section if data provided
+  if (referenceData) {
+    lines.push('')
+    lines.push('# === VALID OPTIONS REFERENCE (delete these lines before importing) ===')
+    lines.push('#')
+    lines.push('# COMPANIES:')
+    for (const company of referenceData.companies) {
+      lines.push(`#   ${company.name}`)
+    }
+    lines.push('#')
+    lines.push('# BRANDS (Company -> Brand):')
+    for (const brand of referenceData.brands) {
+      lines.push(`#   ${brand.companyName} -> ${brand.name}`)
+    }
+    lines.push('#')
+    lines.push('# SALES CHANNELS:')
+    lines.push('#   Amazon, Shopify, TikTok, Generic')
+    lines.push('# ===================================================================')
+  }
+
+  return lines.join('\n')
 }
 
 /**

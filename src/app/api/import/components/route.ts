@@ -4,8 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { success, unauthorized, serverError, error } from '@/lib/api-response'
-import { processComponentImport, type ImportSummary } from '@/services/import'
-import type { CreateComponentInput } from '@/types/component'
+import {
+  processComponentImport,
+  type ImportSummary,
+  type ComponentImportWithLookups,
+} from '@/services/import'
 
 interface ComponentImportResult {
   total: number
@@ -16,6 +19,70 @@ interface ComponentImportResult {
     name: string
     errors: string[]
   }>
+}
+
+/**
+ * Lookup maps for resolving entity names to IDs
+ */
+interface LookupMaps {
+  companies: Map<string, string> // lowercase name -> id
+  companyNames: Map<string, string> // id -> original name
+  brands: Map<string, { id: string; companyId: string }> // "companyName|brandName" -> { id, companyId }
+  locations: Map<string, { id: string; companyId: string }> // "companyName|locationName" -> { id, companyId }
+  categories: Map<string, string> // lowercase name -> original name
+}
+
+/**
+ * Pre-fetch all lookup data to avoid N+1 queries during import
+ */
+async function buildLookupMaps(
+  userId: string,
+  selectedCompanyId: string
+): Promise<LookupMaps> {
+  // Get user's accessible companies
+  const userCompanies = await prisma.userCompany.findMany({
+    where: { userId },
+    select: { companyId: true },
+  })
+  const companyIds = [selectedCompanyId, ...userCompanies.map((uc) => uc.companyId)]
+  const uniqueCompanyIds = Array.from(new Set(companyIds))
+
+  const [companies, brands, locations, categories] = await Promise.all([
+    prisma.company.findMany({
+      where: { id: { in: uniqueCompanyIds } },
+      select: { id: true, name: true },
+    }),
+    prisma.brand.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+    prisma.location.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+    prisma.category.findMany({
+      where: { companyId: selectedCompanyId, isActive: true },
+      select: { name: true },
+    }),
+  ])
+
+  return {
+    companies: new Map(companies.map((c) => [c.name.toLowerCase(), c.id])),
+    companyNames: new Map(companies.map((c) => [c.id, c.name])),
+    brands: new Map(
+      brands.map((b) => [
+        `${b.company.name.toLowerCase()}|${b.name.toLowerCase()}`,
+        { id: b.id, companyId: b.companyId },
+      ])
+    ),
+    locations: new Map(
+      locations.map((l) => [
+        `${l.company.name.toLowerCase()}|${l.name.toLowerCase()}`,
+        { id: l.id, companyId: l.companyId },
+      ])
+    ),
+    categories: new Map(categories.map((c) => [c.name.toLowerCase(), c.name])),
+  }
 }
 
 // POST /api/import/components - Import components from CSV
@@ -35,16 +102,16 @@ export async function POST(request: NextRequest) {
     const selectedCompanyId = session.user.selectedCompanyId
 
     // Use selected brand from session, or fall back to first active brand
-    let brandId = session.user.selectedBrandId
+    let defaultBrandId = session.user.selectedBrandId
 
-    if (!brandId) {
+    if (!defaultBrandId) {
       const brand = await prisma.brand.findFirst({
         where: { companyId: selectedCompanyId, isActive: true },
       })
       if (!brand) {
         return error('No active brand found for selected company', 400)
       }
-      brandId = brand.id
+      defaultBrandId = brand.id
     }
 
     // Parse multipart form data or raw CSV
@@ -69,8 +136,12 @@ export async function POST(request: NextRequest) {
       return error('Empty file provided', 400)
     }
 
+    // Pre-fetch all lookup data (avoid N+1 queries)
+    const lookupMaps = await buildLookupMaps(session.user.id, selectedCompanyId)
+
     // Process CSV
-    const importSummary: ImportSummary<CreateComponentInput> = processComponentImport(csvContent)
+    const importSummary: ImportSummary<ComponentImportWithLookups> =
+      processComponentImport(csvContent)
 
     const result: ComponentImportResult = {
       total: importSummary.total,
@@ -94,10 +165,91 @@ export async function POST(request: NextRequest) {
       const componentData = row.data
 
       try {
-        // Check for duplicate name or skuCode within the selected company
+        // Resolve company (use provided or default to selected)
+        let companyId = selectedCompanyId
+        if (componentData.company) {
+          const resolvedCompanyId = lookupMaps.companies.get(componentData.company.toLowerCase())
+          if (!resolvedCompanyId) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              name: componentData.name,
+              errors: [
+                `Company "${componentData.company}" not found. Valid options are listed in the template.`,
+              ],
+            })
+            continue
+          }
+          companyId = resolvedCompanyId
+        }
+
+        // Resolve brand (use provided or default)
+        let brandId = defaultBrandId
+        if (componentData.brand) {
+          // Find brand for the resolved company
+          const companyName =
+            componentData.company || lookupMaps.companyNames.get(companyId) || ''
+          const brandKey = `${companyName.toLowerCase()}|${componentData.brand.toLowerCase()}`
+          const resolvedBrand = lookupMaps.brands.get(brandKey)
+          if (!resolvedBrand) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              name: componentData.name,
+              errors: [
+                `Brand "${componentData.brand}" not found for company. Valid options are listed in the template.`,
+              ],
+            })
+            continue
+          }
+          brandId = resolvedBrand.id
+          // Verify brand belongs to resolved company
+          if (resolvedBrand.companyId !== companyId) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              name: componentData.name,
+              errors: [`Brand "${componentData.brand}" does not belong to the specified company.`],
+            })
+            continue
+          }
+        }
+
+        // Resolve location (optional) - validate it exists even though we don't store it yet
+        if (componentData.location) {
+          const companyName =
+            componentData.company || lookupMaps.companyNames.get(companyId) || ''
+          const locationKey = `${companyName.toLowerCase()}|${componentData.location.toLowerCase()}`
+          const resolvedLocation = lookupMaps.locations.get(locationKey)
+          if (!resolvedLocation) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              name: componentData.name,
+              errors: [
+                `Location "${componentData.location}" not found for company. Valid options are listed in the template.`,
+              ],
+            })
+            continue
+          }
+          // Note: locationId (resolvedLocation.id) is currently not stored on Component model
+          // When Component model is updated to include locationId, use it here
+        }
+
+        // Resolve category (use canonical casing from database)
+        let category = componentData.category
+        if (category) {
+          const canonicalCategory = lookupMaps.categories.get(category.toLowerCase())
+          if (canonicalCategory) {
+            category = canonicalCategory
+          }
+          // Note: Categories can be free-text, so we don't fail on unknown categories
+        }
+
+        // Check for duplicate name or skuCode within the resolved company
         const existing = await prisma.component.findFirst({
           where: {
-            companyId: selectedCompanyId,
+            companyId,
             OR: [{ name: componentData.name }, { skuCode: componentData.skuCode }],
           },
         })
@@ -116,14 +268,14 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create component with companyId
+        // Create component with resolved IDs
         await prisma.component.create({
           data: {
             brandId,
-            companyId: selectedCompanyId,
+            companyId,
             name: componentData.name,
             skuCode: componentData.skuCode,
-            category: componentData.category ?? null,
+            category: category ?? null,
             unitOfMeasure: componentData.unitOfMeasure ?? 'each',
             costPerUnit: new Prisma.Decimal(componentData.costPerUnit ?? 0),
             reorderPoint: componentData.reorderPoint ?? 0,
