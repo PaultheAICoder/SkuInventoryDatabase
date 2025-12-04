@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Upload, Download, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { BrandSelectionDialog } from './BrandSelectionDialog'
 
 export interface ImportResult {
   total: number
@@ -51,6 +52,8 @@ export function ImportForm({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [allowOverwrite, setAllowOverwrite] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showBrandDialog, setShowBrandDialog] = useState(false)
+  const [pendingRetry, setPendingRetry] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null
@@ -148,6 +151,14 @@ export function ImportForm({
     } catch (error) {
       console.error('Upload error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.'
+
+      // Check if error is brand-related
+      if (errorMessage.toLowerCase().includes('no active brand')) {
+        setShowBrandDialog(true)
+        setUploadError(null) // Clear any previous error
+        return
+      }
+
       setUploadError(errorMessage)
       toast.error('Import failed', {
         description: errorMessage,
@@ -156,6 +167,20 @@ export function ImportForm({
       setIsUploading(false)
     }
   }
+
+  const handleBrandSelected = async () => {
+    // Set flag to trigger retry, then close dialog
+    setPendingRetry(true)
+    setShowBrandDialog(false)
+  }
+
+  // Retry upload after brand selection
+  useEffect(() => {
+    if (pendingRetry && file) {
+      setPendingRetry(false)
+      handleUpload()
+    }
+  }, [pendingRetry]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Card>
@@ -271,6 +296,20 @@ export function ImportForm({
           )}
         </Button>
       </CardContent>
+
+      {/* Brand Selection Dialog */}
+      <BrandSelectionDialog
+        open={showBrandDialog}
+        onOpenChange={(open) => {
+          setShowBrandDialog(open)
+          if (!open) {
+            setPendingRetry(false)
+          }
+        }}
+        onBrandSelected={handleBrandSelected}
+        title="Brand Required"
+        description="This import requires a brand to be selected. Please choose a brand to continue."
+      />
     </Card>
   )
 }
