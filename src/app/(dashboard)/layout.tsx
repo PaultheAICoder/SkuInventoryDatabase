@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   TrendingDown,
   Tag,
+  FolderTree,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -43,6 +44,7 @@ const navigation = [
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
   { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
   { name: 'Brands', href: '/settings/brands', icon: Tag, adminOnly: true },
+  { name: 'Categories', href: '/settings/categories', icon: FolderTree, adminOnly: true },
   { name: 'Companies', href: '/settings/companies', icon: Building2, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]

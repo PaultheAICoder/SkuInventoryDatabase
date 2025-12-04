@@ -18,6 +18,7 @@ model Company {
   updatedAt DateTime @updatedAt
 
   brands           Brand[]
+  categories       Category[]
   users            User[]
   locations        Location[]
   transactions     Transaction[]
@@ -75,6 +76,19 @@ model Brand {
 
   components Component[]
   skus       SKU[]
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String   @db.VarChar(50)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([companyId, name])
   @@index([companyId, isActive])

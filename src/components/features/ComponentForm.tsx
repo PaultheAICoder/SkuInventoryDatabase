@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,18 +15,15 @@ import {
 } from '@/components/ui/select'
 import type { ComponentResponse } from '@/types/component'
 
+interface CategoryOption {
+  value: string
+  label: string
+}
+
 interface ComponentFormProps {
   component?: ComponentResponse
   onSuccess?: () => void
 }
-
-const CATEGORIES = [
-  { value: 'packaging', label: 'Packaging' },
-  { value: 'tool', label: 'Tool' },
-  { value: 'documentation', label: 'Documentation' },
-  { value: 'accessory', label: 'Accessory' },
-  { value: 'other', label: 'Other' },
-]
 
 const UNITS_OF_MEASURE = [
   { value: 'each', label: 'Each' },
@@ -42,6 +39,8 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   const [formData, setFormData] = useState({
     name: component?.name ?? '',
@@ -53,6 +52,29 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
     leadTimeDays: component?.leadTimeDays?.toString() ?? '0',
     notes: component?.notes ?? '',
   })
+
+  // Fetch categories on mount
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        const res = await fetch('/api/categories?isActive=true&pageSize=100')
+        if (res.ok) {
+          const data = await res.json()
+          const categoryOptions = (data?.data || []).map((cat: { name: string }) => ({
+            value: cat.name,
+            label: cat.name,
+          }))
+          setCategories(categoryOptions)
+        }
+      } catch (err) {
+        console.error('Failed to fetch categories:', err)
+      } finally {
+        setCategoriesLoading(false)
+      }
+    }
+
+    fetchCategories()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -138,12 +160,13 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
               <Select
                 value={formData.category}
                 onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+                disabled={categoriesLoading}
               >
                 <SelectTrigger id="category">
-                  <SelectValue placeholder="Select a category" />
+                  <SelectValue placeholder={categoriesLoading ? 'Loading...' : 'Select a category'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
                     </SelectItem>
