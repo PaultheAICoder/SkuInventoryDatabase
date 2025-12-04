@@ -16,6 +16,7 @@ import { disconnectTestDb } from '../helpers/db'
 import { GET as getComponents, POST as createComponent } from '@/app/api/components/route'
 import { GET as getSettings, PATCH as updateSettings } from '@/app/api/settings/route'
 import { POST as createReceipt } from '@/app/api/transactions/receipt/route'
+import { GET as getUsers, POST as createUser } from '@/app/api/users/route'
 
 describe('API Authentication', () => {
   beforeAll(async () => {
@@ -136,6 +137,62 @@ describe('API Authentication', () => {
       const result = await parseRouteResponse(response)
 
       expect(result.status).toBe(403)
+    })
+  })
+
+  describe('Session Validation - Missing selectedCompanyId', () => {
+    it('GET /api/users returns 400 when selectedCompanyId is missing', async () => {
+      // Create a session with empty selectedCompanyId to simulate edge case
+      const incompleteSession = {
+        user: {
+          id: TEST_SESSIONS.admin!.user.id,
+          email: TEST_SESSIONS.admin!.user.email,
+          name: TEST_SESSIONS.admin!.user.name,
+          role: 'admin' as const,
+          companyId: TEST_SESSIONS.admin!.user.companyId,
+          companyName: TEST_SESSIONS.admin!.user.companyName,
+          selectedCompanyId: '', // Empty string simulates missing
+        },
+      }
+      setTestSession(incompleteSession)
+
+      const request = createTestRequest('/api/users')
+      const response = await getUsers(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(400)
+      expect(result.error).toContain('company')
+    })
+
+    it('POST /api/users returns 400 when selectedCompanyId is missing', async () => {
+      // Create a session with empty selectedCompanyId to simulate edge case
+      const incompleteSession = {
+        user: {
+          id: TEST_SESSIONS.admin!.user.id,
+          email: TEST_SESSIONS.admin!.user.email,
+          name: TEST_SESSIONS.admin!.user.name,
+          role: 'admin' as const,
+          companyId: TEST_SESSIONS.admin!.user.companyId,
+          companyName: TEST_SESSIONS.admin!.user.companyName,
+          selectedCompanyId: '', // Empty string simulates missing
+        },
+      }
+      setTestSession(incompleteSession)
+
+      const request = createTestRequest('/api/users', {
+        method: 'POST',
+        body: {
+          email: 'newuser@test.com',
+          password: 'Password123!',
+          name: 'Test User',
+          role: 'ops',
+        },
+      })
+      const response = await createUser(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(400)
+      expect(result.error).toContain('company')
     })
   })
 })

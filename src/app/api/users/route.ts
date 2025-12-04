@@ -34,6 +34,13 @@ export async function GET(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Build where clause - scope by selected company
     const where: Prisma.UserWhereInput = {
       companyId: selectedCompanyId,
@@ -158,6 +165,13 @@ export async function POST(request: NextRequest) {
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Create user in the selected company
     const user = await prisma.user.create({
       data: {
@@ -192,7 +206,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error('Error creating user:', error)
+    console.error('Error creating user:', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
   }
 }
