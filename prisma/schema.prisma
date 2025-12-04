@@ -176,11 +176,42 @@ model Component {
   bomLines         BOMLine[]
   transactionLines TransactionLine[]
   alertState       ComponentAlertState?
+  lots             Lot[]
 
   @@unique([brandId, name])
   @@unique([brandId, skuCode])
   @@index([brandId, isActive])
   @@index([companyId, isActive])
+}
+
+model Lot {
+  id               String    @id @default(uuid())
+  componentId      String
+  component        Component @relation(fields: [componentId], references: [id])
+  lotNumber        String    @db.VarChar(100)
+  expiryDate       DateTime? @db.Date
+  receivedQuantity Decimal   @db.Decimal(10, 4)
+  supplier         String?   @db.VarChar(100)
+  notes            String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  balance          LotBalance?
+  transactionLines TransactionLine[]
+
+  @@unique([componentId, lotNumber])
+  @@index([componentId])
+  @@index([expiryDate])
+}
+
+model LotBalance {
+  id               String  @id @default(uuid())
+  lotId            String  @unique
+  lot              Lot     @relation(fields: [lotId], references: [id])
+  quantity         Decimal @db.Decimal(10, 4)
+  reservedQuantity Decimal @default(0) @db.Decimal(10, 4)
+
+  @@index([lotId])
 }
 
 enum TransactionType {
@@ -249,8 +280,11 @@ model TransactionLine {
   component      Component   @relation(fields: [componentId], references: [id])
   quantityChange Decimal     @db.Decimal(10, 4)
   costPerUnit    Decimal?    @db.Decimal(10, 4)
+  lotId          String?
+  lot            Lot?        @relation(fields: [lotId], references: [id])
 
   @@index([componentId])
+  @@index([lotId])
 }
 
 model FinishedGoodsLine {
