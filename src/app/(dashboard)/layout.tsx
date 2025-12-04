@@ -20,6 +20,7 @@ import {
   Menu,
   X,
   Layers,
+  Building2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
   { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
+  { name: 'Companies', href: '/settings/companies', icon: Building2, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]
 
