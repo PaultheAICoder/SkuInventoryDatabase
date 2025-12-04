@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         createdById: session.user.id,
         allowInsufficientInventory: allowInsufficient,
         locationId: data.locationId,
+        outputToFinishedGoods: data.outputToFinishedGoods,
         outputLocationId: data.outputLocationId,
         outputQuantity: data.outputQuantity,
       })
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
             quantityChange: line.quantityChange.toString(),
             costPerUnit: line.costPerUnit?.toString() ?? null,
           })),
+          outputToFinishedGoods: result.transaction.outputToFinishedGoods ?? true,
           outputLocationId: result.transaction.outputLocationId ?? null,
           outputLocation: result.transaction.outputLocation ?? null,
           outputQuantity: result.transaction.outputQuantity ?? null,

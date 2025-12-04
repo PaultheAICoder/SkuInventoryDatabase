@@ -620,6 +620,7 @@ export interface BuildTransactionResult {
     quantityChange: { toString(): string }
     costPerUnit: { toString(): string } | null
   }>
+  outputToFinishedGoods?: boolean
   outputLocationId?: string | null
   outputLocation?: { id: string; name: string } | null
   outputQuantity?: number | null
@@ -643,6 +644,7 @@ export async function createBuildTransaction(params: {
   createdById: string
   allowInsufficientInventory?: boolean
   locationId?: string
+  outputToFinishedGoods?: boolean
   outputLocationId?: string
   outputQuantity?: number
 }): Promise<{
@@ -702,114 +704,130 @@ export async function createBuildTransaction(params: {
 
   const totalBomCost = unitBomCost * unitsToBuild
 
-  // Create build transaction with consumption lines
-  const transaction = await prisma.transaction.create({
-    data: {
-      companyId,
-      type: 'build',
-      date,
-      skuId,
-      bomVersionId,
-      locationId: locationIdToUse,
-      salesChannel,
-      unitsBuild: unitsToBuild,
-      unitBomCost: new Prisma.Decimal(unitBomCost),
-      totalBomCost: new Prisma.Decimal(totalBomCost),
-      notes,
-      defectCount,
-      defectNotes,
-      affectedUnits,
-      createdById,
-      lines: {
-        create: bomLines.map((line) => ({
-          componentId: line.componentId,
-          // Negative quantity (consuming inventory)
-          quantityChange: new Prisma.Decimal(
-            -1 * line.quantityPerUnit.toNumber() * unitsToBuild
-          ),
-          costPerUnit: line.component.costPerUnit,
-        })),
-      },
-    },
-    include: {
-      sku: {
-        select: {
-          id: true,
-          name: true,
-          internalCode: true,
+  // Determine if we should output to finished goods (defaults to true)
+  const shouldOutputFG = params.outputToFinishedGoods !== false
+
+  // Determine output location for finished goods
+  // Use explicit outputLocationId if provided, otherwise use default location when outputToFinishedGoods is enabled
+  const outputLocationIdToUse = params.outputLocationId ?? (shouldOutputFG ? await getDefaultLocationId(companyId) : null)
+
+  // Use atomic transaction to create build transaction + finished goods line together
+  const transactionResult = await prisma.$transaction(async (tx) => {
+    // Validate output location if we're outputting FG
+    let outputLocation: { id: string; name: string } | null = null
+    if (shouldOutputFG && outputLocationIdToUse) {
+      const outputLoc = await tx.location.findFirst({
+        where: {
+          id: outputLocationIdToUse,
+          companyId: companyId,
+          isActive: true,
+        },
+        select: { id: true, name: true },
+      })
+
+      if (!outputLoc) {
+        throw new Error('Output location not found or not active')
+      }
+      outputLocation = outputLoc
+    }
+
+    // Create build transaction with consumption lines
+    const transaction = await tx.transaction.create({
+      data: {
+        companyId,
+        type: 'build',
+        date,
+        skuId,
+        bomVersionId,
+        locationId: locationIdToUse,
+        salesChannel,
+        unitsBuild: unitsToBuild,
+        unitBomCost: new Prisma.Decimal(unitBomCost),
+        totalBomCost: new Prisma.Decimal(totalBomCost),
+        notes,
+        defectCount,
+        defectNotes,
+        affectedUnits,
+        createdById,
+        lines: {
+          create: bomLines.map((line) => ({
+            componentId: line.componentId,
+            // Negative quantity (consuming inventory)
+            quantityChange: new Prisma.Decimal(
+              -1 * line.quantityPerUnit.toNumber() * unitsToBuild
+            ),
+            costPerUnit: line.component.costPerUnit,
+          })),
         },
       },
-      bomVersion: {
-        select: {
-          id: true,
-          versionName: true,
+      include: {
+        sku: {
+          select: {
+            id: true,
+            name: true,
+            internalCode: true,
+          },
         },
-      },
-      location: {
-        select: {
-          id: true,
-          name: true,
+        bomVersion: {
+          select: {
+            id: true,
+            versionName: true,
+          },
         },
-      },
-      lines: {
-        include: {
-          component: {
-            select: {
-              id: true,
-              name: true,
-              skuCode: true,
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        lines: {
+          include: {
+            component: {
+              select: {
+                id: true,
+                name: true,
+                skuCode: true,
+              },
             },
           },
         },
+        createdBy: {
+          select: { id: true, name: true },
+        },
       },
-      createdBy: {
-        select: { id: true, name: true },
-      },
-    },
-  })
-
-  // Create finished goods line if outputLocationId is provided
-  let outputLocation: { id: string; name: string } | null = null
-  let outputQuantityActual: number | null = null
-
-  if (params.outputLocationId) {
-    const outputQty = params.outputQuantity ?? params.unitsToBuild
-    outputQuantityActual = outputQty
-
-    // Validate output location belongs to company
-    const outputLoc = await prisma.location.findFirst({
-      where: {
-        id: params.outputLocationId,
-        companyId: params.companyId,
-        isActive: true,
-      },
-      select: { id: true, name: true },
     })
 
-    if (!outputLoc) {
-      throw new Error('Output location not found or not active')
+    // Create finished goods line atomically if outputting FG
+    let outputQuantityActual: number | null = null
+    if (shouldOutputFG && outputLocationIdToUse) {
+      const outputQty = params.outputQuantity ?? unitsToBuild
+      outputQuantityActual = outputQty
+
+      await tx.finishedGoodsLine.create({
+        data: {
+          transactionId: transaction.id,
+          skuId,
+          locationId: outputLocationIdToUse,
+          quantityChange: new Prisma.Decimal(outputQty),
+          costPerUnit: new Prisma.Decimal(unitBomCost),
+        },
+      })
     }
 
-    outputLocation = outputLoc
+    return {
+      transaction,
+      outputLocation,
+      outputQuantityActual,
+      outputLocationId: outputLocationIdToUse,
+    }
+  })
 
-    // Create finished goods line
-    await prisma.finishedGoodsLine.create({
-      data: {
-        transactionId: transaction.id,
-        skuId: params.skuId,
-        locationId: params.outputLocationId,
-        quantityChange: new Prisma.Decimal(outputQty),
-        costPerUnit: new Prisma.Decimal(unitBomCost),
-      },
-    })
-  }
-
-  // Evaluate defect threshold if defects were recorded
+  // Evaluate defect threshold AFTER the transaction completes (non-critical, external operation)
   if (defectCount && defectCount > 0 && unitsToBuild > 0) {
     const defectRate = (defectCount / unitsToBuild) * 100
     try {
       await evaluateDefectThreshold({
-        transactionId: transaction.id,
+        transactionId: transactionResult.transaction.id,
         skuId,
         defectRate,
         companyId,
@@ -824,10 +842,11 @@ export async function createBuildTransaction(params: {
 
   // Construct the result with output info
   const result: BuildTransactionResult = {
-    ...(transaction as unknown as BuildTransactionResult),
-    outputLocationId: params.outputLocationId ?? null,
-    outputLocation,
-    outputQuantity: outputQuantityActual,
+    ...(transactionResult.transaction as unknown as BuildTransactionResult),
+    outputToFinishedGoods: shouldOutputFG,
+    outputLocationId: transactionResult.outputLocationId ?? null,
+    outputLocation: transactionResult.outputLocation,
+    outputQuantity: transactionResult.outputQuantityActual,
   }
 
   return {

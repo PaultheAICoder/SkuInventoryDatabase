@@ -64,6 +64,7 @@ export const createBuildSchema = z.object({
   allowInsufficientInventory: z.boolean().default(false),
   locationId: z.string().uuid('Invalid location ID').optional(),
   // Finished goods output
+  outputToFinishedGoods: z.boolean().default(true),
   outputLocationId: z.string().uuid('Invalid output location ID').optional(),
   outputQuantity: z.coerce.number().int().positive().optional(),
 })
