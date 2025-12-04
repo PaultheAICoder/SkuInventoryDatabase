@@ -131,6 +131,13 @@ export const authOptions: NextAuthOptions = {
         token.selectedBrandName = user.selectedBrandName
       }
 
+      // Ensure selectedCompanyId has a fallback value for backward compatibility
+      // This handles tokens created before multi-company support was added
+      if (!token.selectedCompanyId && token.companyId) {
+        token.selectedCompanyId = token.companyId
+        token.selectedCompanyName = token.companyName
+      }
+
       // Handle session update (for company switching)
       if (trigger === 'update' && session?.selectedCompanyId) {
         // Verify user has access to the requested company

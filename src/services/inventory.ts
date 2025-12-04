@@ -15,6 +15,12 @@ import { isLotExpired } from './expiry'
  * Returns validated settings or defaults if validation fails
  */
 export async function getCompanySettings(companyId: string): Promise<CompanySettings> {
+  // Defensive check - return defaults if no companyId provided
+  if (!companyId) {
+    console.warn('getCompanySettings called without companyId, returning defaults')
+    return DEFAULT_SETTINGS
+  }
+
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { settings: true },
