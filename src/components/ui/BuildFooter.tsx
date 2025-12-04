@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import versionData from '../../../version.json'
 
@@ -21,6 +24,12 @@ function formatTimestamp(isoString: string): string {
 }
 
 export function BuildFooter({ className }: BuildFooterProps) {
+  const [formattedDate, setFormattedDate] = useState<string>('')
+
+  useEffect(() => {
+    setFormattedDate(formatTimestamp(versionData.buildTimestamp))
+  }, [])
+
   return (
     <footer
       className={cn(
@@ -30,7 +39,7 @@ export function BuildFooter({ className }: BuildFooterProps) {
     >
       <span>Build {versionData.version}</span>
       <span className="mx-2">|</span>
-      <span>{formatTimestamp(versionData.buildTimestamp)}</span>
+      <span suppressHydrationWarning>{formattedDate}</span>
     </footer>
   )
 }
