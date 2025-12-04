@@ -50,7 +50,9 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  transactions Transaction[]
+  transactions  Transaction[] @relation("TransactionLocation")
+  transfersFrom Transaction[] @relation("TransferFrom")
+  transfersTo   Transaction[] @relation("TransferTo")
 
   @@unique([companyId, name])
   @@index([companyId, isActive])
@@ -181,33 +183,38 @@ enum TransactionType {
   build
   adjustment
   initial
+  transfer
 }
 
 model Transaction {
-  id            String          @id @default(uuid())
-  companyId     String
-  company       Company         @relation(fields: [companyId], references: [id])
-  type          TransactionType
-  date          DateTime        @db.Date
-  skuId         String?
-  sku           SKU?            @relation(fields: [skuId], references: [id])
-  bomVersionId  String?
-  bomVersion    BOMVersion?     @relation(fields: [bomVersionId], references: [id])
-  locationId    String?
-  location      Location?       @relation(fields: [locationId], references: [id])
-  salesChannel  String?         @db.VarChar(50)
-  unitsBuild    Int?
-  unitBomCost   Decimal?        @db.Decimal(10, 4)
-  totalBomCost  Decimal?        @db.Decimal(10, 4)
-  supplier      String?         @db.VarChar(100)
-  reason        String?         @db.VarChar(200)
-  notes         String?         @db.Text
-  defectCount   Int?
-  defectNotes   String?         @db.Text
-  affectedUnits Int?
-  createdAt     DateTime        @default(now())
-  createdById   String
-  createdBy     User            @relation(fields: [createdById], references: [id])
+  id             String          @id @default(uuid())
+  companyId      String
+  company        Company         @relation(fields: [companyId], references: [id])
+  type           TransactionType
+  date           DateTime        @db.Date
+  skuId          String?
+  sku            SKU?            @relation(fields: [skuId], references: [id])
+  bomVersionId   String?
+  bomVersion     BOMVersion?     @relation(fields: [bomVersionId], references: [id])
+  locationId     String?
+  location       Location?       @relation("TransactionLocation", fields: [locationId], references: [id])
+  fromLocationId String?
+  fromLocation   Location?       @relation("TransferFrom", fields: [fromLocationId], references: [id])
+  toLocationId   String?
+  toLocation     Location?       @relation("TransferTo", fields: [toLocationId], references: [id])
+  salesChannel   String?         @db.VarChar(50)
+  unitsBuild     Int?
+  unitBomCost    Decimal?        @db.Decimal(10, 4)
+  totalBomCost   Decimal?        @db.Decimal(10, 4)
+  supplier       String?         @db.VarChar(100)
+  reason         String?         @db.VarChar(200)
+  notes          String?         @db.Text
+  defectCount    Int?
+  defectNotes    String?         @db.Text
+  affectedUnits  Int?
+  createdAt      DateTime        @default(now())
+  createdById    String
+  createdBy      User            @relation(fields: [createdById], references: [id])
 
   lines        TransactionLine[]
   defectAlerts DefectAlert[]
@@ -216,6 +223,8 @@ model Transaction {
   @@index([skuId])
   @@index([type])
   @@index([locationId])
+  @@index([fromLocationId])
+  @@index([toLocationId])
 }
 
 model TransactionLine {

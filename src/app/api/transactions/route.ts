@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
         sku: { select: { id: true, name: true } },
         bomVersion: { select: { id: true, versionName: true } },
         location: { select: { id: true, name: true } },
+        fromLocation: { select: { id: true, name: true } },
+        toLocation: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         lines: {
           include: {
@@ -76,6 +78,10 @@ export async function GET(request: NextRequest) {
       bomVersion: tx.bomVersion,
       locationId: tx.locationId,
       location: tx.location,
+      fromLocationId: tx.fromLocationId,
+      fromLocation: tx.fromLocation,
+      toLocationId: tx.toLocationId,
+      toLocation: tx.toLocation,
       salesChannel: tx.salesChannel,
       unitsBuild: tx.unitsBuild,
       unitBomCost: tx.unitBomCost?.toString() ?? null,

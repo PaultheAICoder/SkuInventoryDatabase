@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Package, Receipt, Minus, Settings } from 'lucide-react'
+import { Package, Receipt, Minus, Settings, ArrowLeftRight } from 'lucide-react'
 
 interface TransactionLine {
   id: string
@@ -29,12 +29,14 @@ interface TransactionLine {
 interface TransactionDetailProps {
   transaction: {
     id: string
-    type: 'receipt' | 'build' | 'adjustment' | 'initial'
+    type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer'
     date: string
     company?: { id: string; name: string }
     sku?: { id: string; name: string; internalCode?: string } | null
     bomVersion?: { id: string; versionName: string } | null
     location?: { id: string; name: string; type?: string } | null
+    fromLocation?: { id: string; name: string; type?: string } | null
+    toLocation?: { id: string; name: string; type?: string } | null
     salesChannel: string | null
     unitsBuild: number | null
     unitBomCost: string | null
@@ -80,6 +82,12 @@ const transactionTypeConfig = {
     icon: Settings,
     variant: 'secondary' as const,
     description: 'Initial inventory setup',
+  },
+  transfer: {
+    label: 'Transfer',
+    icon: ArrowLeftRight,
+    variant: 'default' as const,
+    description: 'Inventory transfer between locations',
   },
 }
 
@@ -160,6 +168,20 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 <p className="text-sm text-muted-foreground">Reason</p>
                 <p className="font-medium">{transaction.reason || '-'}</p>
               </div>
+            )}
+
+            {/* Transfer-specific info */}
+            {transaction.type === 'transfer' && (
+              <>
+                <div>
+                  <p className="text-sm text-muted-foreground">From Location</p>
+                  <p className="font-medium">{transaction.fromLocation?.name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">To Location</p>
+                  <p className="font-medium">{transaction.toLocation?.name || '-'}</p>
+                </div>
+              </>
             )}
 
             {/* Sales channel if present */}

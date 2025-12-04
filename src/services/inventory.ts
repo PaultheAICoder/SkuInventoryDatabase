@@ -29,60 +29,176 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
 /**
  * Calculate the on-hand quantity for a component by summing all transaction lines
  * Optionally filter by location - if locationId is omitted, returns global total
+ *
+ * For transfers, special handling is needed:
+ * - Non-transfer transactions: use transaction.locationId
+ * - Transfer transactions:
+ *   - negative line = outgoing from fromLocationId
+ *   - positive line = incoming to toLocationId
  */
 export async function getComponentQuantity(
   componentId: string,
   locationId?: string
 ): Promise<number> {
-  const whereClause: Prisma.TransactionLineWhereInput = {
-    componentId,
+  if (!locationId) {
+    // Global total - sum all lines for this component
+    const result = await prisma.transactionLine.aggregate({
+      where: { componentId },
+      _sum: { quantityChange: true },
+    })
+    return result._sum.quantityChange?.toNumber() ?? 0
   }
 
-  // Add location filter via join to Transaction
-  if (locationId) {
-    whereClause.transaction = { locationId }
-  }
+  // Location-specific total requires handling transfers specially
+  // For non-transfer transactions: use transaction.locationId
+  // For transfer transactions:
+  //   - negative line = fromLocationId
+  //   - positive line = toLocationId
 
-  const result = await prisma.transactionLine.aggregate({
-    where: whereClause,
+  // Get regular (non-transfer) transaction lines at this location
+  const regularResult = await prisma.transactionLine.aggregate({
+    where: {
+      componentId,
+      transaction: {
+        locationId,
+        type: { not: 'transfer' },
+      },
+    },
     _sum: { quantityChange: true },
   })
-  return result._sum.quantityChange?.toNumber() ?? 0
+
+  // Get transfer lines where this is the FROM location (negative = outgoing)
+  const transferFromResult = await prisma.transactionLine.aggregate({
+    where: {
+      componentId,
+      quantityChange: { lt: 0 },
+      transaction: {
+        type: 'transfer',
+        fromLocationId: locationId,
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  // Get transfer lines where this is the TO location (positive = incoming)
+  const transferToResult = await prisma.transactionLine.aggregate({
+    where: {
+      componentId,
+      quantityChange: { gt: 0 },
+      transaction: {
+        type: 'transfer',
+        toLocationId: locationId,
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  const regular = regularResult._sum.quantityChange?.toNumber() ?? 0
+  const transferFrom = transferFromResult._sum.quantityChange?.toNumber() ?? 0
+  const transferTo = transferToResult._sum.quantityChange?.toNumber() ?? 0
+
+  return regular + transferFrom + transferTo
 }
 
 /**
  * Calculate quantities for multiple components at once
  * Optionally filter by location - if locationId is omitted, returns global totals
+ *
+ * For transfers, special handling is needed:
+ * - Non-transfer transactions: use transaction.locationId
+ * - Transfer transactions:
+ *   - negative line = outgoing from fromLocationId
+ *   - positive line = incoming to toLocationId
  */
 export async function getComponentQuantities(
   componentIds: string[],
   locationId?: string
 ): Promise<Map<string, number>> {
-  const whereClause: Prisma.TransactionLineWhereInput = {
-    componentId: { in: componentIds },
+  if (!locationId) {
+    // Global totals - no location filtering needed
+    const results = await prisma.transactionLine.groupBy({
+      by: ['componentId'],
+      where: { componentId: { in: componentIds } },
+      _sum: { quantityChange: true },
+    })
+
+    const quantities = new Map<string, number>()
+    for (const result of results) {
+      quantities.set(result.componentId, result._sum.quantityChange?.toNumber() ?? 0)
+    }
+
+    // Ensure all requested components have an entry (even if 0)
+    for (const id of componentIds) {
+      if (!quantities.has(id)) {
+        quantities.set(id, 0)
+      }
+    }
+
+    return quantities
   }
 
-  // Add location filter via join to Transaction
-  if (locationId) {
-    whereClause.transaction = { locationId }
+  // Location-specific totals require handling transfers specially
+  const quantities = new Map<string, number>()
+
+  // Initialize all to 0
+  for (const id of componentIds) {
+    quantities.set(id, 0)
   }
 
-  const results = await prisma.transactionLine.groupBy({
+  // Get regular (non-transfer) transaction lines at this location
+  const regularResults = await prisma.transactionLine.groupBy({
     by: ['componentId'],
-    where: whereClause,
+    where: {
+      componentId: { in: componentIds },
+      transaction: {
+        locationId,
+        type: { not: 'transfer' },
+      },
+    },
     _sum: { quantityChange: true },
   })
 
-  const quantities = new Map<string, number>()
-  for (const result of results) {
-    quantities.set(result.componentId, result._sum.quantityChange?.toNumber() ?? 0)
+  for (const result of regularResults) {
+    const current = quantities.get(result.componentId) ?? 0
+    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
   }
 
-  // Ensure all requested components have an entry (even if 0)
-  for (const id of componentIds) {
-    if (!quantities.has(id)) {
-      quantities.set(id, 0)
-    }
+  // Get transfer lines where this is the FROM location (negative = outgoing)
+  const transferFromResults = await prisma.transactionLine.groupBy({
+    by: ['componentId'],
+    where: {
+      componentId: { in: componentIds },
+      quantityChange: { lt: 0 },
+      transaction: {
+        type: 'transfer',
+        fromLocationId: locationId,
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  for (const result of transferFromResults) {
+    const current = quantities.get(result.componentId) ?? 0
+    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
+  }
+
+  // Get transfer lines where this is the TO location (positive = incoming)
+  const transferToResults = await prisma.transactionLine.groupBy({
+    by: ['componentId'],
+    where: {
+      componentId: { in: componentIds },
+      quantityChange: { gt: 0 },
+      transaction: {
+        type: 'transfer',
+        toLocationId: locationId,
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  for (const result of transferToResults) {
+    const current = quantities.get(result.componentId) ?? 0
+    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
   }
 
   return quantities

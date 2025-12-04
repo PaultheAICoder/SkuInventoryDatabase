@@ -45,6 +45,20 @@ export async function GET(
             type: true,
           },
         },
+        fromLocation: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+        toLocation: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
         lines: {
           include: {
             component: {
@@ -77,6 +91,10 @@ export async function GET(
         bomVersion: transaction.bomVersion,
         locationId: transaction.locationId,
         location: transaction.location,
+        fromLocationId: transaction.fromLocationId,
+        fromLocation: transaction.fromLocation,
+        toLocationId: transaction.toLocationId,
+        toLocation: transaction.toLocation,
         salesChannel: transaction.salesChannel,
         unitsBuild: transaction.unitsBuild,
         unitBomCost: transaction.unitBomCost?.toString() ?? null,

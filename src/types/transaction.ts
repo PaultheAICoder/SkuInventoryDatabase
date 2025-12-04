@@ -39,6 +39,18 @@ export const createInitialSchema = z.object({
 
 export type CreateInitialInput = z.infer<typeof createInitialSchema>
 
+// Transfer transaction schema
+export const createTransferSchema = z.object({
+  date: z.coerce.date(),
+  componentId: z.string().uuid('Invalid component ID'),
+  quantity: z.coerce.number().positive('Quantity must be positive'),
+  fromLocationId: z.string().uuid('Invalid from location ID'),
+  toLocationId: z.string().uuid('Invalid to location ID'),
+  notes: z.string().optional().nullable(),
+})
+
+export type CreateTransferInput = z.infer<typeof createTransferSchema>
+
 // Build transaction schema
 export const createBuildSchema = z.object({
   date: z.coerce.date(),
@@ -76,7 +88,7 @@ export interface BuildTransactionResponse {
 export const transactionListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(50),
-  type: z.enum(['receipt', 'build', 'adjustment', 'initial']).optional(),
+  type: z.enum(['receipt', 'build', 'adjustment', 'initial', 'transfer']).optional(),
   componentId: z.string().uuid().optional(),
   skuId: z.string().uuid().optional(),
   salesChannel: z.string().optional(),
@@ -91,12 +103,16 @@ export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>
 // Transaction response type
 export interface TransactionResponse {
   id: string
-  type: 'receipt' | 'build' | 'adjustment' | 'initial'
+  type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer'
   date: string
   sku?: { id: string; name: string } | null
   bomVersion?: { id: string; versionName: string } | null
   locationId: string | null
   location?: { id: string; name: string } | null
+  fromLocationId?: string | null
+  fromLocation?: { id: string; name: string } | null
+  toLocationId?: string | null
+  toLocation?: { id: string; name: string } | null
   salesChannel: string | null
   unitsBuild: number | null
   unitBomCost: string | null

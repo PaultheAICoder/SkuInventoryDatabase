@@ -136,6 +136,9 @@ export interface TransactionExportData {
   affectedUnits: number | null
   createdAt: string
   createdByName: string
+  // Transfer-specific fields
+  fromLocationName: string | null
+  toLocationName: string | null
   // Flattened component lines
   componentName: string
   componentSkuCode: string
@@ -159,6 +162,8 @@ export const transactionExportColumns: CSVColumn<TransactionExportData>[] = [
   { header: 'Total BOM Cost', accessor: (t) => t.totalBomCost },
   { header: 'Supplier', accessor: (t) => t.supplier },
   { header: 'Reason', accessor: (t) => t.reason },
+  { header: 'From Location', accessor: (t) => t.fromLocationName },
+  { header: 'To Location', accessor: (t) => t.toLocationName },
   { header: 'Notes', accessor: (t) => t.notes },
   { header: 'Defect Count', accessor: (t) => t.defectCount },
   { header: 'Defect Notes', accessor: (t) => t.defectNotes },

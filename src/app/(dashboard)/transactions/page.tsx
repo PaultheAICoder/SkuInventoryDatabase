@@ -33,6 +33,7 @@ const TRANSACTION_TYPES = [
   { value: 'adjustment', label: 'Adjustment' },
   { value: 'build', label: 'Build' },
   { value: 'initial', label: 'Initial' },
+  { value: 'transfer', label: 'Transfer' },
 ]
 
 function TransactionLogContent() {
@@ -134,6 +135,8 @@ function TransactionLogContent() {
         return 'default'
       case 'initial':
         return 'secondary'
+      case 'transfer':
+        return 'default'
       default:
         return 'outline'
     }
@@ -149,6 +152,8 @@ function TransactionLogContent() {
         return `Built ${tx.unitsBuild} × ${tx.sku?.name}`
       case 'initial':
         return 'Initial inventory'
+      case 'transfer':
+        return `Transfer to ${tx.toLocation?.name || 'unknown'}`
       default:
         return '-'
     }

@@ -17,9 +17,10 @@ import {
 } from '@/components/ui/table'
 import { ReceiptDialog } from '@/components/features/ReceiptDialog'
 import { AdjustmentDialog } from '@/components/features/AdjustmentDialog'
+import { TransferDialog } from '@/components/features/TransferDialog'
 import { ComponentSparkline } from '@/components/features/ComponentSparkline'
 import { SparklineTimeFilter } from '@/components/features/SparklineTimeFilter'
-import { ArrowLeft, Edit, Package, Plus, Minus } from 'lucide-react'
+import { ArrowLeft, Edit, Package, Plus, Minus, ArrowLeftRight } from 'lucide-react'
 import type { ComponentDetailResponse } from '@/types/component'
 
 export default function ComponentDetailPage() {
@@ -31,6 +32,7 @@ export default function ComponentDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [receiptDialogOpen, setReceiptDialogOpen] = useState(false)
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false)
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [sparklineDays, setSparklineDays] = useState(30)
 
   const fetchComponent = useCallback(async () => {
@@ -128,6 +130,10 @@ export default function ComponentDetailPage() {
             <Button variant="outline" onClick={() => setAdjustmentDialogOpen(true)}>
               <Minus className="mr-2 h-4 w-4" />
               Adjust
+            </Button>
+            <Button variant="outline" onClick={() => setTransferDialogOpen(true)}>
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Transfer
             </Button>
             <Link href={`/components/${id}/edit`}>
               <Button>
@@ -375,6 +381,16 @@ export default function ComponentDetailPage() {
         open={adjustmentDialogOpen}
         onOpenChange={(open) => {
           setAdjustmentDialogOpen(open)
+          if (!open) fetchComponent()
+        }}
+        componentId={component.id}
+        componentName={component.name}
+        currentQuantity={component.quantityOnHand}
+      />
+      <TransferDialog
+        open={transferDialogOpen}
+        onOpenChange={(open) => {
+          setTransferDialogOpen(open)
           if (!open) fetchComponent()
         }}
         componentId={component.id}

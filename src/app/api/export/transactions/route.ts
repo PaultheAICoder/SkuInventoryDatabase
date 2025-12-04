@@ -91,6 +91,16 @@ export async function GET(request: NextRequest) {
             name: true,
           },
         },
+        fromLocation: {
+          select: {
+            name: true,
+          },
+        },
+        toLocation: {
+          select: {
+            name: true,
+          },
+        },
       },
     })
 
@@ -119,6 +129,8 @@ export async function GET(request: NextRequest) {
             affectedUnits: tx.affectedUnits,
             createdAt: tx.createdAt.toISOString(),
             createdByName: tx.createdBy.name,
+            fromLocationName: tx.fromLocation?.name ?? null,
+            toLocationName: tx.toLocation?.name ?? null,
             componentName: line.component.name,
             componentSkuCode: line.component.skuCode,
             quantityChange: line.quantityChange.toString(),
@@ -145,6 +157,8 @@ export async function GET(request: NextRequest) {
           affectedUnits: tx.affectedUnits,
           createdAt: tx.createdAt.toISOString(),
           createdByName: tx.createdBy.name,
+          fromLocationName: tx.fromLocation?.name ?? null,
+          toLocationName: tx.toLocation?.name ?? null,
           componentName: '',
           componentSkuCode: '',
           quantityChange: '0',

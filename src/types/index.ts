@@ -28,7 +28,7 @@ export type UserRole = 'admin' | 'ops' | 'viewer'
 export type ReorderStatus = 'critical' | 'warning' | 'ok'
 
 // Transaction types
-export type TransactionType = 'receipt' | 'build' | 'adjustment' | 'initial'
+export type TransactionType = 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer'
 
 // Sales channels
 export const salesChannels = ['Amazon', 'Shopify', 'TikTok', 'Generic'] as const
