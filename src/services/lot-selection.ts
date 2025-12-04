@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { isLotExpired } from './expiry'
 
 /**
  * Lot selection result for consumption
@@ -25,17 +26,29 @@ export interface LotAvailabilityResult {
 }
 
 /**
+ * Options for lot selection
+ */
+export interface LotSelectionOptions {
+  excludeExpired?: boolean // Default: false (backward compatible)
+  allowExpiredOverride?: boolean // Allow selecting expired lots with explicit override
+}
+
+/**
  * Get available lots for a component ordered by FEFO (earliest expiry first)
  * Lots without expiry dates are sorted to the end
  */
 export async function getAvailableLotsForComponent(
-  componentId: string
+  componentId: string,
+  options?: LotSelectionOptions
 ): Promise<Array<{
   lotId: string
   lotNumber: string
   availableQuantity: number
   expiryDate: Date | null
+  isExpired: boolean
 }>> {
+  const { excludeExpired = false } = options ?? {}
+
   // Query Lot joined with LotBalance, only lots with positive balance
   const lots = await prisma.lot.findMany({
     where: {
@@ -61,12 +74,20 @@ export async function getAvailableLotsForComponent(
     return a.expiryDate.getTime() - b.expiryDate.getTime()
   })
 
-  return sortedLots.map((lot) => ({
+  // Map and optionally filter expired lots
+  const result = sortedLots.map((lot) => ({
     lotId: lot.id,
     lotNumber: lot.lotNumber,
     availableQuantity: lot.balance?.quantity.toNumber() ?? 0,
     expiryDate: lot.expiryDate,
+    isExpired: isLotExpired(lot.expiryDate),
   }))
+
+  if (excludeExpired) {
+    return result.filter((lot) => !lot.isExpired)
+  }
+
+  return result
 }
 
 /**
@@ -78,10 +99,11 @@ export async function selectLotsForConsumption(params: {
   componentId: string
   requiredQuantity: number
   allowInsufficient?: boolean
+  options?: LotSelectionOptions
 }): Promise<LotSelection[]> {
-  const { componentId, requiredQuantity, allowInsufficient = false } = params
+  const { componentId, requiredQuantity, allowInsufficient = false, options } = params
 
-  const availableLots = await getAvailableLotsForComponent(componentId)
+  const availableLots = await getAvailableLotsForComponent(componentId, options)
 
   const selections: LotSelection[] = []
   let remaining = requiredQuantity
@@ -122,12 +144,13 @@ export async function checkLotAvailabilityForBuild(params: {
     skuCode: string
     quantityRequired: number
   }>
+  options?: LotSelectionOptions
 }): Promise<LotAvailabilityResult[]> {
-  const { bomLines } = params
+  const { bomLines, options } = params
   const results: LotAvailabilityResult[] = []
 
   for (const line of bomLines) {
-    const availableLots = await getAvailableLotsForComponent(line.componentId)
+    const availableLots = await getAvailableLotsForComponent(line.componentId, options)
     const totalLotQuantity = availableLots.reduce((sum, lot) => sum + lot.availableQuantity, 0)
     const hasLots = availableLots.length > 0
 

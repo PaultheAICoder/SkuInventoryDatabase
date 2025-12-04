@@ -16,6 +16,11 @@ export const companySettingsSchema = z.object({
   defectRateWarningThreshold: z.coerce.number().min(0).max(100).default(5),
   defectRateCriticalThreshold: z.coerce.number().min(0).max(100).default(10),
   enableDefectAlerts: z.boolean().default(true),
+
+  // Expiry enforcement settings
+  expiryEnforcementEnabled: z.boolean().default(false),
+  expiryWarningDays: z.coerce.number().int().nonnegative().default(30),
+  allowExpiredOverride: z.boolean().default(true),
 })
 
 export type CompanySettings = z.infer<typeof companySettingsSchema>
@@ -36,6 +41,9 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   defectRateWarningThreshold: 5,
   defectRateCriticalThreshold: 10,
   enableDefectAlerts: true,
+  expiryEnforcementEnabled: false,
+  expiryWarningDays: 30,
+  allowExpiredOverride: true,
 }
 
 // Settings response type

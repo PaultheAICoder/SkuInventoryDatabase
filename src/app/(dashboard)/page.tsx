@@ -9,6 +9,7 @@ import { CriticalComponentsList } from '@/components/features/CriticalComponents
 import { TopBuildableSkusList } from '@/components/features/TopBuildableSkusList'
 import { DashboardTimeFilter } from '@/components/features/DashboardTimeFilter'
 import { LocationFilter } from '@/components/features/LocationFilter'
+import { ExpiryWarningBanner } from '@/components/features/ExpiryWarningBanner'
 import {
   Table,
   TableBody,
@@ -55,6 +56,22 @@ interface DashboardData {
   }>
 }
 
+interface ExpiryData {
+  expiringLots: Array<{
+    id: string
+    lotNumber: string
+    componentId: string
+    componentName: string
+    componentSkuCode: string
+    expiryDate: string
+    balance: number
+    daysUntilExpiry: number
+  }>
+  expiringCount: number
+  expiredCount: number
+  warningDays: number
+}
+
 export default function DashboardPage() {
   const { data: session } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -62,6 +79,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [timeFilter, setTimeFilter] = useState<number | null>(30)
   const [locationId, setLocationId] = useState<string | undefined>(undefined)
+  const [expiryData, setExpiryData] = useState<ExpiryData | null>(null)
 
   // Refetch when company changes, time filter changes, or location changes
   useEffect(() => {
@@ -78,6 +96,17 @@ export default function DashboardPage() {
         }
         const result = await res.json()
         setData(result.data)
+
+        // Fetch expiry data (non-blocking)
+        try {
+          const expiryRes = await fetch('/api/lots/expiring')
+          if (expiryRes.ok) {
+            const expiryResult = await expiryRes.json()
+            setExpiryData(expiryResult.data)
+          }
+        } catch {
+          // Silently fail - expiry warning is non-critical
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
@@ -125,6 +154,15 @@ export default function DashboardPage() {
       </div>
 
       <DashboardStats stats={data.componentStats} />
+
+      {expiryData && (expiryData.expiringCount > 0 || expiryData.expiredCount > 0) && (
+        <ExpiryWarningBanner
+          expiringLots={expiryData.expiringLots}
+          expiringCount={expiryData.expiringCount}
+          expiredCount={expiryData.expiredCount}
+          warningDays={expiryData.warningDays}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <CriticalComponentsList components={data.criticalComponents} />

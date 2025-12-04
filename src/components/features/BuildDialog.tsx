@@ -61,6 +61,16 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
   const [skus, setSkus] = useState<SKUOption[]>([])
   const [insufficientItems, setInsufficientItems] = useState<InsufficientInventoryItem[]>([])
   const [showWarning, setShowWarning] = useState(false)
+  const [expiredLots, setExpiredLots] = useState<Array<{
+    componentId: string
+    componentName: string
+    skuCode: string
+    lotNumber: string
+    expiryDate: string
+    quantity: number
+  }>>([])
+  const [showExpiredWarning, setShowExpiredWarning] = useState(false)
+  const [canOverrideExpired, setCanOverrideExpired] = useState(false)
 
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -74,6 +84,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     locationId: '',
     outputLocationId: '',
     outputQuantity: '',
+    allowExpiredLots: false,
   })
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
@@ -174,6 +185,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     if (!forceSubmit) {
       setInsufficientItems([])
       setShowWarning(false)
+      setExpiredLots([])
+      setShowExpiredWarning(false)
     }
 
     setIsLoading(true)
@@ -196,6 +209,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           locationId: formData.locationId || undefined,
           outputLocationId: formData.outputLocationId || undefined,
           outputQuantity: formData.outputQuantity ? parseInt(formData.outputQuantity) : undefined,
+          allowExpiredLots: forceSubmit ? formData.allowExpiredLots : false,
         }),
       })
 
@@ -206,6 +220,13 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         if (data?.insufficientItems && data.insufficientItems.length > 0) {
           setInsufficientItems(data.insufficientItems)
           setShowWarning(true)
+          return
+        }
+        // Handle expired lots error
+        if (data?.expiredLots && data.expiredLots.length > 0) {
+          setExpiredLots(data.expiredLots)
+          setShowExpiredWarning(true)
+          setCanOverrideExpired(data.canOverride === true)
           return
         }
         throw new Error(data?.error || 'Failed to record build')
@@ -232,9 +253,13 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         locationId: '',
         outputLocationId: '',
         outputQuantity: '',
+        allowExpiredLots: false,
       })
       setInsufficientItems([])
       setShowWarning(false)
+      setExpiredLots([])
+      setShowExpiredWarning(false)
+      setCanOverrideExpired(false)
       setLotAvailability([])
       setShowLotDetails(false)
     } catch (err) {
@@ -303,6 +328,61 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                         {isLoading ? 'Building...' : 'Build Anyway'}
                       </Button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showExpiredWarning && expiredLots.length > 0 && (
+              <div className="rounded-md bg-orange-50 border border-orange-200 p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-orange-800">Expired Lots Would Be Used</p>
+                    <p className="text-sm text-orange-700 mt-1">
+                      This build would consume inventory from expired lots:
+                    </p>
+                    <ul className="mt-2 text-sm text-orange-700 space-y-1">
+                      {expiredLots.map((lot, idx) => (
+                        <li key={idx} suppressHydrationWarning>
+                          <span className="font-medium">{lot.lotNumber}</span>{' '}
+                          ({lot.componentName}): {lot.quantity.toLocaleString()} units, expired {lot.expiryDate}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setShowExpiredWarning(false)
+                          setExpiredLots([])
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      {canOverrideExpired && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={(e) => {
+                            setFormData((prev) => ({ ...prev, allowExpiredLots: true }))
+                            setShowExpiredWarning(false)
+                            handleSubmit(e, true)
+                          }}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Building...' : 'Use Expired Lots'}
+                        </Button>
+                      )}
+                    </div>
+                    {!canOverrideExpired && (
+                      <p className="mt-2 text-sm text-red-600">
+                        Override is not allowed. Contact an admin to enable expired lot override.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -588,7 +668,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             )}
           </div>
 
-          {!showWarning && (
+          {!showWarning && !showExpiredWarning && (
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel

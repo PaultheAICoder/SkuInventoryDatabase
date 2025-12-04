@@ -1,0 +1,26 @@
+{
+  "issue": "91",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-04T08:53:30.000Z",
+  "plan_start": "2025-12-04T08:53:30.000Z",
+  "plan_end": "2025-12-04T09:00:00.000Z",
+  "build_start": "2025-12-04T09:00:00.000Z",
+  "build_end": "2025-12-04T09:10:00.000Z",
+  "cleanup_start": "2025-12-04T09:13:00.000Z",
+  "cleanup_end": "2025-12-04T09:20:00.000Z",
+  "workflow_end": "2025-12-04T09:20:00.000Z",
+  "durations": {
+    "plan": "6.5m",
+    "build": "10m",
+    "cleanup": "7m",
+    "total": "26.5m"
+  },
+  "metrics": {
+    "files_created": 3,
+    "files_modified": 8,
+    "tests_run": 498,
+    "tests_passed": 498,
+    "typescript_errors": 0,
+    "lint_warnings": 0
+  }
+}

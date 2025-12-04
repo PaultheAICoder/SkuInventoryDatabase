@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, error, serverError, parseBody } from '@/lib/api-response'
 import { createBuildSchema } from '@/types/transaction'
-import { createBuildTransaction, getCompanySettings, checkInsufficientInventory } from '@/services/inventory'
+import { createBuildTransaction, getCompanySettings, checkInsufficientInventory, checkExpiredLotsForBuild } from '@/services/inventory'
 
 // POST /api/transactions/build - Create a build transaction
 export async function POST(request: NextRequest) {
@@ -94,6 +94,38 @@ export async function POST(request: NextRequest) {
     // If settings.allowNegativeInventory is true, OR if user explicitly allows it
     const allowInsufficient = settings.allowNegativeInventory || data.allowInsufficientInventory
 
+    // Check for expired lots if enforcement is enabled
+    const enforceExpiry = settings.expiryEnforcementEnabled
+    const allowExpiredOverride = settings.allowExpiredOverride
+
+    if (enforceExpiry && !data.allowExpiredLots) {
+      const expiredLots = await checkExpiredLotsForBuild({
+        bomVersionId: selectedBomVersionId,
+        unitsToBuild: data.unitsToBuild,
+      })
+
+      if (expiredLots.length > 0 && !allowExpiredOverride) {
+        return NextResponse.json(
+          {
+            error: 'Build would use expired lots and override is not allowed',
+            expiredLots,
+          },
+          { status: 400 }
+        )
+      }
+
+      if (expiredLots.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Build would use expired lots',
+            expiredLots,
+            canOverride: true,
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     try {
       // Create the build transaction for the selected company
       const result = await createBuildTransaction({
@@ -114,6 +146,7 @@ export async function POST(request: NextRequest) {
         outputLocationId: data.outputLocationId,
         outputQuantity: data.outputQuantity,
         lotOverrides: data.lotOverrides,
+        allowExpiredLots: data.allowExpiredLots,
       })
 
       return created({

@@ -288,6 +288,76 @@ export function SettingsForm({ settings, companyName, onSave }: SettingsFormProp
         </CardContent>
       </Card>
 
+      {/* Expiry Enforcement Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Lot Expiry Enforcement</CardTitle>
+          <CardDescription>Configure expiry date enforcement for lot consumption</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <input
+              id="expiryEnforcementEnabled"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={formData.expiryEnforcementEnabled}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, expiryEnforcementEnabled: e.target.checked }))
+              }
+            />
+            <div>
+              <Label htmlFor="expiryEnforcementEnabled" className="font-normal">
+                Enable Expiry Enforcement
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Prevent use of expired lots in build transactions
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              id="allowExpiredOverride"
+              type="checkbox"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={formData.allowExpiredOverride}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, allowExpiredOverride: e.target.checked }))
+              }
+              disabled={!formData.expiryEnforcementEnabled}
+            />
+            <div>
+              <Label htmlFor="allowExpiredOverride" className="font-normal">
+                Allow Override
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Allow users to override and use expired lots with confirmation
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 max-w-xs">
+            <Label htmlFor="expiryWarningDays">Warning Period (days)</Label>
+            <Input
+              id="expiryWarningDays"
+              type="number"
+              min="1"
+              max="365"
+              value={formData.expiryWarningDays}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  expiryWarningDays: parseInt(e.target.value) || 30,
+                }))
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Show warnings for lots expiring within this many days
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end">
         <Button type="submit" disabled={isLoading}>
           {isLoading ? 'Saving...' : 'Save Settings'}

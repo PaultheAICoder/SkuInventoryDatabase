@@ -8,6 +8,7 @@ import {
 } from '@/types/settings'
 import { evaluateDefectThreshold } from './alert'
 import { getDefaultLocationId } from './location'
+import { isLotExpired } from './expiry'
 
 /**
  * Fetch and merge company settings with defaults
@@ -614,6 +615,19 @@ export interface InsufficientInventoryItem {
 }
 
 /**
+ * Result type for expired lot check
+ */
+export interface ExpiredLotItem {
+  componentId: string
+  componentName: string
+  skuCode: string
+  lotId: string
+  lotNumber: string
+  expiryDate: string
+  quantity: number
+}
+
+/**
  * Check if there's sufficient inventory to build a SKU
  * Returns list of components with insufficient inventory, or empty array if sufficient
  * Optionally filter by location - if locationId is omitted, checks global inventory
@@ -666,6 +680,77 @@ export async function checkInsufficientInventory(params: {
   }
 
   return insufficientItems
+}
+
+/**
+ * Check if build would use expired lots
+ * Returns list of expired lots that would be consumed, or empty array if none
+ */
+export async function checkExpiredLotsForBuild(params: {
+  bomVersionId: string
+  unitsToBuild: number
+}): Promise<ExpiredLotItem[]> {
+  const { bomVersionId, unitsToBuild } = params
+
+  // Get BOM lines with components
+  const bomLines = await prisma.bOMLine.findMany({
+    where: { bomVersionId },
+    include: {
+      component: {
+        select: {
+          id: true,
+          name: true,
+          skuCode: true,
+        },
+      },
+    },
+  })
+
+  const expiredLots: ExpiredLotItem[] = []
+
+  for (const line of bomLines) {
+    const requiredQty = line.quantityPerUnit.toNumber() * unitsToBuild
+
+    // Get lots for this component using FEFO (including expired)
+    const lots = await prisma.lot.findMany({
+      where: {
+        componentId: line.componentId,
+        balance: { quantity: { gt: 0 } },
+      },
+      include: { balance: true },
+      orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
+    })
+
+    // Sort nulls to end
+    const sortedLots = lots.sort((a, b) => {
+      if (a.expiryDate === null && b.expiryDate === null) return 0
+      if (a.expiryDate === null) return 1
+      if (b.expiryDate === null) return -1
+      return a.expiryDate.getTime() - b.expiryDate.getTime()
+    })
+
+    let remaining = requiredQty
+    for (const lot of sortedLots) {
+      if (remaining <= 0) break
+      const available = lot.balance?.quantity.toNumber() ?? 0
+      const toConsume = Math.min(available, remaining)
+
+      if (toConsume > 0 && isLotExpired(lot.expiryDate)) {
+        expiredLots.push({
+          componentId: line.componentId,
+          componentName: line.component.name,
+          skuCode: line.component.skuCode,
+          lotId: lot.id,
+          lotNumber: lot.lotNumber,
+          expiryDate: lot.expiryDate!.toISOString().split('T')[0],
+          quantity: toConsume,
+        })
+      }
+      remaining -= toConsume
+    }
+  }
+
+  return expiredLots
 }
 
 /**
@@ -730,6 +815,7 @@ export async function createBuildTransaction(params: {
     componentId: string
     allocations: Array<{ lotId: string; quantity: number }>
   }>
+  allowExpiredLots?: boolean // Allow consuming expired lots (override enforcement)
 }): Promise<{
   transaction: BuildTransactionResult
   insufficientItems: InsufficientInventoryItem[]

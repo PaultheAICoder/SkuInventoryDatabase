@@ -77,6 +77,8 @@ export const createBuildSchema = z.object({
       quantity: z.coerce.number().positive('Quantity must be positive'),
     })),
   })).optional(),
+  // Allow using expired lots (override expiry enforcement)
+  allowExpiredLots: z.boolean().optional(),
 })
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>
