@@ -10,6 +10,8 @@ export const createReceiptSchema = z.object({
   updateComponentCost: z.boolean().default(false),
   notes: z.string().optional().nullable(),
   locationId: z.string().uuid('Invalid location ID').optional(),
+  lotNumber: z.string().max(100).optional(),
+  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format').optional(),
 })
 
 export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
@@ -138,6 +140,8 @@ export interface TransactionLineResponse {
   component: { id: string; name: string; skuCode: string }
   quantityChange: string
   costPerUnit: string | null
+  lotId: string | null
+  lot: { id: string; lotNumber: string; expiryDate: string | null } | null
 }
 
 // Transaction detail response

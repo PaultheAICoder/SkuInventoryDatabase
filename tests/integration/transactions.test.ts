@@ -165,6 +165,115 @@ describe('Transaction Flows', () => {
 
       expect(result.status).toBe(404)
     })
+
+    it('receipt with lot info creates Lot and LotBalance records', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 50,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+          lotNumber: 'LOT-001',
+          expiryDate: '2025-12-31',
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify Lot created
+      const prisma = getIntegrationPrisma()
+      const lot = await prisma.lot.findFirst({
+        where: { componentId: component.id, lotNumber: 'LOT-001' },
+        include: { balance: true },
+      })
+
+      expect(lot).toBeDefined()
+      expect(lot?.lotNumber).toBe('LOT-001')
+      expect(lot?.expiryDate?.toISOString().split('T')[0]).toBe('2025-12-31')
+      expect(Number(lot?.receivedQuantity)).toBe(50)
+      expect(Number(lot?.balance?.quantity)).toBe(50)
+    })
+
+    it('receipt without lot info remains backward compatible', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 25,
+          supplier: 'Test Supplier',
+          date: new Date().toISOString().split('T')[0],
+          // No lotNumber or expiryDate
+        },
+      })
+
+      const response = await createReceipt(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(201)
+
+      // Verify no lot created
+      const prisma = getIntegrationPrisma()
+      const lots = await prisma.lot.findMany({
+        where: { componentId: component.id },
+      })
+
+      expect(lots.length).toBe(0)
+    })
+
+    it('receipt adding to existing lot increases LotBalance', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      // First receipt creates lot
+      const request1 = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 50,
+          supplier: 'Supplier A',
+          date: new Date().toISOString().split('T')[0],
+          lotNumber: 'LOT-MULTI',
+          expiryDate: '2025-12-31',
+        },
+      })
+      await createReceipt(request1)
+
+      // Second receipt adds to same lot
+      const request2 = createTestRequest('/api/transactions/receipt', {
+        method: 'POST',
+        body: {
+          componentId: component.id,
+          quantity: 30,
+          supplier: 'Supplier B',
+          date: new Date().toISOString().split('T')[0],
+          lotNumber: 'LOT-MULTI',
+          // Note: expiryDate not provided - should not update existing
+        },
+      })
+      const response = await createReceipt(request2)
+      expect((await parseRouteResponse(response)).status).toBe(201)
+
+      // Verify lot balance increased
+      const prisma = getIntegrationPrisma()
+      const lot = await prisma.lot.findFirst({
+        where: { componentId: component.id, lotNumber: 'LOT-MULTI' },
+        include: { balance: true },
+      })
+
+      expect(lot).toBeDefined()
+      expect(Number(lot?.receivedQuantity)).toBe(80) // 50 + 30
+      expect(Number(lot?.balance?.quantity)).toBe(80) // 50 + 30
+    })
   })
 
   describe('Adjustment Transaction', () => {

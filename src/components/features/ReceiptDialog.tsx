@@ -50,6 +50,8 @@ export function ReceiptDialog({
     updateComponentCost: false,
     notes: '',
     locationId: '',
+    lotNumber: '',
+    expiryDate: '',
   })
 
   useEffect(() => {
@@ -91,6 +93,8 @@ export function ReceiptDialog({
           updateComponentCost: formData.updateComponentCost,
           notes: formData.notes || null,
           locationId: formData.locationId || undefined,
+          lotNumber: formData.lotNumber || undefined,
+          expiryDate: formData.expiryDate || undefined,
         }),
       })
 
@@ -111,6 +115,8 @@ export function ReceiptDialog({
         updateComponentCost: false,
         notes: '',
         locationId: '',
+        lotNumber: '',
+        expiryDate: '',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -202,6 +208,34 @@ export function ReceiptDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Lot Tracking Section */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="lotNumber" className="text-right">
+                Lot Number
+              </Label>
+              <Input
+                id="lotNumber"
+                className="col-span-3"
+                placeholder="e.g., LOT-2024-001"
+                value={formData.lotNumber}
+                onChange={(e) => setFormData((prev) => ({ ...prev, lotNumber: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="expiryDate" className="text-right">
+                Expiry Date
+              </Label>
+              <Input
+                id="expiryDate"
+                type="date"
+                className="col-span-3"
+                value={formData.expiryDate}
+                onChange={(e) => setFormData((prev) => ({ ...prev, expiryDate: e.target.value }))}
+                disabled={!formData.lotNumber}
+              />
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">

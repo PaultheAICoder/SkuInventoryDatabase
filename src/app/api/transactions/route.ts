@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
         lines: {
           include: {
             component: { select: { id: true, name: true, skuCode: true } },
+            lot: { select: { id: true, lotNumber: true, expiryDate: true } },
           },
         },
       },
@@ -107,6 +108,14 @@ export async function GET(request: NextRequest) {
         component: line.component,
         quantityChange: line.quantityChange.toString(),
         costPerUnit: line.costPerUnit?.toString() ?? null,
+        lotId: line.lotId ?? null,
+        lot: line.lot
+          ? {
+              id: line.lot.id,
+              lotNumber: line.lot.lotNumber,
+              expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+            }
+          : null,
       })),
     }))
 

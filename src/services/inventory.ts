@@ -271,6 +271,7 @@ export function calculateReorderStatus(
 
 /**
  * Create a receipt transaction (adds inventory)
+ * Optionally creates or updates a Lot and LotBalance when lotNumber is provided
  */
 export async function createReceiptTransaction(params: {
   companyId: string
@@ -283,6 +284,8 @@ export async function createReceiptTransaction(params: {
   notes?: string | null
   createdById: string
   locationId?: string
+  lotNumber?: string
+  expiryDate?: string
 }) {
   const {
     companyId,
@@ -295,6 +298,8 @@ export async function createReceiptTransaction(params: {
     notes,
     createdById,
     locationId,
+    lotNumber,
+    expiryDate,
   } = params
 
   const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
@@ -311,6 +316,72 @@ export async function createReceiptTransaction(params: {
 
     const lineCostPerUnit = costPerUnit ?? component.costPerUnit.toNumber()
 
+    // Handle lot creation/update if lotNumber provided
+    let lotId: string | null = null
+    if (lotNumber) {
+      // Parse expiry date if provided
+      const expiryDateValue = expiryDate ? new Date(expiryDate) : null
+
+      // Check if lot already exists for this component
+      const existingLot = await tx.lot.findUnique({
+        where: {
+          componentId_lotNumber: {
+            componentId,
+            lotNumber,
+          },
+        },
+      })
+
+      if (existingLot) {
+        // Lot exists - update receivedQuantity
+        await tx.lot.update({
+          where: { id: existingLot.id },
+          data: {
+            receivedQuantity: {
+              increment: new Prisma.Decimal(quantity),
+            },
+          },
+        })
+
+        // Update or create LotBalance
+        await tx.lotBalance.upsert({
+          where: { lotId: existingLot.id },
+          create: {
+            lotId: existingLot.id,
+            quantity: new Prisma.Decimal(quantity),
+          },
+          update: {
+            quantity: {
+              increment: new Prisma.Decimal(quantity),
+            },
+          },
+        })
+
+        lotId = existingLot.id
+      } else {
+        // Create new Lot and LotBalance
+        const newLot = await tx.lot.create({
+          data: {
+            componentId,
+            lotNumber,
+            expiryDate: expiryDateValue,
+            receivedQuantity: new Prisma.Decimal(quantity),
+            supplier,
+            notes,
+          },
+        })
+
+        await tx.lotBalance.create({
+          data: {
+            lotId: newLot.id,
+            quantity: new Prisma.Decimal(quantity),
+          },
+        })
+
+        lotId = newLot.id
+      }
+    }
+
     // Create transaction with line
     const transaction = await tx.transaction.create({
       data: {
@@ -326,6 +397,7 @@ export async function createReceiptTransaction(params: {
             componentId,
             quantityChange: new Prisma.Decimal(quantity),
             costPerUnit: new Prisma.Decimal(lineCostPerUnit),
+            lotId,
           },
         },
       },
@@ -334,6 +406,9 @@ export async function createReceiptTransaction(params: {
           include: {
             component: {
               select: { id: true, name: true, skuCode: true },
+            },
+            lot: {
+              select: { id: true, lotNumber: true, expiryDate: true },
             },
           },
         },

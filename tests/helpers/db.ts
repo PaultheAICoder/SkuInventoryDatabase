@@ -35,6 +35,8 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   await prisma.finishedGoodsLine.deleteMany({})
   await prisma.transactionLine.deleteMany({})
   await prisma.transaction.deleteMany({})
+  await prisma.lotBalance.deleteMany({})
+  await prisma.lot.deleteMany({})
   await prisma.bOMLine.deleteMany({})
   await prisma.bOMVersion.deleteMany({})
   await prisma.sKU.deleteMany({})
