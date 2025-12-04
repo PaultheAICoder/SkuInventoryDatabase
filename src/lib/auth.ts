@@ -26,7 +26,16 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          include: { company: true },
+          include: {
+            company: true,
+            userCompanies: {
+              include: {
+                company: {
+                  select: { id: true, name: true }
+                }
+              }
+            }
+          },
         })
 
         if (!user || !user.isActive) {
@@ -63,6 +72,23 @@ export const authOptions: NextAuthOptions = {
           }),
         ])
 
+        // Build companies list from userCompanies
+        const companiesFromJoin = user.userCompanies.map(uc => ({
+          id: uc.company.id,
+          name: uc.company.name,
+          role: uc.role,
+        }))
+
+        // Ensure primary company is included (for backward compatibility)
+        const primaryCompanyIncluded = companiesFromJoin.some(c => c.id === user.companyId)
+        const companies = primaryCompanyIncluded
+          ? companiesFromJoin
+          : [{ id: user.company.id, name: user.company.name, role: user.role }, ...companiesFromJoin]
+
+        // Selected company defaults to primary company
+        const selectedCompanyId = user.companyId
+        const selectedCompanyName = user.company.name
+
         return {
           id: user.id,
           email: user.email,
@@ -70,18 +96,40 @@ export const authOptions: NextAuthOptions = {
           role: user.role,
           companyId: user.companyId,
           companyName: user.company.name,
+          companies,
+          selectedCompanyId,
+          selectedCompanyName,
         }
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
         token.role = user.role
         token.companyId = user.companyId
         token.companyName = user.companyName
+        token.companies = user.companies
+        token.selectedCompanyId = user.selectedCompanyId
+        token.selectedCompanyName = user.selectedCompanyName
       }
+
+      // Handle session update (for company switching)
+      if (trigger === 'update' && session?.selectedCompanyId) {
+        // Verify user has access to the requested company
+        const hasAccess = (token.companies as Array<{ id: string }>)?.some(
+          c => c.id === session.selectedCompanyId
+        )
+        if (hasAccess) {
+          token.selectedCompanyId = session.selectedCompanyId
+          token.selectedCompanyName = session.selectedCompanyName
+          // Keep companyId in sync for backward compatibility
+          token.companyId = session.selectedCompanyId
+          token.companyName = session.selectedCompanyName
+        }
+      }
+
       return token
     },
     async session({ session, token }) {
@@ -90,6 +138,9 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role as string
         session.user.companyId = token.companyId as string
         session.user.companyName = token.companyName as string
+        session.user.companies = token.companies as Array<{ id: string; name: string; role?: string }>
+        session.user.selectedCompanyId = token.selectedCompanyId as string
+        session.user.selectedCompanyName = token.selectedCompanyName as string
       }
       return session
     },
@@ -103,6 +154,9 @@ declare module 'next-auth' {
     role: string
     companyId: string
     companyName: string
+    companies: Array<{ id: string; name: string; role?: string }>
+    selectedCompanyId: string
+    selectedCompanyName: string
   }
 
   interface Session {
@@ -111,6 +165,9 @@ declare module 'next-auth' {
       role: string
       companyId: string
       companyName: string
+      companies: Array<{ id: string; name: string; role?: string }>
+      selectedCompanyId: string
+      selectedCompanyName: string
     }
   }
 }
@@ -121,6 +178,9 @@ declare module 'next-auth/jwt' {
     role: string
     companyId: string
     companyName: string
+    companies: Array<{ id: string; name: string; role?: string }>
+    selectedCompanyId: string
+    selectedCompanyName: string
   }
 }
 
@@ -167,4 +227,5 @@ export const SECURITY_EVENTS = {
   USER_DEACTIVATED: 'user_deactivated',
   ROLE_CHANGED: 'role_changed',
   SETTINGS_CHANGED: 'settings_changed',
+  COMPANY_SWITCH: 'company_switch',
 } as const

@@ -65,12 +65,22 @@ export interface ApiSuccess<T> {
   message?: string
 }
 
+// Company info for session
+export interface SessionCompany {
+  id: string
+  name: string
+  role?: 'admin' | 'ops' | 'viewer'
+}
+
 // Session user type (matches NextAuth)
 export interface SessionUser {
   id: string
   email: string
   name: string
   role: UserRole
-  companyId: string
-  companyName: string
+  companyId: string  // Selected company ID (for backward compatibility)
+  companyName: string  // Selected company name
+  companies: SessionCompany[]  // All accessible companies
+  selectedCompanyId: string  // Currently selected company
+  selectedCompanyName: string  // Currently selected company name
 }
