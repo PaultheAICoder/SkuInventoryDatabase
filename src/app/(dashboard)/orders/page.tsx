@@ -7,7 +7,7 @@ import { OrderReviewTable } from '@/components/features/OrderReviewTable'
 import type { OrderResponse } from '@/types/shopify-sync'
 
 export default function OrdersPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const searchParams = useSearchParams()
   const [orders, setOrders] = useState<OrderResponse[]>([])
   const [total, setTotal] = useState(0)
@@ -26,8 +26,8 @@ export default function OrdersPage() {
       params.set('page', page.toString())
       params.set('pageSize', pageSize.toString())
 
-      const status = searchParams.get('status')
-      if (status) params.set('status', status)
+      const orderStatus = searchParams.get('status')
+      if (orderStatus) params.set('status', orderStatus)
 
       const search = searchParams.get('search')
       if (search) params.set('search', search)
@@ -57,12 +57,19 @@ export default function OrdersPage() {
   }, [page, pageSize, searchParams])
 
   useEffect(() => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
+    // If authenticated with a company selected, fetch orders
     if (session?.user?.selectedCompanyId) {
       fetchOrders()
+    } else {
+      // Session loaded but no company - stop loading
+      setIsLoading(false)
     }
-  }, [session?.user?.selectedCompanyId, fetchOrders])
+  }, [status, session?.user?.selectedCompanyId, fetchOrders])
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="space-y-6">
         <div>
