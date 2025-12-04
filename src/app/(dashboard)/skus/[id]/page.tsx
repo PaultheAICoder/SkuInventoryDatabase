@@ -15,9 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ArrowLeft, Edit, Package, Hammer } from 'lucide-react'
+import { ArrowLeft, Edit, Package, Hammer, Minus, Plus } from 'lucide-react'
 import { BOMVersionList } from '@/components/features/BOMVersionList'
 import { BuildDialog } from '@/components/features/BuildDialog'
+import { FinishedGoodsAdjustmentDialog } from '@/components/features/FinishedGoodsAdjustmentDialog'
+import { FinishedGoodsReceiptDialog } from '@/components/features/FinishedGoodsReceiptDialog'
 import { BuildableUnitsDisplay } from '@/components/features/BuildableUnitsDisplay'
 import { InventoryByLocationTable } from '@/components/features/InventoryByLocationTable'
 import type { SKUDetailResponse } from '@/types/sku'
@@ -33,6 +35,8 @@ export default function SKUDetailPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const [fgAdjustmentDialogOpen, setFgAdjustmentDialogOpen] = useState(false)
+  const [fgReceiptDialogOpen, setFgReceiptDialogOpen] = useState(false)
 
   const canEdit = session?.user?.role !== 'viewer'
 
@@ -120,6 +124,14 @@ export default function SKUDetailPage() {
                 Build
               </Button>
             )}
+            <Button variant="outline" onClick={() => setFgAdjustmentDialogOpen(true)}>
+              <Minus className="h-4 w-4 mr-2" />
+              Adjust FG
+            </Button>
+            <Button variant="outline" onClick={() => setFgReceiptDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Receive FG
+            </Button>
             <Button asChild variant="outline">
               <Link href={`/skus/${skuId}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
@@ -299,6 +311,32 @@ export default function SKUDetailPage() {
           }}
           preselectedSkuId={skuId}
         />
+      )}
+
+      {/* Finished Goods Dialogs */}
+      {skuId && (
+        <>
+          <FinishedGoodsAdjustmentDialog
+            open={fgAdjustmentDialogOpen}
+            onOpenChange={(open) => {
+              setFgAdjustmentDialogOpen(open)
+              if (!open) handleRefresh()
+            }}
+            skuId={skuId}
+            skuName={sku.name}
+            currentQuantity={sku.finishedGoodsInventory?.totalQuantity ?? 0}
+          />
+          <FinishedGoodsReceiptDialog
+            open={fgReceiptDialogOpen}
+            onOpenChange={(open) => {
+              setFgReceiptDialogOpen(open)
+              if (!open) handleRefresh()
+            }}
+            skuId={skuId}
+            skuName={sku.name}
+            currentQuantity={sku.finishedGoodsInventory?.totalQuantity ?? 0}
+          />
+        </>
       )}
     </div>
   )
