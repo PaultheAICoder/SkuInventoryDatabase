@@ -4,6 +4,12 @@ import {
   calculateReorderStatus,
   getCompanySettings,
 } from './inventory'
+import {
+  sendSlackMessage,
+  formatLowStockAlert,
+  formatDigestMessage,
+  type LowStockAlertData,
+} from '@/lib/slack'
 import type { ReorderStatus } from '@/types'
 import type {
   AlertConfigResponse,
@@ -340,4 +346,65 @@ export async function getComponentsInAlertStatus(
   }
 
   return { warnings, criticals }
+}
+
+/**
+ * Send low-stock alerts via Slack webhook
+ * Used by scheduler to deliver alerts
+ */
+export async function sendSlackAlerts(
+  companyId: string,
+  alerts: ComponentAlertNeeded[],
+  baseUrl: string
+): Promise<{ sent: number; errors: string[] }> {
+  const config = await getAlertConfig(companyId)
+
+  if (!config || !config.enableSlack || !config.slackWebhookUrl) {
+    return { sent: 0, errors: [] }
+  }
+
+  const errors: string[] = []
+
+  // Convert alerts to LowStockAlertData format
+  const alertData: LowStockAlertData[] = alerts.map((alert) => ({
+    componentName: alert.componentName,
+    skuCode: alert.skuCode,
+    brandName: alert.brandName,
+    currentStatus: alert.currentStatus as 'warning' | 'critical',
+    quantityOnHand: alert.quantityOnHand,
+    reorderPoint: alert.reorderPoint,
+    leadTimeDays: alert.leadTimeDays,
+    componentId: alert.componentId,
+    baseUrl,
+  }))
+
+  try {
+    if (config.alertMode === 'daily_digest') {
+      // Send single digest message
+      const message = formatDigestMessage(alertData, baseUrl)
+      await sendSlackMessage(config.slackWebhookUrl, message)
+      await updateLastDigestSent(companyId)
+      return { sent: alerts.length, errors: [] }
+    } else {
+      // Send individual alerts (per_transition mode)
+      let sent = 0
+      for (const data of alertData) {
+        try {
+          const message = formatLowStockAlert(data)
+          await sendSlackMessage(config.slackWebhookUrl, message)
+          sent++
+        } catch (error) {
+          errors.push(
+            `Failed to send alert for ${data.componentName}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          )
+        }
+      }
+      return { sent, errors }
+    }
+  } catch (error) {
+    errors.push(
+      `Slack delivery failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    )
+    return { sent: 0, errors }
+  }
 }

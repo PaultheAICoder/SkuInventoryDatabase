@@ -1,0 +1,21 @@
+{
+  "issue": 105,
+  "title": "Slack webhook integration and admin UI",
+  "workflow_start": "2025-12-04T15:30:00Z",
+  "scout_plan_start": "2025-12-04T15:30:00Z",
+  "scout_plan_end": "2025-12-04T15:35:00Z",
+  "build_start": "2025-12-04T15:35:00Z",
+  "build_end": "2025-12-04T15:50:00Z",
+  "cleanup_start": "2025-12-04T15:50:00Z",
+  "cleanup_end": "2025-12-04T16:00:00Z",
+  "status": "complete",
+  "validation": {
+    "typescript": "PASS",
+    "build": "PASS",
+    "lint": "PASS",
+    "tests": "35/35 passed"
+  },
+  "files_created": 5,
+  "files_modified": 2,
+  "total_duration_minutes": 30
+}

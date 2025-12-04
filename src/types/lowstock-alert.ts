@@ -5,9 +5,21 @@ import type { ReorderStatus } from '@/types'
 export const alertModeSchema = z.enum(['daily_digest', 'per_transition'])
 export type AlertMode = z.infer<typeof alertModeSchema>
 
+// Slack webhook URL validation (must be https://hooks.slack.com/...)
+const slackWebhookUrlSchema = z
+  .string()
+  .url()
+  .max(500)
+  .refine(
+    (url) => url.startsWith('https://hooks.slack.com/services/'),
+    { message: 'Slack webhook URL must start with https://hooks.slack.com/services/' }
+  )
+  .optional()
+  .nullable()
+
 // Alert config create/update schema
 export const alertConfigSchema = z.object({
-  slackWebhookUrl: z.string().url().max(500).optional().nullable(),
+  slackWebhookUrl: slackWebhookUrlSchema,
   emailAddresses: z.array(z.string().email()).default([]),
   enableSlack: z.boolean().default(false),
   enableEmail: z.boolean().default(false),
