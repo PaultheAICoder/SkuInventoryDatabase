@@ -11,6 +11,7 @@ import {
   serverError,
   parseBody,
   parseQuery,
+  error,
 } from '@/lib/api-response'
 import { createSKUSchema, skuListQuerySchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
@@ -123,16 +124,41 @@ export async function GET(request: NextRequest) {
 
 // POST /api/skus - Create a new SKU
 export async function POST(request: NextRequest) {
+  // Store context for error logging
+  let errorContext: {
+    userId?: string
+    companyId?: string | null
+    brandId?: string | null
+    internalCode?: string
+  } = {}
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
     }
 
+    // Store session info for error logging
+    errorContext = {
+      userId: session.user.id,
+      companyId: session.user.selectedCompanyId,
+      brandId: session.user.selectedBrandId,
+    }
+
+    // Validate session has required company context
+    if (!session.user.selectedCompanyId) {
+      console.error('SKU creation failed: No selectedCompanyId in session', {
+        userId: session.user.id,
+        email: session.user.email,
+      })
+      return error('Company context is required. Please select a company and try again.', 400, 'BadRequest')
+    }
+
     const bodyResult = await parseBody(request, createSKUSchema)
     if (bodyResult.error) return bodyResult.error
 
     const data = bodyResult.data
+    errorContext.internalCode = data.internalCode
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
@@ -149,6 +175,23 @@ export async function POST(request: NextRequest) {
         return serverError('No active brand found for selected company')
       }
       brandId = brand.id
+    } else {
+      // Validate brand belongs to selected company
+      const validBrand = await prisma.brand.findFirst({
+        where: {
+          id: brandId,
+          companyId: selectedCompanyId,
+          isActive: true,
+        },
+      })
+
+      if (!validBrand) {
+        console.error('SKU creation failed: Brand does not belong to company', {
+          brandId,
+          companyId: selectedCompanyId,
+        })
+        return error('Invalid brand selection. Please refresh the page and try again.', 400, 'BadRequest')
+      }
     }
 
     // Check for duplicate internalCode within the selected company
@@ -194,8 +237,21 @@ export async function POST(request: NextRequest) {
       activeBom: null,
       maxBuildableUnits: null,
     })
-  } catch (error) {
-    console.error('Error creating SKU:', error)
-    return serverError()
+  } catch (err) {
+    // Log detailed error for debugging
+    const errorDetails = {
+      message: err instanceof Error ? err.message : 'Unknown error',
+      stack: err instanceof Error ? err.stack : undefined,
+      name: err instanceof Error ? err.name : undefined,
+      ...errorContext,
+    }
+    console.error('Error creating SKU:', JSON.stringify(errorDetails, null, 2))
+
+    // Return user-friendly message based on error type
+    if (err instanceof Error && err.message.includes('Unique constraint')) {
+      return conflict('A SKU with this internal code already exists')
+    }
+
+    return serverError('Failed to create SKU. Please try again or contact support.')
   }
 }
