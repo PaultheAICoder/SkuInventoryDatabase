@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { success, unauthorized, serverError, error, parseBody } from '@/lib/api-response'
-import { submitFeedbackSchema, type SubmitFeedbackResponse } from '@/types/feedback'
+import { submitFeedbackSchema, type SubmitFeedbackResponse, type FeedbackType } from '@/types/feedback'
 import { Octokit } from '@octokit/rest'
 import { enhanceIssueWithClaudeCode } from '@/lib/claude'
+import { createFeedback } from '@/services/feedback'
 
 // GitHub repo configuration
 const GITHUB_OWNER = 'PaultheAICoder'
@@ -98,6 +99,21 @@ export async function POST(request: NextRequest) {
 
     const issueUrl = issue.html_url
     const issueNumber = issue.number
+
+    // Save feedback record to database for tracking
+    try {
+      await createFeedback({
+        userId: session.user.id,
+        type: type as FeedbackType,
+        description,
+        githubIssueNumber: issueNumber,
+        githubIssueUrl: issueUrl,
+      })
+      console.log(`[Feedback] Saved feedback record for issue #${issueNumber}`)
+    } catch (dbError) {
+      // Log but don't fail - the GitHub issue was created successfully
+      console.error('[Feedback] Failed to save feedback record:', dbError)
+    }
 
     const response: SubmitFeedbackResponse = {
       issueUrl,

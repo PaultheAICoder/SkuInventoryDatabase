@@ -96,8 +96,9 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    // Protect all routes except auth, api/auth, api/cron, health check, and static files
+    // Protect all routes except auth, api/auth, api/cron, api/webhooks, health check, and static files
     // Note: api/cron routes use their own Bearer token authentication
-    '/((?!login|api/auth|api/health|api/cron|_next/static|_next/image|favicon.ico).*)',
+    // Note: api/webhooks routes use their own signature-based authentication
+    '/((?!login|api/auth|api/health|api/cron|api/webhooks|_next/static|_next/image|favicon.ico).*)',
   ],
 }

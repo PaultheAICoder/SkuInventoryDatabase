@@ -56,3 +56,61 @@ export interface EnhanceIssueRequest {
   description: string
   answers: string[]
 }
+
+// ============================================
+// Feedback Tracking Types (Database Entities)
+// ============================================
+
+// Feedback status enum (matches Prisma)
+export type FeedbackStatus = 'pending' | 'in_progress' | 'resolved' | 'verified' | 'reopened'
+
+// Feedback reply action enum
+export type FeedbackReplyAction = 'verified' | 'changes_requested'
+
+// Feedback record (database entity)
+export interface FeedbackRecord {
+  id: string
+  userId: string
+  userName?: string | null
+  userEmail?: string | null
+  type: FeedbackType
+  description: string
+  githubIssueNumber: number
+  githubIssueUrl: string
+  status: FeedbackStatus
+  emailMessageId: string | null
+  resolvedAt: string | null
+  verifiedAt: string | null
+  createdAt: string
+  updatedAt: string
+  replies?: FeedbackReplyRecord[]
+}
+
+// Feedback reply record
+export interface FeedbackReplyRecord {
+  id: string
+  feedbackId: string
+  emailMessageId: string | null
+  content: string
+  action: FeedbackReplyAction
+  followUpIssueNumber: number | null
+  followUpIssueUrl: string | null
+  createdAt: string
+}
+
+// Create feedback input (internal, from API)
+export interface CreateFeedbackInput {
+  userId: string
+  type: FeedbackType
+  description: string
+  githubIssueNumber: number
+  githubIssueUrl: string
+}
+
+// Update feedback status input
+export interface UpdateFeedbackStatusInput {
+  status: FeedbackStatus
+  resolvedAt?: Date
+  verifiedAt?: Date
+  emailMessageId?: string
+}

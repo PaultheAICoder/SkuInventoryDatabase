@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
+    "@azure/identity": "^4.13.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@octokit/rest": "^22.0.1",
     "@prisma/adapter-pg": "^7.0.1",
     "@prisma/client": "^7.0.1",
