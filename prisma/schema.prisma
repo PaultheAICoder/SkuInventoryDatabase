@@ -26,9 +26,13 @@ model Company {
   alertConfig      AlertConfig?
 
   // Multi-company relations
-  userCompanies    UserCompany[] @relation("UserCompanies")
-  components       Component[] @relation("CompanyComponents")
-  skus             SKU[] @relation("CompanySKUs")
+  userCompanies UserCompany[] @relation("UserCompanies")
+  components    Component[]   @relation("CompanyComponents")
+  skus          SKU[]         @relation("CompanySKUs")
+
+  // Shopify integration relations
+  shopifyConnection  ShopifyConnection?
+  skuChannelMappings SkuChannelMapping[]
 }
 
 enum LocationType {
@@ -108,7 +112,7 @@ model User {
   alertsAcknowledged DefectAlert[]     @relation("AlertAcknowledgedBy")
 
   // Multi-company assignment
-  userCompanies     UserCompany[]
+  userCompanies UserCompany[]
 
   @@index([companyId, isActive])
 }
@@ -152,7 +156,7 @@ model Component {
   brandId       String
   brand         Brand    @relation(fields: [brandId], references: [id])
   companyId     String?
-  company       Company?  @relation("CompanyComponents", fields: [companyId], references: [id])
+  company       Company? @relation("CompanyComponents", fields: [companyId], references: [id])
   name          String   @db.VarChar(100)
   skuCode       String   @db.VarChar(50)
   category      String?  @db.VarChar(50)
@@ -185,6 +189,14 @@ enum TransactionType {
   adjustment
   initial
   transfer
+}
+
+enum ShopifyOrderStatus {
+  pending // Newly synced, awaiting review
+  approved // Ready for transaction posting
+  posted // Transaction created
+  skipped // Manually skipped
+  error // Processing error
 }
 
 model Transaction {
@@ -266,7 +278,7 @@ model SKU {
   brandId      String
   brand        Brand    @relation(fields: [brandId], references: [id])
   companyId    String?
-  company      Company?  @relation("CompanySKUs", fields: [companyId], references: [id])
+  company      Company? @relation("CompanySKUs", fields: [companyId], references: [id])
   name         String   @db.VarChar(100)
   internalCode String   @db.VarChar(50)
   salesChannel String   @db.VarChar(50)
@@ -285,6 +297,9 @@ model SKU {
   defectThresholds   DefectThreshold[]
   defectAlerts       DefectAlert[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
+
+  // Channel mapping relations
+  channelMappings SkuChannelMapping[]
 
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
@@ -375,24 +390,24 @@ model DefectAlert {
 // ============================================
 
 model AlertConfig {
-  id              String    @id @default(uuid())
-  companyId       String    @unique
-  company         Company   @relation(fields: [companyId], references: [id])
+  id        String  @id @default(uuid())
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id])
 
   // Channel configuration
-  slackWebhookUrl String?   @db.VarChar(500)
-  emailAddresses  String[]  // PostgreSQL array type
+  slackWebhookUrl String?  @db.VarChar(500)
+  emailAddresses  String[] // PostgreSQL array type
 
   // Toggles
-  enableSlack     Boolean   @default(false)
-  enableEmail     Boolean   @default(false)
+  enableSlack Boolean @default(false)
+  enableEmail Boolean @default(false)
 
   // Throttle settings
-  alertMode       String    @default("daily_digest") @db.VarChar(20) // 'daily_digest' | 'per_transition'
-  lastDigestSent  DateTime?
+  alertMode      String    @default("daily_digest") @db.VarChar(20) // 'daily_digest' | 'per_transition'
+  lastDigestSent DateTime?
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ComponentAlertState {
@@ -402,6 +417,86 @@ model ComponentAlertState {
   lastStatus    String    @db.VarChar(20) // 'ok' | 'warning' | 'critical'
   lastAlertSent DateTime?
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// Shopify Integration Entities
+// ============================================
+
+model ShopifyConnection {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  shopName    String    @db.VarChar(100) // e.g., "mystore.myshopify.com"
+  accessToken String    @db.VarChar(255) // encrypted API token
+  isActive    Boolean   @default(true)
+  lastSyncAt  DateTime?
+  syncStatus  String?   @db.VarChar(50) // "idle", "syncing", "error"
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orders ShopifyOrder[]
+
+  @@unique([companyId]) // One connection per company initially
+  @@index([companyId, isActive])
+}
+
+model ShopifyOrder {
+  id                 String             @id @default(uuid())
+  connectionId       String
+  connection         ShopifyConnection  @relation(fields: [connectionId], references: [id])
+  shopifyOrderId     String // Shopify's order ID
+  shopifyOrderNumber String // Human-readable order number
+  orderDate          DateTime
+  fulfillmentStatus  String?            @db.VarChar(50)
+  financialStatus    String?            @db.VarChar(50)
+  status             ShopifyOrderStatus @default(pending)
+  transactionId      String? // Link to created Transaction
+  errorMessage       String?            @db.Text
+  rawData            Json               @default("{}") // Store raw order JSON
+  syncedAt           DateTime           @default(now())
+  processedAt        DateTime?
+
+  lines ShopifyOrderLine[]
+
+  @@unique([connectionId, shopifyOrderId])
+  @@index([connectionId, status])
+  @@index([syncedAt])
+}
+
+model ShopifyOrderLine {
+  id               String       @id @default(uuid())
+  orderId          String
+  order            ShopifyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shopifyLineId    String
+  shopifyVariantId String? // May be null for custom items
+  shopifySku       String?      @db.VarChar(100)
+  title            String       @db.VarChar(255)
+  quantity         Int
+  price            Decimal      @db.Decimal(10, 2)
+  mappedSkuId      String? // Internal SKU if mapped (not a FK - may be unmapped)
+  mappingStatus    String       @default("unmapped") @db.VarChar(20) // "mapped", "unmapped", "not_found"
+
+  @@index([orderId])
+  @@index([shopifyVariantId])
+}
+
+model SkuChannelMapping {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  channelType String   @default("shopify") @db.VarChar(20) // Future: amazon, tiktok, etc.
+  externalId  String   @db.VarChar(100) // Shopify variant ID
+  externalSku String?  @db.VarChar(100) // Shopify SKU for reference
+  skuId       String
+  sku         SKU      @relation(fields: [skuId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, channelType, externalId])
+  @@index([companyId, channelType])
+  @@index([skuId])
 }
