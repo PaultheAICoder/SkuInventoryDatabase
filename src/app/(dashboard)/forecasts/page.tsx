@@ -22,7 +22,7 @@ interface ForecastListResponse {
 }
 
 export default function ForecastsPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [response, setResponse] = useState<ForecastListResponse | null>(null)
@@ -99,10 +99,17 @@ export default function ForecastsPage() {
       }
     }
 
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
+    // If authenticated with a company selected, fetch forecasts
     if (session?.user?.selectedCompanyId) {
       fetchForecasts()
+    } else {
+      // Session loaded but no company - stop loading
+      setIsLoading(false)
     }
-  }, [queryString, session?.user?.selectedCompanyId, refreshKey])
+  }, [status, queryString, session?.user?.selectedCompanyId, refreshKey])
 
   // Handle lookback change from quick settings
   const handleLookbackChange = (days: number) => {
@@ -162,7 +169,7 @@ export default function ForecastsPage() {
     }
   }, [response])
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="space-y-6">
         <div>
