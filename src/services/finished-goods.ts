@@ -149,6 +149,52 @@ export async function adjustFinishedGoods(params: {
 }
 
 /**
+ * Create a finished goods receipt transaction (for returns, corrections)
+ * Always adds to inventory (positive quantity only)
+ */
+export async function receiveFinishedGoods(params: {
+  companyId: string
+  skuId: string
+  locationId: string
+  quantity: number
+  source: string
+  costPerUnit?: number
+  notes?: string | null
+  date: Date
+  createdById: string
+}): Promise<{ id: string; newBalance: number }> {
+  const { companyId, skuId, locationId, quantity, source, costPerUnit, notes, date, createdById } = params
+
+  // Create receipt transaction with finished goods line
+  const transaction = await prisma.transaction.create({
+    data: {
+      companyId,
+      type: 'receipt',
+      date,
+      skuId,
+      supplier: source, // Reuse supplier field for source
+      notes,
+      createdById,
+      locationId, // For FG receipt, location goes on transaction for reference
+      finishedGoodsLines: {
+        create: {
+          skuId,
+          locationId,
+          quantityChange: new Prisma.Decimal(quantity),
+          costPerUnit: costPerUnit ? new Prisma.Decimal(costPerUnit) : null,
+        },
+      },
+    },
+    select: { id: true },
+  })
+
+  // Get new balance at this location
+  const newBalance = await getSkuQuantity(skuId, locationId)
+
+  return { id: transaction.id, newBalance }
+}
+
+/**
  * Create a finished goods transfer between locations
  */
 export async function transferFinishedGoods(params: {

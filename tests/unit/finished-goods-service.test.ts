@@ -29,6 +29,7 @@ import {
   getSkuInventorySummary,
   adjustFinishedGoods,
   transferFinishedGoods,
+  receiveFinishedGoods,
 } from '@/services/finished-goods'
 import { prisma } from '@/lib/db'
 
@@ -420,6 +421,86 @@ describe('Finished Goods Service', () => {
       })
 
       expect(result.id).toBe('trans-1')
+    })
+  })
+
+  describe('receiveFinishedGoods', () => {
+    it('creates receipt transaction with finished goods line', async () => {
+      vi.mocked(prisma.transaction.create).mockResolvedValue({
+        id: 'trans-1',
+      } as never)
+
+      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
+        _sum: { quantityChange: new Prisma.Decimal(125) },
+      } as never)
+
+      const result = await receiveFinishedGoods({
+        companyId: 'company-1',
+        skuId: 'sku-1',
+        locationId: 'loc-1',
+        quantity: 25,
+        source: 'Customer Return',
+        costPerUnit: 10.50,
+        notes: 'Return from order #12345',
+        date: new Date('2024-01-15'),
+        createdById: 'user-1',
+      })
+
+      expect(result.id).toBe('trans-1')
+      expect(result.newBalance).toBe(125)
+      expect(prisma.transaction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          companyId: 'company-1',
+          type: 'receipt',
+          skuId: 'sku-1',
+          supplier: 'Customer Return',
+          notes: 'Return from order #12345',
+          createdById: 'user-1',
+          locationId: 'loc-1',
+          finishedGoodsLines: {
+            create: expect.objectContaining({
+              skuId: 'sku-1',
+              locationId: 'loc-1',
+              quantityChange: new Prisma.Decimal(25),
+              costPerUnit: new Prisma.Decimal(10.50),
+            }),
+          },
+        }),
+        select: { id: true },
+      })
+    })
+
+    it('works without optional costPerUnit', async () => {
+      vi.mocked(prisma.transaction.create).mockResolvedValue({
+        id: 'trans-1',
+      } as never)
+
+      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
+        _sum: { quantityChange: new Prisma.Decimal(50) },
+      } as never)
+
+      const result = await receiveFinishedGoods({
+        companyId: 'company-1',
+        skuId: 'sku-1',
+        locationId: 'loc-1',
+        quantity: 50,
+        source: 'Production Correction',
+        date: new Date(),
+        createdById: 'user-1',
+      })
+
+      expect(result.id).toBe('trans-1')
+      expect(prisma.transaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            finishedGoodsLines: {
+              create: expect.objectContaining({
+                costPerUnit: null,
+              }),
+            },
+          }),
+        })
+      )
     })
   })
 })

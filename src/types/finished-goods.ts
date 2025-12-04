@@ -38,6 +38,18 @@ export interface SkuInventorySummary {
   byLocation: SkuInventoryByLocation[]
 }
 
+// Finished goods receipt schema (for returns, corrections - always positive)
+export const receiveFinishedGoodsSchema = z.object({
+  locationId: z.string().uuid('Invalid location ID'),
+  quantity: z.coerce.number().positive('Quantity must be positive'),
+  source: z.string().min(1, 'Source is required').max(100), // e.g., "Customer Return", "Correction"
+  costPerUnit: z.coerce.number().nonnegative().optional(),
+  notes: z.string().optional().nullable(),
+  date: z.coerce.date(),
+})
+
+export type ReceiveFinishedGoodsInput = z.infer<typeof receiveFinishedGoodsSchema>
+
 // Finished goods line response
 export interface FinishedGoodsLineResponse {
   id: string
