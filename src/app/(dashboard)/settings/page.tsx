@@ -6,7 +6,7 @@ import { SettingsForm } from '@/components/features/SettingsForm'
 import type { SettingsResponse, CompanySettings } from '@/types/settings'
 
 export default function SettingsPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [settings, setSettings] = useState<SettingsResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,10 +29,17 @@ export default function SettingsPage() {
 
   // Refetch when company changes
   useEffect(() => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
+    // If authenticated with a company selected, fetch settings
     if (session?.user?.selectedCompanyId) {
       fetchSettings()
+    } else {
+      // Session loaded but no company - stop loading
+      setIsLoading(false)
     }
-  }, [session?.user?.selectedCompanyId, fetchSettings])
+  }, [status, session?.user?.selectedCompanyId, fetchSettings])
 
   const handleSave = async (newSettings: Partial<CompanySettings>) => {
     const res = await fetch('/api/settings', {
@@ -50,7 +57,7 @@ export default function SettingsPage() {
     await fetchSettings()
   }
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="space-y-6">
         <div>

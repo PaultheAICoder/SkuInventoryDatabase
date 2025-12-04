@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, Page } from '@playwright/test'
 
 test.describe('Company Brand Editing (Issue #160)', () => {
   test.beforeEach(async ({ page }) => {
@@ -12,7 +12,7 @@ test.describe('Company Brand Editing (Issue #160)', () => {
   })
 
   // Helper to navigate to company edit page via dropdown menu
-  async function navigateToCompanyEdit(page: typeof test.fixme extends (arg: infer P) => void ? P : never) {
+  async function navigateToCompanyEdit(page: Page) {
     // Navigate to companies list
     await page.goto('/settings/companies')
     await page.waitForSelector('table', { timeout: 10000 })
