@@ -1,0 +1,27 @@
+{
+  "issue": 124,
+  "title": "Add brand management admin page (CRUD)",
+  "parent_issue": 20,
+  "created": "2025-12-04T15:30:00Z",
+  "planning": {
+    "start": "2025-12-04T15:00:00Z",
+    "end": "2025-12-04T15:35:00Z",
+    "duration_minutes": 35
+  },
+  "implementation": {
+    "start": "2025-12-04T15:35:00Z",
+    "end": "2025-12-04T16:00:00Z",
+    "duration_minutes": 25
+  },
+  "testing": {
+    "start": "2025-12-04T16:00:00Z",
+    "end": "2025-12-04T16:25:00Z",
+    "duration_minutes": 25
+  },
+  "estimated_build_hours": "4-6",
+  "actual_build_hours": 1.5,
+  "complexity": "Medium",
+  "status": "complete",
+  "files_created": 8,
+  "files_modified": 1
+}

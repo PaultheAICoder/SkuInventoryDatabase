@@ -23,6 +23,7 @@ import {
   Building2,
   ShoppingCart,
   TrendingDown,
+  Tag,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -42,6 +43,7 @@ const navigation = [
   { name: 'Forecasts', href: '/forecasts', icon: TrendingDown },
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
   { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
+  { name: 'Brands', href: '/settings/brands', icon: Tag, adminOnly: true },
   { name: 'Companies', href: '/settings/companies', icon: Building2, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
 ]
