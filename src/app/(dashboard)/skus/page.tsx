@@ -145,6 +145,7 @@ export default async function SKUsPage({
           total={meta.total}
           page={meta.page}
           pageSize={meta.pageSize}
+          locationId={params.locationId}
         />
       </Suspense>
     </div>

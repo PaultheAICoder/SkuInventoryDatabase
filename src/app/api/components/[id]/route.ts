@@ -15,6 +15,7 @@ import { updateComponentSchema } from '@/types/component'
 import type { ComponentTrendPoint } from '@/types/component'
 import {
   getComponentQuantity,
+  getComponentQuantitiesByLocation,
   calculateReorderStatus,
   canDeleteComponent,
   getCompanySettings,
@@ -209,6 +210,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       trend = await calculateComponentTrend(id, trendDays)
     }
 
+    // Get per-location inventory breakdown
+    const locationQuantities = await getComponentQuantitiesByLocation(id, selectedCompanyId)
+
     return success({
       id: component.id,
       name: component.name,
@@ -241,6 +245,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         createdAt: line.transaction.createdAt.toISOString(),
       })),
       ...(trend && { trend }),
+      ...(locationQuantities.length > 0 && { locationQuantities }),
     })
   } catch (error) {
     console.error('Error getting component:', error)

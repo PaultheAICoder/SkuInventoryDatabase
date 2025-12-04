@@ -19,6 +19,7 @@ import { ArrowLeft, Edit, Package, Hammer } from 'lucide-react'
 import { BOMVersionList } from '@/components/features/BOMVersionList'
 import { BuildDialog } from '@/components/features/BuildDialog'
 import { BuildableUnitsDisplay } from '@/components/features/BuildableUnitsDisplay'
+import { InventoryByLocationTable } from '@/components/features/InventoryByLocationTable'
 import type { SKUDetailResponse } from '@/types/sku'
 import type { BOMVersionResponse } from '@/types/bom'
 
@@ -235,6 +236,15 @@ export default function SKUDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Finished Goods by Location - shown as separate card when multiple locations */}
+      {sku.finishedGoodsInventory && sku.finishedGoodsInventory.byLocation.length > 1 && (
+        <InventoryByLocationTable
+          title="Finished Goods by Location"
+          data={sku.finishedGoodsInventory.byLocation}
+          totalLabel="Total Finished Goods"
+        />
+      )}
 
       {/* Recent Transactions */}
       {sku.recentTransactions && sku.recentTransactions.length > 0 && (

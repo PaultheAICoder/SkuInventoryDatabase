@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select'
 import { ChevronLeft, ChevronRight, Filter } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
+import { LocationFilter } from '@/components/features/LocationFilter'
 import type { TransactionResponse } from '@/types/transaction'
 import { salesChannels } from '@/types'
 
@@ -57,6 +58,7 @@ function TransactionLogContent() {
     salesChannel: searchParams.get('salesChannel') ?? '',
     dateFrom: searchParams.get('dateFrom') ?? '',
     dateTo: searchParams.get('dateTo') ?? '',
+    locationId: searchParams.get('locationId') ?? '',
   })
 
   const updateFilters = (params: Record<string, string>) => {
@@ -89,6 +91,7 @@ function TransactionLogContent() {
       if (filters.salesChannel) params.set('salesChannel', filters.salesChannel)
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
+      if (filters.locationId) params.set('locationId', filters.locationId)
 
       const res = await fetch(`/api/transactions?${params.toString()}`)
       if (!res.ok) {
@@ -121,6 +124,7 @@ function TransactionLogContent() {
       salesChannel: '',
       dateFrom: '',
       dateTo: '',
+      locationId: '',
     })
     router.push('/transactions')
   }
@@ -165,6 +169,7 @@ function TransactionLogContent() {
     salesChannel: filters.salesChannel,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
+    locationId: filters.locationId,
   }
 
   return (
@@ -245,6 +250,14 @@ function TransactionLogContent() {
               </Select>
             </div>
 
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Location</label>
+              <LocationFilter
+                value={filters.locationId || undefined}
+                onValueChange={(value) => setFilters((prev) => ({ ...prev, locationId: value || '' }))}
+              />
+            </div>
+
             <div className="flex gap-2">
               <Button variant="secondary" onClick={handleApplyFilters}>
                 Apply
@@ -280,6 +293,7 @@ function TransactionLogContent() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Summary</TableHead>
                   <TableHead>Components</TableHead>
                   <TableHead>Created By</TableHead>
@@ -288,7 +302,7 @@ function TransactionLogContent() {
               <TableBody>
                 {transactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       No transactions found.
                     </TableCell>
                   </TableRow>
@@ -304,6 +318,15 @@ function TransactionLogContent() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={getTypeBadgeVariant(tx.type)}>{tx.type}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {tx.type === 'transfer' ? (
+                          <span>
+                            {tx.fromLocation?.name || '-'} <span className="text-muted-foreground">-&gt;</span> {tx.toLocation?.name || '-'}
+                          </span>
+                        ) : (
+                          tx.location?.name || '-'
+                        )}
                       </TableCell>
                       <TableCell>{formatTransactionSummary(tx)}</TableCell>
                       <TableCell>

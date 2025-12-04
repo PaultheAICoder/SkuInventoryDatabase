@@ -54,15 +54,20 @@ interface CriticalComponent {
 
 interface CriticalComponentsListProps {
   components: CriticalComponent[]
+  locationName?: string
 }
 
-export function CriticalComponentsList({ components }: CriticalComponentsListProps) {
+export function CriticalComponentsList({ components, locationName }: CriticalComponentsListProps) {
+  const description = locationName
+    ? `Components that need immediate attention at ${locationName}`
+    : 'Components that need immediate attention'
+
   if (components.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Critical Components</CardTitle>
-          <CardDescription>Components that need immediate attention</CardDescription>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -77,7 +82,7 @@ export function CriticalComponentsList({ components }: CriticalComponentsListPro
     <Card>
       <CardHeader>
         <CardTitle>Critical Components</CardTitle>
-        <CardDescription>Components that need immediate attention</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>

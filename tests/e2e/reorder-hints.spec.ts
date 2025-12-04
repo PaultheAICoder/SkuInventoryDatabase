@@ -244,8 +244,8 @@ test.describe('Reorder Hints with Different Time Ranges', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
 
-    // Find and click the time filter dropdown
-    const selectTrigger = page.locator('[role="combobox"]').first()
+    // Find and click the time filter dropdown (use data-testid for specificity)
+    const selectTrigger = page.locator('[data-testid="time-filter-trigger"]')
 
     // Check initial state has Lead Time header
     const leadTimeHeader = page.locator('th:has-text("Lead Time")')
@@ -253,13 +253,20 @@ test.describe('Reorder Hints with Different Time Ranges', () => {
     // Change time filter to 7 days
     await selectTrigger.click()
     await page.locator('[role="option"]:has-text("Last 7 days")').click()
-    await page.waitForTimeout(1000)
+
+    // Wait for network idle after API call completes
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(500)
 
     // Verify Lead Time header still exists (or no critical components)
     const afterChangeCount = await leadTimeHeader.count()
-    const noComponentsMessage = page.locator('text=No critical components')
+    // Check for empty state message (exact text from CriticalComponentsList)
+    const noComponentsMessage = page.locator('text=No critical components. All inventory levels are healthy.')
     const hasNoComponents = await noComponentsMessage.count()
 
+    // Test passes if either:
+    // 1. The Lead Time header is present (has critical components)
+    // 2. The "No critical components" message is shown (no critical components for time range)
     expect(afterChangeCount > 0 || hasNoComponents > 0).toBe(true)
   })
 })

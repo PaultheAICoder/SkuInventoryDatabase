@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LocationFilter } from './LocationFilter'
 import type { ComponentResponse } from '@/types/component'
 
 interface ComponentTableProps {
@@ -29,6 +30,7 @@ interface ComponentTableProps {
   total: number
   page: number
   pageSize: number
+  locationId?: string
 }
 
 const CATEGORIES = [
@@ -47,7 +49,7 @@ const REORDER_STATUSES = [
   { value: 'ok', label: 'OK' },
 ]
 
-export function ComponentTable({ components, total, page, pageSize }: ComponentTableProps) {
+export function ComponentTable({ components, total, page, pageSize, locationId }: ComponentTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
@@ -150,6 +152,11 @@ export function ComponentTable({ components, total, page, pageSize }: ComponentT
               ))}
             </SelectContent>
           </Select>
+
+          <LocationFilter
+            value={locationId}
+            onValueChange={(value) => updateFilters({ locationId: value || '' })}
+          />
         </div>
       </div>
 

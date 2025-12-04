@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { createLocationSchema, locationListQuerySchema } from '@/types/location'
 
-// GET /api/locations - List locations (admin only)
+// GET /api/locations - List locations (all authenticated users can read)
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -14,9 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    // All authenticated users can read locations (no role check for GET)
 
     const searchParams = Object.fromEntries(request.nextUrl.searchParams)
     const validation = locationListQuerySchema.safeParse(searchParams)

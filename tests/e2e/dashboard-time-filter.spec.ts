@@ -25,8 +25,8 @@ test.describe('Dashboard Time Filter', () => {
     const timeFilter = page.locator('text=Time Range')
     await expect(timeFilter).toBeVisible()
 
-    // The select trigger should be visible
-    const selectTrigger = page.locator('[role="combobox"]').first()
+    // The select trigger should be visible (use data-testid for specificity)
+    const selectTrigger = page.locator('[data-testid="time-filter-trigger"]')
     await expect(selectTrigger).toBeVisible()
   })
 
@@ -34,8 +34,8 @@ test.describe('Dashboard Time Filter', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
 
-    // Find and click the time filter dropdown
-    const selectTrigger = page.locator('[role="combobox"]').first()
+    // Find and click the time filter dropdown (use data-testid for specificity)
+    const selectTrigger = page.locator('[data-testid="time-filter-trigger"]')
     await selectTrigger.click()
 
     // Wait for dropdown to appear
@@ -63,8 +63,8 @@ test.describe('Dashboard Time Filter', () => {
     // Clear previous calls
     apiCalls.length = 0
 
-    // Find and click the time filter dropdown
-    const selectTrigger = page.locator('[role="combobox"]').first()
+    // Find and click the time filter dropdown (use data-testid for specificity)
+    const selectTrigger = page.locator('[data-testid="time-filter-trigger"]')
     await selectTrigger.click()
 
     // Select 7 days option

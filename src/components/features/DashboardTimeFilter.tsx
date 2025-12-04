@@ -35,7 +35,7 @@ export function DashboardTimeFilter({ value, onChange }: DashboardTimeFilterProp
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted-foreground whitespace-nowrap">Time Range:</span>
       <Select value={currentValue} onValueChange={handleValueChange}>
-        <SelectTrigger className="w-full sm:w-[160px]">
+        <SelectTrigger className="w-full sm:w-[160px]" data-testid="time-filter-trigger">
           <SelectValue placeholder="Select time range" />
         </SelectTrigger>
         <SelectContent>

@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LocationFilter } from './LocationFilter'
 import type { SKUResponse } from '@/types/sku'
 import { salesChannels } from '@/types'
 
@@ -30,9 +31,10 @@ interface SKUTableProps {
   total: number
   page: number
   pageSize: number
+  locationId?: string
 }
 
-export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
+export function SKUTable({ skus, total, page, pageSize, locationId }: SKUTableProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
@@ -107,6 +109,11 @@ export function SKUTable({ skus, total, page, pageSize }: SKUTableProps) {
               ))}
             </SelectContent>
           </Select>
+
+          <LocationFilter
+            value={locationId}
+            onValueChange={(value) => updateFilters({ locationId: value || '' })}
+          />
         </div>
       </div>
 

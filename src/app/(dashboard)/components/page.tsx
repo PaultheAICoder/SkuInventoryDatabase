@@ -192,7 +192,10 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
           <p className="text-muted-foreground">Manage your component inventory</p>
         </div>
         <div className="flex items-center gap-2">
-          <ExportButton exportType="components" />
+          <ExportButton
+            exportType="components"
+            queryParams={params.locationId ? { locationId: params.locationId } : undefined}
+          />
           {canCreate && (
             <Link href="/components/new">
               <Button>
@@ -205,7 +208,13 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
       </div>
 
       <Suspense fallback={<div>Loading...</div>}>
-        <ComponentTable components={components} total={total} page={page} pageSize={pageSize} />
+        <ComponentTable
+          components={components}
+          total={total}
+          page={page}
+          pageSize={pageSize}
+          locationId={params.locationId}
+        />
       </Suspense>
     </div>
   )

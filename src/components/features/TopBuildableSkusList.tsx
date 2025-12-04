@@ -20,9 +20,14 @@ interface TopBuildableSku {
 
 interface TopBuildableSkusListProps {
   skus: TopBuildableSku[]
+  locationName?: string
 }
 
-export function TopBuildableSkusList({ skus }: TopBuildableSkusListProps) {
+export function TopBuildableSkusList({ skus, locationName }: TopBuildableSkusListProps) {
+  const description = locationName
+    ? `SKUs with the most available inventory for building at ${locationName}`
+    : 'SKUs with the most available inventory for building'
+
   if (skus.length === 0) {
     return (
       <Card>
@@ -31,7 +36,7 @@ export function TopBuildableSkusList({ skus }: TopBuildableSkusListProps) {
             <Package className="h-5 w-5" />
             Top Buildable SKUs
           </CardTitle>
-          <CardDescription>SKUs with the most available inventory for building</CardDescription>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -49,7 +54,7 @@ export function TopBuildableSkusList({ skus }: TopBuildableSkusListProps) {
           <Package className="h-5 w-5" />
           Top Buildable SKUs
         </CardTitle>
-        <CardDescription>SKUs with the most available inventory for building</CardDescription>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>

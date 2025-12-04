@@ -205,6 +205,48 @@ export async function getComponentQuantities(
 }
 
 /**
+ * Get component quantity breakdown by all locations
+ * Returns array of { locationId, locationName, locationType, quantity } for all locations with inventory
+ */
+export async function getComponentQuantitiesByLocation(
+  componentId: string,
+  companyId: string
+): Promise<Array<{ locationId: string; locationName: string; locationType: string; quantity: number }>> {
+  // Get all active locations for the company
+  const locations = await prisma.location.findMany({
+    where: {
+      companyId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+    },
+  })
+
+  // Calculate quantity for each location
+  const result: Array<{ locationId: string; locationName: string; locationType: string; quantity: number }> = []
+
+  for (const location of locations) {
+    const quantity = await getComponentQuantity(componentId, location.id)
+    if (quantity !== 0) {
+      result.push({
+        locationId: location.id,
+        locationName: location.name,
+        locationType: location.type,
+        quantity,
+      })
+    }
+  }
+
+  // Sort by location name
+  result.sort((a, b) => a.locationName.localeCompare(b.locationName))
+
+  return result
+}
+
+/**
  * Calculate reorder status based on quantity and reorder point
  * Critical: quantity <= reorderPoint
  * Warning: quantity <= reorderPoint * reorderWarningMultiplier

@@ -8,9 +8,14 @@ interface DashboardStatsProps {
     warning: number
     ok: number
   }
+  locationName?: string
 }
 
-export function DashboardStats({ stats }: DashboardStatsProps) {
+export function DashboardStats({ stats, locationName }: DashboardStatsProps) {
+  const subtitle = locationName
+    ? `Active inventory items at ${locationName}`
+    : 'Active inventory items'
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
@@ -20,7 +25,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats.total}</div>
-          <p className="text-xs text-muted-foreground">Active inventory items</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </CardContent>
       </Card>
 

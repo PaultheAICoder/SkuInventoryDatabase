@@ -68,8 +68,17 @@ export interface ComponentResponse {
   createdBy?: { id: string; name: string }
 }
 
+// Location quantity breakdown for components
+export interface ComponentLocationQuantity {
+  locationId: string
+  locationName: string
+  locationType?: string
+  quantity: number
+}
+
 // Component detail response (includes related data)
 export interface ComponentDetailResponse extends ComponentResponse {
+  locationQuantities?: ComponentLocationQuantity[]
   usedInSkus: Array<{
     id: string
     name: string

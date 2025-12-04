@@ -20,6 +20,7 @@ import { AdjustmentDialog } from '@/components/features/AdjustmentDialog'
 import { TransferDialog } from '@/components/features/TransferDialog'
 import { ComponentSparkline } from '@/components/features/ComponentSparkline'
 import { SparklineTimeFilter } from '@/components/features/SparklineTimeFilter'
+import { InventoryByLocationTable } from '@/components/features/InventoryByLocationTable'
 import { ArrowLeft, Edit, Package, Plus, Minus, ArrowLeftRight } from 'lucide-react'
 import type { ComponentDetailResponse } from '@/types/component'
 
@@ -234,6 +235,15 @@ export default function ComponentDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Per-Location Inventory Breakdown */}
+      {component.locationQuantities && component.locationQuantities.length > 1 && (
+        <InventoryByLocationTable
+          title="Inventory by Location"
+          data={component.locationQuantities}
+          totalLabel="Total On Hand"
+        />
+      )}
 
       {/* Used in SKUs */}
       {component.usedInSkus && component.usedInSkus.length > 0 && (

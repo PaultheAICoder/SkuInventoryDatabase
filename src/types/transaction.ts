@@ -97,6 +97,7 @@ export const transactionListQuerySchema = z.object({
   salesChannel: z.string().optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
+  locationId: z.string().uuid().optional(),
   sortBy: z.enum(['date', 'createdAt', 'type']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 })

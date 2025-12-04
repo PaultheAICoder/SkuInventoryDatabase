@@ -8,6 +8,7 @@ import { DashboardStats } from '@/components/features/DashboardStats'
 import { CriticalComponentsList } from '@/components/features/CriticalComponentsList'
 import { TopBuildableSkusList } from '@/components/features/TopBuildableSkusList'
 import { DashboardTimeFilter } from '@/components/features/DashboardTimeFilter'
+import { LocationFilter } from '@/components/features/LocationFilter'
 import {
   Table,
   TableBody,
@@ -60,13 +61,17 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timeFilter, setTimeFilter] = useState<number | null>(30)
+  const [locationId, setLocationId] = useState<string | undefined>(undefined)
 
-  // Refetch when company changes or time filter changes
+  // Refetch when company changes, time filter changes, or location changes
   useEffect(() => {
     async function fetchDashboard() {
       try {
         setIsLoading(true)
-        const url = timeFilter ? `/api/dashboard?days=${timeFilter}` : '/api/dashboard'
+        let url = timeFilter ? `/api/dashboard?days=${timeFilter}` : '/api/dashboard'
+        if (locationId) {
+          url += `${url.includes('?') ? '&' : '?'}locationId=${locationId}`
+        }
         const res = await fetch(url)
         if (!res.ok) {
           throw new Error('Failed to load dashboard')
@@ -82,7 +87,7 @@ export default function DashboardPage() {
     if (session?.user?.selectedCompanyId) {
       fetchDashboard()
     }
-  }, [timeFilter, session?.user?.selectedCompanyId, session?.user?.selectedBrandId])
+  }, [timeFilter, locationId, session?.user?.selectedCompanyId, session?.user?.selectedBrandId])
 
   if (isLoading) {
     return (
@@ -113,7 +118,10 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Welcome to the Inventory & BOM Tracker</p>
         </div>
-        <DashboardTimeFilter value={timeFilter} onChange={setTimeFilter} />
+        <div className="flex gap-2">
+          <LocationFilter value={locationId} onValueChange={setLocationId} />
+          <DashboardTimeFilter value={timeFilter} onChange={setTimeFilter} />
+        </div>
       </div>
 
       <DashboardStats stats={data.componentStats} />

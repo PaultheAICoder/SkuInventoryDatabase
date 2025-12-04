@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const queryResult = parseQuery(searchParams, transactionListQuerySchema)
     if (queryResult.error) return queryResult.error
 
-    const { page, pageSize, type, componentId, skuId, salesChannel, dateFrom, dateTo, sortBy, sortOrder } =
+    const { page, pageSize, type, componentId, skuId, salesChannel, dateFrom, dateTo, locationId, sortBy, sortOrder } =
       queryResult.data
 
     // Use selected company for scoping
@@ -43,6 +43,14 @@ export async function GET(request: NextRequest) {
             },
           }
         : {}),
+      // Location filter: matches locationId, fromLocationId, or toLocationId (for transfers)
+      ...(locationId && {
+        OR: [
+          { locationId },
+          { fromLocationId: locationId },
+          { toLocationId: locationId },
+        ],
+      }),
     }
 
     // Get total count
