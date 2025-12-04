@@ -264,12 +264,17 @@ model Transaction {
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
   defectAlerts       DefectAlert[]
 
+  // Source tracking for automated transactions (e.g., from Shopify orders)
+  sourceType    String? @db.VarChar(20) // "shopify", "manual", etc.
+  sourceOrderId String? // Reference to ShopifyOrder.id
+
   @@index([companyId, createdAt(sort: Desc)])
   @@index([skuId])
   @@index([type])
   @@index([locationId])
   @@index([fromLocationId])
   @@index([toLocationId])
+  @@index([sourceType, sourceOrderId])
 }
 
 model TransactionLine {
