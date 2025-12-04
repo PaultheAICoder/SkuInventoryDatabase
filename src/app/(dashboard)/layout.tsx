@@ -21,6 +21,7 @@ import {
   X,
   Layers,
   Building2,
+  ShoppingCart,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Components', href: '/components', icon: Package },
   { name: 'SKUs', href: '/skus', icon: Boxes },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Lots', href: '/lots', icon: Layers },
   { name: 'Import', href: '/import', icon: Upload },
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },

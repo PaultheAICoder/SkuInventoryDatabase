@@ -1,0 +1,35 @@
+{
+  "issue": "95",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-04T10:30:24.000Z",
+  "cleanup_start": "2025-12-04T10:50:00.000Z",
+  "cleanup_complete": "2025-12-04T10:52:00.000Z",
+  "total_duration_minutes": 22,
+  "validation_results": {
+    "typescript": "PASS",
+    "build": "PASS",
+    "lint": "PASS",
+    "tests": {
+      "total": 507,
+      "passed": 507,
+      "failed": 0,
+      "duration_seconds": 18.79
+    }
+  },
+  "files_created": 9,
+  "files_modified": 1,
+  "files_created_list": [
+    "src/types/order-review.ts",
+    "src/app/api/shopify/orders/[id]/lines/[lineId]/route.ts",
+    "src/app/api/shopify/orders/[id]/approve/route.ts",
+    "src/app/api/shopify/orders/[id]/skip/route.ts",
+    "src/components/features/LineMappingDialog.tsx",
+    "src/components/features/OrderDetail.tsx",
+    "src/components/features/OrderReviewTable.tsx",
+    "src/app/(dashboard)/orders/page.tsx",
+    "src/app/(dashboard)/orders/[id]/page.tsx"
+  ],
+  "files_modified_list": [
+    "src/app/(dashboard)/layout.tsx"
+  ]
+}
