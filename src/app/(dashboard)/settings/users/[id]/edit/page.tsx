@@ -1,29 +1,52 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import { UserForm } from '@/components/features/UserForm'
-import type { UserResponse } from '@/types/user'
+import { CompanyAssignment } from '@/components/features/CompanyAssignment'
+import type { UserWithCompaniesResponse } from '@/types/user'
+
+interface Company {
+  id: string
+  name: string
+}
 
 export default function EditUserPage() {
   const params = useParams()
   const id = params.id as string
-  const [user, setUser] = useState<UserResponse | null>(null)
+  const [user, setUser] = useState<UserWithCompaniesResponse | null>(null)
+  const [allCompanies, setAllCompanies] = useState<Company[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchUser() {
+    async function fetchData() {
       try {
-        const res = await fetch(`/api/users/${id}`)
-        if (!res.ok) {
+        const [userRes, companiesRes] = await Promise.all([
+          fetch(`/api/users/${id}`),
+          fetch('/api/companies?pageSize=100'),
+        ])
+
+        if (!userRes.ok) {
           throw new Error('User not found')
         }
-        const data = await res.json().catch(() => ({}))
-        setUser(data?.data)
+        if (!companiesRes.ok) {
+          throw new Error('Failed to load companies')
+        }
+
+        const userData = await userRes.json()
+        const companiesData = await companiesRes.json()
+
+        setUser(userData?.data)
+        setAllCompanies(
+          companiesData?.data?.map((c: { id: string; name: string }) => ({
+            id: c.id,
+            name: c.name,
+          })) ?? []
+        )
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
@@ -31,8 +54,28 @@ export default function EditUserPage() {
       }
     }
 
-    fetchUser()
+    fetchData()
   }, [id])
+
+  const handleCompanyAssignment = useCallback(
+    async (companyIds: string[]) => {
+      const res = await fetch(`/api/users/${id}/companies`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyIds }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to update company assignments')
+      }
+
+      const data = await res.json()
+      // Update local state with new assignments
+      setUser((prev) => (prev ? { ...prev, companies: data.data } : null))
+    },
+    [id]
+  )
 
   if (isLoading) {
     return (
@@ -83,6 +126,17 @@ export default function EditUserPage() {
       <div className="max-w-2xl">
         <UserForm user={user} />
       </div>
+
+      {user && (
+        <div className="max-w-2xl">
+          <CompanyAssignment
+            userId={user.id}
+            assignedCompanyIds={user.companies?.map((c) => c.companyId) ?? []}
+            allCompanies={allCompanies}
+            onAssignmentChange={handleCompanyAssignment}
+          />
+        </div>
+      )}
     </div>
   )
 }

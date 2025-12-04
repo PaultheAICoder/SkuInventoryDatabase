@@ -30,10 +30,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { MoreHorizontal, Edit, Trash2, UserX, UserCheck } from 'lucide-react'
 import { ROLE_DISPLAY_NAMES } from '@/lib/permissions'
-import type { UserResponse } from '@/types/user'
+import type { UserCompanyAssignment, UserResponse } from '@/types/user'
+
+interface UserWithCompanies extends UserResponse {
+  companies?: UserCompanyAssignment[]
+}
 
 interface UserTableProps {
-  users: UserResponse[]
+  users: UserWithCompanies[]
   currentUserId: string
   onRefresh: () => void
 }
@@ -108,6 +112,7 @@ export function UserTable({ users, currentUserId, onRefresh }: UserTableProps) {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Companies</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Last Login</TableHead>
               <TableHead className="w-[70px]" />
@@ -127,6 +132,21 @@ export function UserTable({ users, currentUserId, onRefresh }: UserTableProps) {
                   <Badge variant={getRoleBadgeVariant(user.role)}>
                     {ROLE_DISPLAY_NAMES[user.role]}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {user.companies ? (
+                    user.companies.length <= 2 ? (
+                      <span className="text-sm">
+                        {user.companies.map((c) => c.companyName).join(', ')}
+                      </span>
+                    ) : (
+                      <Badge variant="outline">
+                        {user.companies.length} companies
+                      </Badge>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={user.isActive ? 'success' : 'secondary'}>

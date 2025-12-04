@@ -69,6 +69,19 @@ export async function GET(request: NextRequest) {
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
+        userCompanies: {
+          select: {
+            id: true,
+            companyId: true,
+            company: {
+              select: {
+                name: true,
+              },
+            },
+            role: true,
+            assignedAt: true,
+          },
+        },
       },
       orderBy: {
         [sortBy]: sortOrder,
@@ -83,6 +96,14 @@ export async function GET(request: NextRequest) {
         lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
+        companies: user.userCompanies.map((uc) => ({
+          id: uc.id,
+          companyId: uc.companyId,
+          companyName: uc.company.name,
+          role: uc.role,
+          assignedAt: uc.assignedAt.toISOString(),
+        })),
+        userCompanies: undefined,
       })),
       meta: {
         page,

@@ -49,6 +49,27 @@ export interface UserResponse {
   updatedAt: string
 }
 
+// User's company assignment (what API returns)
+export interface UserCompanyAssignment {
+  id: string
+  companyId: string
+  companyName: string
+  role: 'admin' | 'ops' | 'viewer'
+  assignedAt: string
+}
+
+// Extended user response with company assignments
+export interface UserWithCompaniesResponse extends UserResponse {
+  companies: UserCompanyAssignment[]
+}
+
+// Update user company assignments schema
+export const updateUserCompaniesSchema = z.object({
+  companyIds: z.array(z.string().uuid()).min(1, 'At least one company is required'),
+})
+
+export type UpdateUserCompaniesInput = z.infer<typeof updateUserCompaniesSchema>
+
 // Password change schema (self-service)
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
