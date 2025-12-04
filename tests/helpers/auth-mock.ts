@@ -37,6 +37,7 @@ export interface TestUserSession {
     role: 'admin' | 'ops' | 'viewer'
     companyId: string
     companyName: string
+    selectedCompanyId: string
   }
 }
 
@@ -97,6 +98,7 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       role: admin.role as 'admin',
       companyId: company.id,
       companyName: company.name,
+      selectedCompanyId: company.id,
     },
   }
 
@@ -108,6 +110,7 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       role: ops.role as 'ops',
       companyId: company.id,
       companyName: company.name,
+      selectedCompanyId: company.id,
     },
   }
 
@@ -119,6 +122,7 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       role: viewer.role as 'viewer',
       companyId: company.id,
       companyName: company.name,
+      selectedCompanyId: company.id,
     },
   }
 

@@ -30,10 +30,13 @@ describe('Tenant Scoping', () => {
     const prisma = getIntegrationPrisma()
     await initializeTestSessions(prisma)
 
-    // Create second company for multi-tenant testing
-    const otherCompany = await prisma.company.create({
-      data: {
-        name: 'Other Company Test',
+    // Create second company for multi-tenant testing (use unique name per run)
+    const timestamp = Date.now()
+    const otherCompany = await prisma.company.upsert({
+      where: { name: `Other Company Test ${timestamp}` },
+      update: {},
+      create: {
+        name: `Other Company Test ${timestamp}`,
         settings: {},
       },
     })
@@ -67,6 +70,7 @@ describe('Tenant Scoping', () => {
         role: 'admin',
         companyId: otherCompany.id,
         companyName: otherCompany.name,
+        selectedCompanyId: otherCompany.id,
       },
     }
   })
@@ -78,10 +82,13 @@ describe('Tenant Scoping', () => {
 
   afterAll(async () => {
     const prisma = getIntegrationPrisma()
-    // Clean up test company
-    await prisma.user.deleteMany({ where: { companyId: otherCompanyId } })
-    await prisma.brand.deleteMany({ where: { companyId: otherCompanyId } })
-    await prisma.company.delete({ where: { id: otherCompanyId } })
+    // Clean up test company (only if it was created)
+    if (otherCompanyId) {
+      await prisma.location.deleteMany({ where: { companyId: otherCompanyId } })
+      await prisma.user.deleteMany({ where: { companyId: otherCompanyId } })
+      await prisma.brand.deleteMany({ where: { companyId: otherCompanyId } })
+      await prisma.company.delete({ where: { id: otherCompanyId } })
+    }
     await disconnectTestDb()
   })
 

@@ -32,12 +32,14 @@ export function getTestPrisma(): PrismaClient {
  */
 export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   // Delete in correct order to respect foreign keys
+  await prisma.finishedGoodsLine.deleteMany({})
   await prisma.transactionLine.deleteMany({})
   await prisma.transaction.deleteMany({})
   await prisma.bOMLine.deleteMany({})
   await prisma.bOMVersion.deleteMany({})
   await prisma.sKU.deleteMany({})
   await prisma.component.deleteMany({})
+  await prisma.location.deleteMany({})
   await prisma.securityEvent.deleteMany({})
   // Don't delete users/brands/companies as they may be needed for auth
 }

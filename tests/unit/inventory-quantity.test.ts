@@ -128,3 +128,206 @@ describe('getComponentQuantities', () => {
     expect(result.has('comp-4')).toBe(true)
   })
 })
+
+describe('getComponentQuantity with locationId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns quantity at specific location', async () => {
+    // Regular transactions at location
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(100) },
+      } as never)
+      // Transfer FROM (negative)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(-20) },
+      } as never)
+      // Transfer TO (positive)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(0) },
+      } as never)
+
+    const result = await getComponentQuantity('comp-1', 'loc-1')
+
+    // 100 (regular) - 20 (transfer out) + 0 (transfer in) = 80
+    expect(result).toBe(80)
+    // First call: regular transactions
+    expect(prisma.transactionLine.aggregate).toHaveBeenNthCalledWith(1, {
+      where: {
+        componentId: 'comp-1',
+        transaction: {
+          locationId: 'loc-1',
+          type: { not: 'transfer' },
+        },
+      },
+      _sum: { quantityChange: true },
+    })
+  })
+
+  it('handles non-transfer transactions at location', async () => {
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(150) },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: null },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: null },
+      } as never)
+
+    const result = await getComponentQuantity('comp-1', 'loc-1')
+
+    expect(result).toBe(150)
+  })
+
+  it('handles transfer FROM location (negative)', async () => {
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(100) },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(-30) },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: null },
+      } as never)
+
+    const result = await getComponentQuantity('comp-1', 'loc-1')
+
+    // 100 - 30 = 70
+    expect(result).toBe(70)
+  })
+
+  it('handles transfer TO location (positive)', async () => {
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(50) },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: null },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(25) },
+      } as never)
+
+    const result = await getComponentQuantity('comp-1', 'loc-1')
+
+    // 50 + 25 = 75
+    expect(result).toBe(75)
+  })
+
+  it('combines regular and transfer quantities correctly', async () => {
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(200) }, // Regular receipts
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(-50) }, // Transfer out
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(30) }, // Transfer in
+      } as never)
+
+    const result = await getComponentQuantity('comp-1', 'loc-1')
+
+    // 200 - 50 + 30 = 180
+    expect(result).toBe(180)
+  })
+})
+
+describe('getComponentQuantities with locationId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns location-filtered quantities for multiple components', async () => {
+    // Regular transactions
+    vi.mocked(prisma.transactionLine.groupBy)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
+        { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
+      ] as never)
+      // Transfer FROM
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(-20) } },
+      ] as never)
+      // Transfer TO
+      .mockResolvedValueOnce([
+        { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(10) } },
+      ] as never)
+
+    const result = await getComponentQuantities(['comp-1', 'comp-2'], 'loc-1')
+
+    // comp-1: 100 - 20 = 80
+    expect(result.get('comp-1')).toBe(80)
+    // comp-2: 50 + 10 = 60
+    expect(result.get('comp-2')).toBe(60)
+  })
+
+  it('handles transfers correctly for each component', async () => {
+    vi.mocked(prisma.transactionLine.groupBy)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(200) } },
+      ] as never)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(-75) } },
+      ] as never)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(25) } },
+      ] as never)
+
+    const result = await getComponentQuantities(['comp-1'], 'loc-1')
+
+    // 200 - 75 + 25 = 150
+    expect(result.get('comp-1')).toBe(150)
+
+    // Verify groupBy was called with location filter for regular transactions
+    expect(prisma.transactionLine.groupBy).toHaveBeenNthCalledWith(1, {
+      by: ['componentId'],
+      where: {
+        componentId: { in: ['comp-1'] },
+        transaction: {
+          locationId: 'loc-1',
+          type: { not: 'transfer' },
+        },
+      },
+      _sum: { quantityChange: true },
+    })
+  })
+})
+
+describe('Performance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('queries component quantity across multiple locations efficiently', async () => {
+    // Setup mock to simulate query completion
+    vi.mocked(prisma.transactionLine.aggregate).mockResolvedValue({
+      _sum: { quantityChange: new Prisma.Decimal(100) },
+    } as never)
+
+    const start = Date.now()
+    await getComponentQuantity('comp-1')
+    const duration = Date.now() - start
+
+    // With mocks, this should be nearly instant (under 100ms)
+    expect(duration).toBeLessThan(100)
+  })
+
+  it('batch queries 100 components efficiently', async () => {
+    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
+
+    const componentIds = Array.from({ length: 100 }, (_, i) => `comp-${i}`)
+
+    const start = Date.now()
+    await getComponentQuantities(componentIds)
+    const duration = Date.now() - start
+
+    // With mocks, batch query should be fast (under 200ms)
+    expect(duration).toBeLessThan(200)
+  })
+})

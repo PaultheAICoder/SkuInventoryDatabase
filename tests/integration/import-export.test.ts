@@ -562,6 +562,7 @@ ALREADY-001,999,20.00`
       await prisma.component.create({
         data: {
           brandId: brand!.id,
+          companyId: TEST_SESSIONS.admin!.user.companyId,
           name: 'Component with "quotes" and, commas',
           skuCode: 'SPECIAL-001',
           category: 'Test',

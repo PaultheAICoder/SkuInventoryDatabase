@@ -21,10 +21,30 @@ export function getIntegrationPrisma(): PrismaClient {
 /**
  * Clean test data before each test
  * Preserves seed data (users, company, brand)
+ * Creates default location for each company if needed
  */
 export async function cleanupBeforeTest(): Promise<void> {
   const db = getIntegrationPrisma()
   await cleanupTestData(db)
+
+  // Ensure each company has a default location after cleanup
+  const companies = await db.company.findMany({ select: { id: true } })
+  for (const company of companies) {
+    const existing = await db.location.findFirst({
+      where: { companyId: company.id, isDefault: true },
+    })
+    if (!existing) {
+      await db.location.create({
+        data: {
+          companyId: company.id,
+          name: 'Main Warehouse',
+          type: 'warehouse',
+          isDefault: true,
+          isActive: true,
+        },
+      })
+    }
+  }
 }
 
 /**
@@ -105,6 +125,7 @@ export async function createTestComponentInDb(
   const component = await db.component.create({
     data: {
       brandId: brand.id,
+      companyId, // Set companyId for direct company scoping
       name: overrides.name ?? `Test Component ${timestamp}`,
       skuCode: overrides.skuCode ?? `TC-${timestamp}`,
       category: overrides.category ?? 'Test',
@@ -150,6 +171,7 @@ export async function createTestSKUInDb(
   const sku = await db.sKU.create({
     data: {
       brandId: brand.id,
+      companyId, // Set companyId for direct company scoping
       name: overrides.name ?? `Test SKU ${timestamp}`,
       internalCode: overrides.internalCode ?? `SKU-${timestamp}`,
       salesChannel: overrides.salesChannel ?? 'Amazon',
@@ -167,13 +189,21 @@ export async function createTestSKUInDb(
 export async function createTestReceiptInDb(
   companyId: string,
   componentId: string,
-  quantity: number
+  quantity: number,
+  locationId?: string
 ): Promise<{ id: string; quantity: number }> {
   const db = getIntegrationPrisma()
 
   const admin = await db.user.findFirst({
     where: { companyId, role: 'admin' },
   })
+
+  // Get location ID - use provided or get default
+  let resolvedLocationId = locationId
+  if (!resolvedLocationId) {
+    const defaultLoc = await getOrCreateDefaultLocation(companyId)
+    resolvedLocationId = defaultLoc.id
+  }
 
   const transaction = await db.transaction.create({
     data: {
@@ -182,6 +212,7 @@ export async function createTestReceiptInDb(
       date: new Date(),
       supplier: 'Test Supplier',
       createdById: admin?.id ?? companyId,
+      locationId: resolvedLocationId,
       lines: {
         create: {
           componentId,
@@ -196,4 +227,58 @@ export async function createTestReceiptInDb(
   })
 
   return { id: transaction.id, quantity }
+}
+
+/**
+ * Create test location in database
+ */
+export async function createTestLocationInDb(
+  companyId: string,
+  overrides: Partial<{
+    name: string
+    type: 'warehouse' | 'threepl' | 'fba' | 'finished_goods'
+    isDefault: boolean
+  }> = {}
+): Promise<{ id: string; name: string; type: string }> {
+  const db = getIntegrationPrisma()
+  const timestamp = Date.now()
+
+  const location = await db.location.create({
+    data: {
+      companyId,
+      name: overrides.name ?? `Test Location ${timestamp}`,
+      type: overrides.type ?? 'warehouse',
+      isDefault: overrides.isDefault ?? false,
+      isActive: true,
+    },
+  })
+
+  return { id: location.id, name: location.name, type: location.type }
+}
+
+/**
+ * Get or create default location for a company
+ */
+export async function getOrCreateDefaultLocation(
+  companyId: string
+): Promise<{ id: string; name: string }> {
+  const db = getIntegrationPrisma()
+
+  let location = await db.location.findFirst({
+    where: { companyId, isDefault: true },
+  })
+
+  if (!location) {
+    location = await db.location.create({
+      data: {
+        companyId,
+        name: 'Main Warehouse',
+        type: 'warehouse',
+        isDefault: true,
+        isActive: true,
+      },
+    })
+  }
+
+  return { id: location.id, name: location.name }
 }
