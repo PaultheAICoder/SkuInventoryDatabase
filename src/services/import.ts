@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod'
+import { parseFractionOrNumber } from '@/lib/utils'
 
 export interface ImportResult<T> {
   success: boolean
@@ -176,11 +177,16 @@ const componentImportSchema = z.object({
 })
 
 // Helper to create BOM column schemas (5 component pairs)
+// Supports fraction values like "1/45" in addition to decimal numbers
 function createBomColumnSchemas(): Record<string, z.ZodTypeAny> {
   const schemas: Record<string, z.ZodTypeAny> = {}
   for (let i = 1; i <= 5; i++) {
     schemas[`bom_component_${i}`] = z.string().optional().transform((v) => v || undefined)
-    schemas[`bom_qty_${i}`] = z.string().optional().transform((v) => v ? parseFloat(v) : undefined)
+    schemas[`bom_qty_${i}`] = z.string().optional().transform((v) => {
+      if (!v) return undefined
+      const parsed = parseFractionOrNumber(v)
+      return parsed !== null && parsed > 0 ? parsed : undefined
+    })
   }
   return schemas
 }

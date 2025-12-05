@@ -1,9 +1,35 @@
 import { z } from 'zod'
+import { parseFractionOrNumber } from '@/lib/utils'
 
 // BOM line schema (for creating/updating BOM versions)
 export const bomLineSchema = z.object({
   componentId: z.string().uuid('Invalid component ID'),
-  quantityPerUnit: z.coerce.number().positive('Quantity must be positive'),
+  quantityPerUnit: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) => {
+      // If already a number, validate it directly
+      if (typeof val === 'number') {
+        if (isNaN(val) || val <= 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Quantity must be a positive number',
+          })
+          return z.NEVER
+        }
+        return val
+      }
+
+      // Parse string (fraction or decimal)
+      const parsed = parseFractionOrNumber(val)
+      if (parsed === null || parsed <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Quantity must be a positive number or fraction (e.g., "1", "0.5", "1/45")',
+        })
+        return z.NEVER
+      }
+      return parsed
+    }),
   notes: z.string().optional().nullable(),
 })
 

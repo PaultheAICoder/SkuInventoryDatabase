@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table'
 import { Plus, Trash2 } from 'lucide-react'
 import type { ComponentResponse } from '@/types/component'
+import { parseFractionOrNumber } from '@/lib/utils'
 
 interface BOMLine {
   componentId: string
@@ -105,7 +106,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
 
   const calculateTotalCost = () => {
     return lines.reduce((total, line) => {
-      const qty = parseFloat(line.quantityPerUnit) || 0
+      const qty = parseFractionOrNumber(line.quantityPerUnit) ?? 0
       const cost = parseFloat(line.costPerUnit) || 0
       return total + qty * cost
     }, 0)
@@ -140,7 +141,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
           defectNotes: formData.defectNotes || null,
           lines: lines.map((line) => ({
             componentId: line.componentId,
-            quantityPerUnit: parseFloat(line.quantityPerUnit),
+            quantityPerUnit: line.quantityPerUnit,
             notes: line.notes || null,
           })),
         }),
@@ -279,7 +280,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
                   <TableBody>
                     {lines.map((line, index) => {
                       const lineCost =
-                        (parseFloat(line.quantityPerUnit) || 0) *
+                        (parseFractionOrNumber(line.quantityPerUnit) ?? 0) *
                         (parseFloat(line.costPerUnit) || 0)
                       return (
                         <TableRow key={index}>
@@ -307,13 +308,12 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
                           </TableCell>
                           <TableCell>
                             <Input
-                              type="number"
-                              step="0.0001"
-                              min="0.0001"
+                              type="text"
                               value={line.quantityPerUnit}
                               onChange={(e) =>
                                 updateLine(index, 'quantityPerUnit', e.target.value)
                               }
+                              placeholder="e.g., 1, 0.5, 1/45"
                               className="w-full"
                             />
                           </TableCell>
