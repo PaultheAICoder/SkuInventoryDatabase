@@ -140,6 +140,39 @@ describe('SKU API', () => {
 
       expect(result.status).toBe(401)
     })
+
+    it('returns 401 for stale user session (user ID not in database)', async () => {
+      // Create a session with a non-existent user ID (simulates stale JWT after DB reseed)
+      const staleSession = {
+        user: {
+          id: '00000000-0000-0000-0000-000000000000', // Non-existent user
+          email: 'deleted@example.com',
+          name: 'Deleted User',
+          role: 'admin' as const,
+          companyId: TEST_SESSIONS.admin!.user.companyId,
+          companyName: 'Tonsil Tech',
+          selectedCompanyId: TEST_SESSIONS.admin!.user.selectedCompanyId,
+        },
+      }
+      setTestSession(staleSession)
+
+      const request = createTestRequest('/api/skus', {
+        method: 'POST',
+        body: {
+          name: 'Test SKU',
+          internalCode: `TEST-STALE-${Date.now()}`,
+          salesChannel: 'Amazon',
+          externalIds: {},
+        },
+      })
+
+      const response = await createSKU(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
+      // API returns error response with message field
+      expect((result.data as { message?: string })?.message).toContain('session has expired')
+    })
   })
 
   describe('GET /api/skus', () => {

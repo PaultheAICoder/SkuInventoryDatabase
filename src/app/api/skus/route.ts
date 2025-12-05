@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, validateUserExists } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import {
@@ -154,6 +154,23 @@ export async function POST(request: NextRequest) {
       return error('Company context is required. Please select a company and try again.', 400, 'BadRequest')
     }
 
+    // Validate user still exists in database (catches stale JWT tokens after DB reseed)
+    const validUser = await validateUserExists(session.user.id)
+    if (!validUser) {
+      console.error('SKU creation failed: User ID not found in database (stale JWT token)', {
+        userId: session.user.id,
+        email: session.user.email,
+      })
+      return error('Your session has expired. Please log out and log back in.', 401, 'Unauthorized')
+    }
+    if (!validUser.isActive) {
+      console.error('SKU creation failed: User is inactive', {
+        userId: session.user.id,
+        email: session.user.email,
+      })
+      return error('Your account is inactive. Please contact an administrator.', 403, 'Forbidden')
+    }
+
     const bodyResult = await parseBody(request, createSKUSchema)
     if (bodyResult.error) return bodyResult.error
 
@@ -250,6 +267,19 @@ export async function POST(request: NextRequest) {
     // Return user-friendly message based on error type
     if (err instanceof Error && err.message.includes('Unique constraint')) {
       return conflict('A SKU with this internal code already exists')
+    }
+
+    // Handle FK constraint violations (e.g., stale user ID in JWT)
+    if (err instanceof Error && err.message.includes('Foreign key constraint')) {
+      if (err.message.includes('createdById') || err.message.includes('updatedById')) {
+        return error('Your session has expired. Please log out and log back in.', 401, 'Unauthorized')
+      }
+      if (err.message.includes('brandId')) {
+        return error('Invalid brand selection. Please refresh the page and try again.', 400, 'BadRequest')
+      }
+      if (err.message.includes('companyId')) {
+        return error('Company context is invalid. Please log out and log back in.', 400, 'BadRequest')
+      }
     }
 
     return serverError('Failed to create SKU. Please try again or contact support.')

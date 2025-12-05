@@ -325,3 +325,20 @@ export function validateCompanyAccess(
 ): boolean {
   return session.user.companies.some((c) => c.id === companyId)
 }
+
+/**
+ * Validate that a user ID exists in the database
+ * Used to catch stale JWT tokens after database reseed
+ * Returns the user record if found, null otherwise
+ */
+export async function validateUserExists(userId: string): Promise<{ id: string; email: string; isActive: boolean } | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, isActive: true }
+    })
+    return user
+  } catch {
+    return null
+  }
+}
