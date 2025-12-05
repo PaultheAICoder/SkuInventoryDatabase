@@ -21,6 +21,8 @@ import { POST as importComponents } from '@/app/api/import/components/route'
 import { POST as importSKUs } from '@/app/api/import/skus/route'
 import { POST as importInitialInventory } from '@/app/api/import/initial-inventory/route'
 import { GET as getTemplate } from '@/app/api/import/template/[type]/route'
+import { POST as importInventorySnapshot } from '@/app/api/import/inventory-snapshot/route'
+import { NextRequest } from 'next/server'
 
 describe('Import/Export API', () => {
   beforeAll(async () => {
@@ -940,6 +942,86 @@ Simple Component,SIMPLE-001,Simple`
 
       expect(response.status).toBe(200)
       expect(result.data.imported).toBe(2)
+    })
+  })
+
+  describe('Inventory Snapshot Import', () => {
+    describe('POST /api/import/inventory-snapshot', () => {
+      it('creates components with correct companyId (issue #174)', async () => {
+        setTestSession(TEST_SESSIONS.admin!)
+        const prisma = getIntegrationPrisma()
+
+        // Generate a unique SKU code for this test
+        const uniqueName = `Test Import Component ${Date.now()}`
+
+        // Create a minimal XLSX buffer with test data
+        const XLSX = await import('xlsx')
+        const workbook = XLSX.utils.book_new()
+        const worksheet = XLSX.utils.aoa_to_sheet([
+          ['Item Name', 'Current Balance'],
+          [uniqueName, 100],
+        ])
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1')
+        const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+        // Create FormData with the file
+        const formData = new FormData()
+        const file = new File([xlsxBuffer], 'test-snapshot.xlsx', {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        formData.append('file', file)
+
+        // Create request with FormData
+        const url = new URL('/api/import/inventory-snapshot', 'http://localhost:4500')
+        const request = new NextRequest(url, {
+          method: 'POST',
+          body: formData,
+        })
+
+        const response = await importInventorySnapshot(request)
+        expect(response.status).toBe(200)
+
+        const json = await response.json()
+        expect(json.data.componentsCreated).toBeGreaterThan(0)
+
+        // Verify the created component has the correct companyId
+        const createdComponent = await prisma.component.findFirst({
+          where: {
+            name: uniqueName,
+          },
+        })
+
+        expect(createdComponent).not.toBeNull()
+        expect(createdComponent!.companyId).toBe(TEST_SESSIONS.admin!.user.companyId)
+      })
+
+      it('viewer cannot import inventory snapshot (401)', async () => {
+        setTestSession(TEST_SESSIONS.viewer!)
+
+        const XLSX = await import('xlsx')
+        const workbook = XLSX.utils.book_new()
+        const worksheet = XLSX.utils.aoa_to_sheet([
+          ['Item Name', 'Current Balance'],
+          ['Test Component', 100],
+        ])
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1')
+        const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+
+        const formData = new FormData()
+        const file = new File([xlsxBuffer], 'test-snapshot.xlsx', {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        formData.append('file', file)
+
+        const url = new URL('/api/import/inventory-snapshot', 'http://localhost:4500')
+        const request = new NextRequest(url, {
+          method: 'POST',
+          body: formData,
+        })
+
+        const response = await importInventorySnapshot(request)
+        expect(response.status).toBe(401)
+      })
     })
   })
 })

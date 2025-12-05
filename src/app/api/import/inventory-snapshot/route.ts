@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
           component = await prisma.component.create({
             data: {
               brandId,
+              companyId,
               name: row.itemName,
               skuCode: generatedSkuCode,
               unitOfMeasure: 'each',
