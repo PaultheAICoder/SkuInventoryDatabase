@@ -233,6 +233,9 @@ const initialInventoryImportSchema = z.object({
     return date
   }),
   notes: z.string().optional().transform((v) => v || null),
+  // Optional company/brand columns
+  company: z.string().optional().transform((v) => v || undefined),
+  brand: z.string().optional().transform((v) => v || undefined),
 })
 
 /**
@@ -352,6 +355,8 @@ export interface InitialInventoryRowData {
   costPerUnit?: number
   date: Date
   notes: string | null
+  company?: string   // Optional company name for lookup
+  brand?: string     // Optional brand name for lookup
 }
 
 /**
@@ -370,6 +375,8 @@ function importInitialInventoryRow(
       costPerUnit: csvParsed.cost_per_unit,
       date: csvParsed.date,
       notes: csvParsed.notes,
+      company: csvParsed.company,
+      brand: csvParsed.brand,
     }
 
     return {
@@ -646,6 +653,8 @@ export function generateInitialInventoryTemplate(): string {
     'Cost Per Unit',
     'Date',
     'Notes',
+    'Company',
+    'Brand',
   ]
 
   const exampleRow = [
@@ -654,6 +663,8 @@ export function generateInitialInventoryTemplate(): string {
     '10.50',
     '2025-01-01',
     'Opening balance',
+    '',  // Company (optional)
+    '',  // Brand (optional)
   ]
 
   return [headers.join(','), exampleRow.join(',')].join('\n')

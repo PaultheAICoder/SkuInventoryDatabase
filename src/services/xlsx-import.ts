@@ -11,6 +11,9 @@ import * as XLSX from 'xlsx'
 export interface InventorySnapshotRow {
   itemName: string
   currentBalance: number
+  company?: string    // Optional company name from file
+  brand?: string      // Optional brand name from file
+  location?: string   // Optional location name from file
 }
 
 /**
@@ -129,6 +132,9 @@ export function normalizeSnapshotHeader(header: string): string {
   // Map variations to standard keys
   const itemVariations = ['item', 'item_name', 'name', 'product', 'product_name']
   const balanceVariations = ['current_balance', 'balance', 'quantity', 'qty', 'on_hand', 'onhand', 'count']
+  const companyVariations = ['company', 'company_name']
+  const brandVariations = ['brand', 'brand_name']
+  const locationVariations = ['location', 'location_name', 'warehouse', 'storage_location']
 
   if (itemVariations.includes(normalized)) {
     return 'item'
@@ -136,6 +142,18 @@ export function normalizeSnapshotHeader(header: string): string {
 
   if (balanceVariations.includes(normalized)) {
     return 'current_balance'
+  }
+
+  if (companyVariations.includes(normalized)) {
+    return 'company'
+  }
+
+  if (brandVariations.includes(normalized)) {
+    return 'brand'
+  }
+
+  if (locationVariations.includes(normalized)) {
+    return 'location'
   }
 
   return normalized
@@ -175,6 +193,9 @@ export function parseInventorySnapshot(
 
   const itemIndex = normalizedHeaders.indexOf('item')
   const balanceIndex = normalizedHeaders.indexOf('current_balance')
+  const companyIndex = normalizedHeaders.indexOf('company')
+  const brandIndex = normalizedHeaders.indexOf('brand')
+  const locationIndex = normalizedHeaders.indexOf('location')
 
   if (itemIndex === -1) {
     result.errors.push({
@@ -202,6 +223,9 @@ export function parseInventorySnapshot(
 
     const itemName = String(row[itemIndex] ?? '').trim()
     const balanceStr = String(row[balanceIndex] ?? '').trim()
+    const company = companyIndex >= 0 ? String(row[companyIndex] ?? '').trim() || undefined : undefined
+    const brand = brandIndex >= 0 ? String(row[brandIndex] ?? '').trim() || undefined : undefined
+    const location = locationIndex >= 0 ? String(row[locationIndex] ?? '').trim() || undefined : undefined
 
     // Validate item name
     if (!itemName) {
@@ -233,6 +257,9 @@ export function parseInventorySnapshot(
       result.rows.push({
         itemName,
         currentBalance,
+        company,
+        brand,
+        location,
       })
     }
   }

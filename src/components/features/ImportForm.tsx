@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Upload, Download, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { BrandSelectionDialog } from './BrandSelectionDialog'
+import { CompanySelectionDialog } from './CompanySelectionDialog'
+import { LocationSelectionDialog } from './LocationSelectionDialog'
 
 export interface ImportResult {
   total: number
@@ -53,6 +55,8 @@ export function ImportForm({
   const [allowOverwrite, setAllowOverwrite] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showBrandDialog, setShowBrandDialog] = useState(false)
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
+  const [showLocationDialog, setShowLocationDialog] = useState(false)
   const [pendingRetry, setPendingRetry] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,9 +156,25 @@ export function ImportForm({
       console.error('Upload error:', error)
       const errorMessage = error instanceof Error ? error.message : 'Import failed. Please try again.'
 
+      // Check if error is company-related
+      if (errorMessage.toLowerCase().includes('no company') ||
+          errorMessage.toLowerCase().includes('company required')) {
+        setShowCompanyDialog(true)
+        setUploadError(null) // Clear any previous error
+        return
+      }
+
       // Check if error is brand-related
       if (errorMessage.toLowerCase().includes('no active brand')) {
         setShowBrandDialog(true)
+        setUploadError(null) // Clear any previous error
+        return
+      }
+
+      // Check if error is location-related
+      if (errorMessage.toLowerCase().includes('no location') ||
+          errorMessage.toLowerCase().includes('location required')) {
+        setShowLocationDialog(true)
         setUploadError(null) // Clear any previous error
         return
       }
@@ -168,10 +188,22 @@ export function ImportForm({
     }
   }
 
+  const handleCompanySelected = async () => {
+    // Set flag to trigger retry, then close dialog
+    setPendingRetry(true)
+    setShowCompanyDialog(false)
+  }
+
   const handleBrandSelected = async () => {
     // Set flag to trigger retry, then close dialog
     setPendingRetry(true)
     setShowBrandDialog(false)
+  }
+
+  const handleLocationSelected = async () => {
+    // Set flag to trigger retry, then close dialog
+    setPendingRetry(true)
+    setShowLocationDialog(false)
   }
 
   // Retry upload after brand selection
@@ -223,6 +255,7 @@ export function ImportForm({
             <p className="text-sm font-medium">Expected Format</p>
             <p className="text-xs text-muted-foreground">
               Excel file with columns: Item (name), Current Balance (quantity).
+              Optional columns: Company, Brand, Location (for multi-company imports).
               Date is extracted from filename (e.g., 2025-11-13_Inventory.xlsx).
             </p>
           </div>
@@ -297,6 +330,20 @@ export function ImportForm({
         </Button>
       </CardContent>
 
+      {/* Company Selection Dialog */}
+      <CompanySelectionDialog
+        open={showCompanyDialog}
+        onOpenChange={(open) => {
+          setShowCompanyDialog(open)
+          if (!open) {
+            setPendingRetry(false)
+          }
+        }}
+        onCompanySelected={handleCompanySelected}
+        title="Company Required"
+        description="This import requires a company to be selected. Please choose a company to continue."
+      />
+
       {/* Brand Selection Dialog */}
       <BrandSelectionDialog
         open={showBrandDialog}
@@ -309,6 +356,20 @@ export function ImportForm({
         onBrandSelected={handleBrandSelected}
         title="Brand Required"
         description="This import requires a brand to be selected. Please choose a brand to continue."
+      />
+
+      {/* Location Selection Dialog */}
+      <LocationSelectionDialog
+        open={showLocationDialog}
+        onOpenChange={(open) => {
+          setShowLocationDialog(open)
+          if (!open) {
+            setPendingRetry(false)
+          }
+        }}
+        onLocationSelected={handleLocationSelected}
+        title="Location Required"
+        description="This import requires a location to be selected. Please choose a location to continue."
       />
     </Card>
   )

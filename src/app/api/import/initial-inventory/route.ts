@@ -22,6 +22,53 @@ interface InitialInventoryImportResult {
   }>
 }
 
+/**
+ * Lookup maps for resolving entity names to IDs
+ */
+interface LookupMaps {
+  companies: Map<string, string> // lowercase name -> id
+  companyNames: Map<string, string> // id -> original name
+  brands: Map<string, { id: string; companyId: string }> // "companyName|brandName" -> { id, companyId }
+}
+
+/**
+ * Pre-fetch all lookup data to avoid N+1 queries during import
+ */
+async function buildLookupMaps(
+  userId: string,
+  selectedCompanyId: string
+): Promise<LookupMaps> {
+  // Get user's accessible companies
+  const userCompanies = await prisma.userCompany.findMany({
+    where: { userId },
+    select: { companyId: true },
+  })
+  const companyIds = [selectedCompanyId, ...userCompanies.map((uc) => uc.companyId)]
+  const uniqueCompanyIds = Array.from(new Set(companyIds))
+
+  const [companies, brands] = await Promise.all([
+    prisma.company.findMany({
+      where: { id: { in: uniqueCompanyIds } },
+      select: { id: true, name: true },
+    }),
+    prisma.brand.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+  ])
+
+  return {
+    companies: new Map(companies.map((c) => [c.name.toLowerCase(), c.id])),
+    companyNames: new Map(companies.map((c) => [c.id, c.name])),
+    brands: new Map(
+      brands.map((b) => [
+        `${b.company.name.toLowerCase()}|${b.name.toLowerCase()}`,
+        { id: b.id, companyId: b.companyId },
+      ])
+    ),
+  }
+}
+
 // POST /api/import/initial-inventory - Import initial inventory from CSV
 export async function POST(request: NextRequest) {
   try {
@@ -72,6 +119,9 @@ export async function POST(request: NextRequest) {
     const importSummary: ImportSummary<InitialInventoryRowData> =
       processInitialInventoryImport(csvContent)
 
+    // Pre-fetch all lookup data (avoid N+1 queries)
+    const lookupMaps = await buildLookupMaps(session.user.id, selectedCompanyId)
+
     const result: InitialInventoryImportResult = {
       total: importSummary.total,
       imported: 0,
@@ -95,11 +145,46 @@ export async function POST(request: NextRequest) {
       const rowData = row.data
 
       try {
-        // Look up component by SKU code within the selected company
+        // Resolve company from file or use session default
+        let resolvedCompanyId = selectedCompanyId
+        if (rowData.company) {
+          const foundCompanyId = lookupMaps.companies.get(rowData.company.toLowerCase())
+          if (!foundCompanyId) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              componentSkuCode: rowData.componentSkuCode,
+              errors: [`Company "${rowData.company}" not found`],
+            })
+            continue
+          }
+          resolvedCompanyId = foundCompanyId
+        }
+
+        // Resolve brand from file if provided (for component lookup scoping)
+        let resolvedBrandId: string | undefined
+        if (rowData.brand) {
+          const companyName = rowData.company || lookupMaps.companyNames.get(resolvedCompanyId) || ''
+          const brandKey = `${companyName.toLowerCase()}|${rowData.brand.toLowerCase()}`
+          const foundBrand = lookupMaps.brands.get(brandKey)
+          if (!foundBrand) {
+            result.skipped++
+            result.errors.push({
+              rowNumber: row.rowNumber,
+              componentSkuCode: rowData.componentSkuCode,
+              errors: [`Brand "${rowData.brand}" not found for company`],
+            })
+            continue
+          }
+          resolvedBrandId = foundBrand.id
+        }
+
+        // Look up component by SKU code within the resolved company (and optionally brand)
         const component = await prisma.component.findFirst({
           where: {
-            companyId: selectedCompanyId,
+            companyId: resolvedCompanyId,
             skuCode: rowData.componentSkuCode,
+            ...(resolvedBrandId ? { brandId: resolvedBrandId } : {}),
           },
         })
 
@@ -147,9 +232,9 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create initial transaction for the selected company
+        // Create initial transaction for the resolved company
         await createInitialTransaction({
-          companyId: selectedCompanyId,
+          companyId: resolvedCompanyId,
           componentId: component.id,
           quantity: rowData.quantity,
           date: rowData.date,

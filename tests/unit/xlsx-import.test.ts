@@ -133,5 +133,38 @@ describe('xlsx-import service', () => {
     it('should handle special characters', () => {
       expect(normalizeSnapshotHeader('Item (Primary)')).toBe('item_primary')
     })
+
+    // New tests for Company/Brand/Location header normalization
+    it('should normalize Company to company', () => {
+      expect(normalizeSnapshotHeader('Company')).toBe('company')
+    })
+
+    it('should normalize Company Name to company', () => {
+      expect(normalizeSnapshotHeader('Company Name')).toBe('company')
+    })
+
+    it('should normalize Brand to brand', () => {
+      expect(normalizeSnapshotHeader('Brand')).toBe('brand')
+    })
+
+    it('should normalize Brand Name to brand', () => {
+      expect(normalizeSnapshotHeader('Brand Name')).toBe('brand')
+    })
+
+    it('should normalize Location to location', () => {
+      expect(normalizeSnapshotHeader('Location')).toBe('location')
+    })
+
+    it('should normalize Location Name to location', () => {
+      expect(normalizeSnapshotHeader('Location Name')).toBe('location')
+    })
+
+    it('should normalize Warehouse to location', () => {
+      expect(normalizeSnapshotHeader('Warehouse')).toBe('location')
+    })
+
+    it('should normalize Storage Location to location', () => {
+      expect(normalizeSnapshotHeader('Storage Location')).toBe('location')
+    })
   })
 })

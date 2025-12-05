@@ -140,4 +140,16 @@ test.describe('Inventory Snapshot Import Feature', () => {
     // Check that the page mentions Excel files in main content area
     await expect(page.locator('main')).toContainText('Excel')
   })
+
+  test('Inventory Snapshot format info mentions optional Company/Brand/Location columns', async ({ page }) => {
+    await page.goto('/import')
+
+    // Wait for page to load
+    await expect(page.locator('h1')).toContainText('Import Data')
+
+    // Verify format info mentions optional columns
+    await expect(page.getByText('Expected Format')).toBeVisible()
+    // The format info text contains "Optional columns: Company, Brand, Location"
+    await expect(page.getByText(/Optional columns:\s*Company,?\s*Brand,?\s*Location/i)).toBeVisible()
+  })
 })

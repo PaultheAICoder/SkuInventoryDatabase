@@ -21,6 +21,64 @@ interface InventorySnapshotImportResult {
   }>
 }
 
+/**
+ * Lookup maps for resolving entity names to IDs
+ */
+interface LookupMaps {
+  companies: Map<string, string> // lowercase name -> id
+  companyNames: Map<string, string> // id -> original name
+  brands: Map<string, { id: string; companyId: string }> // "companyName|brandName" -> { id, companyId }
+  locations: Map<string, { id: string; companyId: string }> // "companyName|locationName" -> { id, companyId }
+}
+
+/**
+ * Pre-fetch all lookup data to avoid N+1 queries during import
+ */
+async function buildLookupMaps(
+  userId: string,
+  selectedCompanyId: string
+): Promise<LookupMaps> {
+  // Get user's accessible companies
+  const userCompanies = await prisma.userCompany.findMany({
+    where: { userId },
+    select: { companyId: true },
+  })
+  const companyIds = [selectedCompanyId, ...userCompanies.map((uc) => uc.companyId)]
+  const uniqueCompanyIds = Array.from(new Set(companyIds))
+
+  const [companies, brands, locations] = await Promise.all([
+    prisma.company.findMany({
+      where: { id: { in: uniqueCompanyIds } },
+      select: { id: true, name: true },
+    }),
+    prisma.brand.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+    prisma.location.findMany({
+      where: { companyId: { in: uniqueCompanyIds }, isActive: true },
+      select: { id: true, name: true, companyId: true, company: { select: { name: true } } },
+    }),
+  ])
+
+  return {
+    companies: new Map(companies.map((c) => [c.name.toLowerCase(), c.id])),
+    companyNames: new Map(companies.map((c) => [c.id, c.name])),
+    brands: new Map(
+      brands.map((b) => [
+        `${b.company.name.toLowerCase()}|${b.name.toLowerCase()}`,
+        { id: b.id, companyId: b.companyId },
+      ])
+    ),
+    locations: new Map(
+      locations.map((l) => [
+        `${l.company.name.toLowerCase()}|${l.name.toLowerCase()}`,
+        { id: l.id, companyId: l.companyId },
+      ])
+    ),
+  }
+}
+
 // POST /api/import/inventory-snapshot - Import inventory snapshot from XLSX
 export async function POST(request: NextRequest) {
   try {
@@ -106,6 +164,9 @@ export async function POST(request: NextRequest) {
       return success(result)
     }
 
+    // Pre-fetch all lookup data (avoid N+1 queries)
+    const lookupMaps = await buildLookupMaps(session.user.id, selectedCompanyId)
+
     // Determine the date to use for transactions
     const transactionDate = parseResult.dateFromFilename ?? new Date()
 
@@ -115,6 +176,67 @@ export async function POST(request: NextRequest) {
       const rowNumber = i + 2 // 1-indexed, +1 for header
 
       try {
+        // Resolve company from file or use session default
+        let resolvedCompanyId = companyId
+        if (row.company) {
+          const foundCompanyId = lookupMaps.companies.get(row.company.toLowerCase())
+          if (!foundCompanyId) {
+            result.skipped++
+            result.errors.push({
+              rowNumber,
+              itemName: row.itemName,
+              errors: [`Company "${row.company}" not found`],
+            })
+            continue
+          }
+          resolvedCompanyId = foundCompanyId
+        }
+
+        // Resolve brand from file or use session default
+        let resolvedBrandId = brandId
+        if (row.brand) {
+          const companyName = row.company || lookupMaps.companyNames.get(resolvedCompanyId) || ''
+          const brandKey = `${companyName.toLowerCase()}|${row.brand.toLowerCase()}`
+          const foundBrand = lookupMaps.brands.get(brandKey)
+          if (!foundBrand) {
+            result.skipped++
+            result.errors.push({
+              rowNumber,
+              itemName: row.itemName,
+              errors: [`Brand "${row.brand}" not found for company`],
+            })
+            continue
+          }
+          if (foundBrand.companyId !== resolvedCompanyId) {
+            result.skipped++
+            result.errors.push({
+              rowNumber,
+              itemName: row.itemName,
+              errors: [`Brand "${row.brand}" does not belong to the specified company`],
+            })
+            continue
+          }
+          resolvedBrandId = foundBrand.id
+        }
+
+        // Resolve location from file (optional validation)
+        let resolvedLocationId: string | undefined
+        if (row.location) {
+          const companyName = row.company || lookupMaps.companyNames.get(resolvedCompanyId) || ''
+          const locationKey = `${companyName.toLowerCase()}|${row.location.toLowerCase()}`
+          const foundLocation = lookupMaps.locations.get(locationKey)
+          if (!foundLocation) {
+            result.skipped++
+            result.errors.push({
+              rowNumber,
+              itemName: row.itemName,
+              errors: [`Location "${row.location}" not found for company`],
+            })
+            continue
+          }
+          resolvedLocationId = foundLocation.id
+        }
+
         // Generate SKU code from item name
         const generatedSkuCode = generateSkuCode(row.itemName)
 
@@ -128,9 +250,9 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Check if component exists by SKU code
+        // Check if component exists by SKU code (using resolved brand)
         let component = await prisma.component.findFirst({
-          where: { brandId, skuCode: generatedSkuCode },
+          where: { brandId: resolvedBrandId, skuCode: generatedSkuCode },
         })
 
         let componentCreated = false
@@ -139,8 +261,8 @@ export async function POST(request: NextRequest) {
         if (!component) {
           component = await prisma.component.create({
             data: {
-              brandId,
-              companyId,
+              brandId: resolvedBrandId,
+              companyId: resolvedCompanyId,
               name: row.itemName,
               skuCode: generatedSkuCode,
               unitOfMeasure: 'each',
@@ -154,6 +276,10 @@ export async function POST(request: NextRequest) {
           componentCreated = true
           result.componentsCreated++
         }
+
+        // Note: resolvedLocationId is validated but not stored on Component model yet
+        // When Component model is updated to include locationId, use it here
+        void resolvedLocationId // Suppress unused variable warning
 
         // Check for existing initial transaction
         const existingInitial = await prisma.transaction.findFirst({
@@ -190,7 +316,7 @@ export async function POST(request: NextRequest) {
 
         // Create initial transaction
         await createInitialTransaction({
-          companyId,
+          companyId: resolvedCompanyId,
           componentId: component.id,
           quantity: row.currentBalance,
           date: transactionDate,
