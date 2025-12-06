@@ -620,18 +620,46 @@ export async function createInitialTransaction(params: {
 }
 
 /**
- * Check if a component can be deleted (not used in active BOMs)
+ * Check if a component can be safely deactivated
+ * Returns detailed reason if deletion is blocked
  */
-export async function canDeleteComponent(componentId: string): Promise<boolean> {
-  const activeBomLineCount = await prisma.bOMLine.count({
-    where: {
-      componentId,
-      bomVersion: {
-        isActive: true,
-      },
-    },
+export async function canDeleteComponent(
+  componentId: string
+): Promise<{ canDelete: boolean; reason?: string }> {
+  // Check 1: Transaction history - most common blocker
+  const transactionLineCount = await prisma.transactionLine.count({
+    where: { componentId },
   })
-  return activeBomLineCount === 0
+  if (transactionLineCount > 0) {
+    return {
+      canDelete: false,
+      reason: `Cannot deactivate component with ${transactionLineCount} transaction record(s). Historical data must be preserved.`,
+    }
+  }
+
+  // Check 2: BOM references (active AND inactive)
+  const bomLineCount = await prisma.bOMLine.count({
+    where: { componentId },
+  })
+  if (bomLineCount > 0) {
+    return {
+      canDelete: false,
+      reason: `Cannot deactivate component used in ${bomLineCount} BOM(s). Remove from all BOMs first.`,
+    }
+  }
+
+  // Check 3: Lot references
+  const lotCount = await prisma.lot.count({
+    where: { componentId },
+  })
+  if (lotCount > 0) {
+    return {
+      canDelete: false,
+      reason: `Cannot deactivate component with ${lotCount} lot(s). Delete lots first.`,
+    }
+  }
+
+  return { canDelete: true }
 }
 
 /**

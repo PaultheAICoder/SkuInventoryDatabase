@@ -378,10 +378,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return notFound('Component')
     }
 
-    // Check if used in active BOMs
-    const canDelete = await canDeleteComponent(id)
-    if (!canDelete) {
-      return conflict('Cannot deactivate component that is used in active BOMs')
+    // Check if component can be safely deactivated (not used in transactions, BOMs, or lots)
+    const deleteCheck = await canDeleteComponent(id)
+    if (!deleteCheck.canDelete) {
+      return conflict(deleteCheck.reason ?? 'Cannot deactivate component due to existing references')
     }
 
     await prisma.component.update({
