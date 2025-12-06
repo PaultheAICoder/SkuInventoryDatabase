@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     const [bomCosts, buildableUnits, finishedGoodsQtys] = await Promise.all([
       activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds, selectedCompanyId!) : new Map<string, number>(),
       skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId!, locationId) : new Map<string, number | null>(),
-      skuIds.length > 0 ? getSkuQuantities(skuIds, locationId) : new Map<string, number>(),
+      skuIds.length > 0 ? getSkuQuantities(skuIds, selectedCompanyId!, locationId) : new Map<string, number>(),
     ])
 
     // Transform response

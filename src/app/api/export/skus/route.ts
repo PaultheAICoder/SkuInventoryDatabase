@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Get all SKU IDs and fetch FG quantities
     const skuIds = skus.map((sku) => sku.id)
-    const fgQuantities = await getSkuQuantities(skuIds, locationId)
+    const fgQuantities = await getSkuQuantities(skuIds, selectedCompanyId!, locationId)
 
     // Transform to export format
     const exportData: SKUExportData[] = await Promise.all(

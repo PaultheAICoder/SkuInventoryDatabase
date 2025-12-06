@@ -23,8 +23,21 @@ export function calculateExpiryStatus(expiryDate: Date | null): ExpiryStatus {
 /**
  * Get lot balance from LotBalance table
  * Returns the current balance for a lot, or 0 if no balance record exists
+ * Enforces tenant isolation by verifying lot belongs to company via component
  */
-export async function getLotBalance(lotId: string): Promise<number> {
+export async function getLotBalance(lotId: string, companyId: string): Promise<number> {
+  // Verify lot belongs to company via component
+  const lot = await prisma.lot.findFirst({
+    where: {
+      id: lotId,
+      component: { companyId },
+    },
+    select: { id: true },
+  })
+  if (!lot) {
+    throw new Error('Lot not found or access denied')
+  }
+
   const balance = await prisma.lotBalance.findUnique({
     where: { lotId },
     select: { quantity: true },
@@ -37,8 +50,21 @@ export async function getLotBalance(lotId: string): Promise<number> {
  * Get affected SKUs for a lot
  * Returns all SKUs that were built using components from this lot
  * with aggregated quantity used and transaction count
+ * Enforces tenant isolation by verifying lot belongs to company via component
  */
-export async function getAffectedSkusForLot(lotId: string): Promise<AffectedSkuResponse[]> {
+export async function getAffectedSkusForLot(lotId: string, companyId: string): Promise<AffectedSkuResponse[]> {
+  // Verify lot belongs to company via component
+  const lot = await prisma.lot.findFirst({
+    where: {
+      id: lotId,
+      component: { companyId },
+    },
+    select: { id: true },
+  })
+  if (!lot) {
+    throw new Error('Lot not found or access denied')
+  }
+
   // Get all transaction lines for this lot that are part of build transactions
   const transactionLines = await prisma.transactionLine.findMany({
     where: {

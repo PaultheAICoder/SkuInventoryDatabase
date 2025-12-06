@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Get current balance
-    const balance = await getLotBalance(id)
+    const balance = await getLotBalance(id, selectedCompanyId!)
 
     // Calculate expiry status
     const expiryStatus = calculateExpiryStatus(lot.expiryDate)

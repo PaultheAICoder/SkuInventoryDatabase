@@ -32,6 +32,9 @@ vi.mock('@/lib/db', () => ({
     lotBalance: {
       update: vi.fn(),
     },
+    component: {
+      findMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))
@@ -107,6 +110,11 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
     // Setup default mocks
     vi.mocked(getDefaultLocationId).mockResolvedValue(mockLocationId)
     vi.mocked(prisma.bOMLine.findMany).mockResolvedValue(mockBomLines as never)
+
+    // Mock component ownership verification for getComponentQuantities (Issue #199)
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'component-1' },
+    ] as never)
 
     // Mock transactionLine for checkInsufficientInventory (returns sufficient inventory)
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([

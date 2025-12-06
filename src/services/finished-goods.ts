@@ -6,11 +6,22 @@ import type { SkuInventorySummary, SkuInventoryByLocation } from '@/types/finish
  * Get finished goods quantity for a SKU
  * If locationId provided, returns quantity at that location
  * Otherwise returns global total
+ * Enforces tenant isolation by verifying SKU belongs to company
  */
 export async function getSkuQuantity(
   skuId: string,
+  companyId: string,
   locationId?: string
 ): Promise<number> {
+  // Verify SKU belongs to company
+  const sku = await prisma.sKU.findFirst({
+    where: { id: skuId, companyId },
+    select: { id: true },
+  })
+  if (!sku) {
+    throw new Error('SKU not found or access denied')
+  }
+
   const where: Prisma.FinishedGoodsLineWhereInput = { skuId }
   if (locationId) {
     where.locationId = locationId
@@ -28,13 +39,35 @@ export async function getSkuQuantity(
  * Get finished goods quantities for multiple SKUs
  * If locationId provided, returns quantities at that location
  * Otherwise returns global totals
+ * Enforces tenant isolation by filtering to only company-owned SKUs
  */
 export async function getSkuQuantities(
   skuIds: string[],
+  companyId: string,
   locationId?: string
 ): Promise<Map<string, number>> {
+  // Filter to only SKUs the company owns
+  if (skuIds.length === 0) {
+    return new Map()
+  }
+
+  const validSkus = await prisma.sKU.findMany({
+    where: { id: { in: skuIds }, companyId },
+    select: { id: true },
+  })
+  const validIds = validSkus.map((s) => s.id)
+
+  // If no valid SKUs, return map with zeros for all requested IDs
+  if (validIds.length === 0) {
+    const quantities = new Map<string, number>()
+    for (const id of skuIds) {
+      quantities.set(id, 0)
+    }
+    return quantities
+  }
+
   const where: Prisma.FinishedGoodsLineWhereInput = {
-    skuId: { in: skuIds },
+    skuId: { in: validIds },
   }
   if (locationId) {
     where.locationId = locationId
@@ -48,12 +81,12 @@ export async function getSkuQuantities(
 
   const quantities = new Map<string, number>()
 
-  // Initialize all to 0
+  // Initialize all requested IDs to 0
   for (const id of skuIds) {
     quantities.set(id, 0)
   }
 
-  // Set actual quantities
+  // Set actual quantities for valid SKUs
   for (const result of results) {
     quantities.set(result.skuId, result._sum.quantityChange?.toNumber() ?? 0)
   }
@@ -63,10 +96,21 @@ export async function getSkuQuantities(
 
 /**
  * Get finished goods inventory summary for a SKU (grouped by location)
+ * Enforces tenant isolation by verifying SKU belongs to company
  */
 export async function getSkuInventorySummary(
-  skuId: string
+  skuId: string,
+  companyId: string
 ): Promise<SkuInventorySummary> {
+  // Verify SKU belongs to company
+  const sku = await prisma.sKU.findFirst({
+    where: { id: skuId, companyId },
+    select: { id: true },
+  })
+  if (!sku) {
+    throw new Error('SKU not found or access denied')
+  }
+
   // Get quantities grouped by location
   const results = await prisma.finishedGoodsLine.groupBy({
     by: ['locationId'],
@@ -189,7 +233,7 @@ export async function receiveFinishedGoods(params: {
   })
 
   // Get new balance at this location
-  const newBalance = await getSkuQuantity(skuId, locationId)
+  const newBalance = await getSkuQuantity(skuId, companyId, locationId)
 
   return { id: transaction.id, newBalance }
 }
@@ -233,7 +277,7 @@ export async function transferFinishedGoods(params: {
     }
 
     // Check sufficient inventory at source
-    const available = await getSkuQuantity(skuId, fromLocationId)
+    const available = await getSkuQuantity(skuId, companyId, fromLocationId)
     if (available < quantity) {
       throw new Error(
         `Insufficient finished goods at source location. Available: ${available}, Required: ${quantity}`
@@ -295,7 +339,7 @@ export async function createOutboundTransaction(params: {
 
   return prisma.$transaction(async (tx) => {
     // Check sufficient inventory at location
-    const currentQty = await getSkuQuantity(skuId, locationId)
+    const currentQty = await getSkuQuantity(skuId, companyId, locationId)
     if (currentQty < quantity) {
       throw new Error(
         `Insufficient finished goods at location. Available: ${currentQty}, Required: ${quantity}`
@@ -326,7 +370,7 @@ export async function createOutboundTransaction(params: {
     })
 
     // Get new balance at this location
-    const newBalance = await getSkuQuantity(skuId, locationId)
+    const newBalance = await getSkuQuantity(skuId, companyId, locationId)
 
     return { id: transaction.id, newBalance }
   })

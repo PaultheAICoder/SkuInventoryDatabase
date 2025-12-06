@@ -19,6 +19,10 @@ vi.mock('@/lib/db', () => ({
     transaction: {
       create: vi.fn(),
     },
+    sKU: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))
@@ -59,13 +63,18 @@ describe('Finished Goods Service', () => {
 
   describe('getSkuQuantity', () => {
     it('returns global total when no locationId', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
         _sum: { quantityChange: new Prisma.Decimal(150) },
       } as never)
 
-      const result = await getSkuQuantity('sku-1')
+      const result = await getSkuQuantity('sku-1', 'company-1')
 
       expect(result).toBe(150)
+      expect(prisma.sKU.findFirst).toHaveBeenCalledWith({
+        where: { id: 'sku-1', companyId: 'company-1' },
+        select: { id: true },
+      })
       expect(prisma.finishedGoodsLine.aggregate).toHaveBeenCalledWith({
         where: { skuId: 'sku-1' },
         _sum: { quantityChange: true },
@@ -73,11 +82,12 @@ describe('Finished Goods Service', () => {
     })
 
     it('returns location-specific total when locationId provided', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
         _sum: { quantityChange: new Prisma.Decimal(75) },
       } as never)
 
-      const result = await getSkuQuantity('sku-1', 'loc-1')
+      const result = await getSkuQuantity('sku-1', 'company-1', 'loc-1')
 
       expect(result).toBe(75)
       expect(prisma.finishedGoodsLine.aggregate).toHaveBeenCalledWith({
@@ -87,24 +97,37 @@ describe('Finished Goods Service', () => {
     })
 
     it('returns 0 when no finished goods lines exist', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-new' } as never)
       vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
         _sum: { quantityChange: null },
       } as never)
 
-      const result = await getSkuQuantity('sku-new')
+      const result = await getSkuQuantity('sku-new', 'company-1')
 
       expect(result).toBe(0)
+    })
+
+    it('throws error when SKU does not belong to company', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue(null)
+
+      await expect(getSkuQuantity('sku-1', 'wrong-company')).rejects.toThrow(
+        'SKU not found or access denied'
+      )
     })
   })
 
   describe('getSkuQuantities', () => {
     it('returns quantities for multiple SKUs', async () => {
+      vi.mocked(prisma.sKU.findMany).mockResolvedValue([
+        { id: 'sku-1' },
+        { id: 'sku-2' },
+      ] as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { skuId: 'sku-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
         { skuId: 'sku-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
       ] as never)
 
-      const result = await getSkuQuantities(['sku-1', 'sku-2', 'sku-3'])
+      const result = await getSkuQuantities(['sku-1', 'sku-2', 'sku-3'], 'company-1')
 
       expect(result.get('sku-1')).toBe(100)
       expect(result.get('sku-2')).toBe(50)
@@ -112,19 +135,23 @@ describe('Finished Goods Service', () => {
     })
 
     it('handles empty SKU list', async () => {
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([])
-
-      const result = await getSkuQuantities([])
+      const result = await getSkuQuantities([], 'company-1')
 
       expect(result.size).toBe(0)
+      // Should not call findMany for empty list
+      expect(prisma.sKU.findMany).not.toHaveBeenCalled()
     })
 
     it('filters by location when provided', async () => {
+      vi.mocked(prisma.sKU.findMany).mockResolvedValue([
+        { id: 'sku-1' },
+        { id: 'sku-2' },
+      ] as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { skuId: 'sku-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
       ] as never)
 
-      await getSkuQuantities(['sku-1', 'sku-2'], 'loc-1')
+      await getSkuQuantities(['sku-1', 'sku-2'], 'company-1', 'loc-1')
 
       expect(prisma.finishedGoodsLine.groupBy).toHaveBeenCalledWith({
         by: ['skuId'],
@@ -137,18 +164,31 @@ describe('Finished Goods Service', () => {
     })
 
     it('handles null quantity sums', async () => {
+      vi.mocked(prisma.sKU.findMany).mockResolvedValue([{ id: 'sku-1' }] as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { skuId: 'sku-1', _sum: { quantityChange: null } },
       ] as never)
 
-      const result = await getSkuQuantities(['sku-1'])
+      const result = await getSkuQuantities(['sku-1'], 'company-1')
 
       expect(result.get('sku-1')).toBe(0)
+    })
+
+    it('returns zeros for SKUs not owned by company', async () => {
+      vi.mocked(prisma.sKU.findMany).mockResolvedValue([]) // No valid SKUs
+
+      const result = await getSkuQuantities(['sku-1', 'sku-2'], 'wrong-company')
+
+      expect(result.get('sku-1')).toBe(0)
+      expect(result.get('sku-2')).toBe(0)
+      // groupBy should not be called when no valid SKUs
+      expect(prisma.finishedGoodsLine.groupBy).not.toHaveBeenCalled()
     })
   })
 
   describe('getSkuInventorySummary', () => {
     it('groups quantities by location', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
         { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
@@ -159,13 +199,14 @@ describe('Finished Goods Service', () => {
         mockLocation({ id: 'loc-2', name: 'FBA Center', type: 'fba' }),
       ])
 
-      const result = await getSkuInventorySummary('sku-1')
+      const result = await getSkuInventorySummary('sku-1', 'company-1')
 
       expect(result.totalQuantity).toBe(150)
       expect(result.byLocation).toHaveLength(2)
     })
 
     it('includes location details', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
       ] as never)
@@ -174,7 +215,7 @@ describe('Finished Goods Service', () => {
         mockLocation({ id: 'loc-1', name: 'Main Warehouse', type: 'warehouse' }),
       ])
 
-      const result = await getSkuInventorySummary('sku-1')
+      const result = await getSkuInventorySummary('sku-1', 'company-1')
 
       expect(result.byLocation[0]).toMatchObject({
         locationId: 'loc-1',
@@ -185,6 +226,7 @@ describe('Finished Goods Service', () => {
     })
 
     it('excludes locations with zero quantity', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
         { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(0) } },
@@ -195,13 +237,14 @@ describe('Finished Goods Service', () => {
         mockLocation({ id: 'loc-2', name: 'Empty Warehouse', type: 'warehouse' }),
       ])
 
-      const result = await getSkuInventorySummary('sku-1')
+      const result = await getSkuInventorySummary('sku-1', 'company-1')
 
       expect(result.byLocation).toHaveLength(1)
       expect(result.byLocation[0].locationId).toBe('loc-1')
     })
 
     it('sorts by quantity descending', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
         { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
         { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(150) } },
@@ -214,11 +257,19 @@ describe('Finished Goods Service', () => {
         mockLocation({ id: 'loc-3', name: 'Medium', type: 'warehouse' }),
       ])
 
-      const result = await getSkuInventorySummary('sku-1')
+      const result = await getSkuInventorySummary('sku-1', 'company-1')
 
       expect(result.byLocation[0].quantity).toBe(150)
       expect(result.byLocation[1].quantity).toBe(100)
       expect(result.byLocation[2].quantity).toBe(50)
+    })
+
+    it('throws error when SKU does not belong to company', async () => {
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue(null)
+
+      await expect(getSkuInventorySummary('sku-1', 'wrong-company')).rejects.toThrow(
+        'SKU not found or access denied'
+      )
     })
   })
 
@@ -331,6 +382,8 @@ describe('Finished Goods Service', () => {
     })
 
     it('rejects when insufficient at source', async () => {
+      // Mock SKU verification for getSkuQuantity call
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       // Mock getSkuQuantity to return insufficient amount
       vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
         _sum: { quantityChange: new Prisma.Decimal(5) },
@@ -364,6 +417,8 @@ describe('Finished Goods Service', () => {
     })
 
     it('creates two finished goods lines (negative and positive)', async () => {
+      // Mock SKU verification for getSkuQuantity call
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
         _sum: { quantityChange: new Prisma.Decimal(100) },
       } as never)
@@ -426,6 +481,8 @@ describe('Finished Goods Service', () => {
 
   describe('receiveFinishedGoods', () => {
     it('creates receipt transaction with finished goods line', async () => {
+      // Mock SKU verification for getSkuQuantity call
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.transaction.create).mockResolvedValue({
         id: 'trans-1',
       } as never)
@@ -471,6 +528,8 @@ describe('Finished Goods Service', () => {
     })
 
     it('works without optional costPerUnit', async () => {
+      // Mock SKU verification for getSkuQuantity call
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
       vi.mocked(prisma.transaction.create).mockResolvedValue({
         id: 'trans-1',
       } as never)

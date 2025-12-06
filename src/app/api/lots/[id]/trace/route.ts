@@ -105,7 +105,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }))
 
     // Get affected SKUs (built using this lot)
-    const affectedSkus: AffectedSkuResponse[] = await getAffectedSkusForLot(id)
+    const affectedSkus: AffectedSkuResponse[] = await getAffectedSkusForLot(id, selectedCompanyId!)
 
     const response: LotTraceResponse = {
       transactions,

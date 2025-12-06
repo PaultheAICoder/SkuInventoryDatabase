@@ -79,7 +79,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!, locationId)
 
     // Get finished goods inventory
-    const finishedGoodsInventory = await getSkuInventorySummary(id)
+    const finishedGoodsInventory = await getSkuInventorySummary(id, selectedCompanyId!)
 
     // Find active BOM
     const activeBom = sku.bomVersions.find((v) => v.isActive)

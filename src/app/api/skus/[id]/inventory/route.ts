@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return notFound('SKU')
     }
 
-    const inventory = await getSkuInventorySummary(id)
+    const inventory = await getSkuInventorySummary(id, selectedCompanyId!)
 
     return success({
       skuId: sku.id,

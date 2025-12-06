@@ -20,6 +20,9 @@ vi.mock('@/lib/db', () => ({
     transactionLine: {
       groupBy: vi.fn(),
     },
+    component: {
+      findMany: vi.fn(),
+    },
   },
 }))
 
@@ -221,6 +224,12 @@ describe('calculateMaxBuildableUnits', () => {
       ],
     } as never)
 
+    // Mock component ownership verification for getComponentQuantities
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+      { id: 'comp-2' },
+    ] as never)
+
     // comp-1: 100 on hand, needs 2 per unit -> can build 50
     // comp-2: 30 on hand, needs 5 per unit -> can build 6
     // Max buildable = min(50, 6) = 6
@@ -244,6 +253,11 @@ describe('calculateMaxBuildableUnits', () => {
       ],
     } as never)
 
+    // Mock component ownership verification for getComponentQuantities
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+    ] as never)
+
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
 
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
@@ -260,6 +274,11 @@ describe('calculateMaxBuildableUnits', () => {
         { componentId: 'comp-1', quantityPerUnit: new Prisma.Decimal(4), component: { id: 'comp-1' } },
       ],
     } as never)
+
+    // Mock component ownership verification for getComponentQuantities
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+    ] as never)
 
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
       { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
@@ -279,6 +298,11 @@ describe('calculateMaxBuildableUnits', () => {
         { componentId: 'comp-1', quantityPerUnit: new Prisma.Decimal(3), component: { id: 'comp-1' } },
       ],
     } as never)
+
+    // Mock component ownership verification for getComponentQuantities
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+    ] as never)
 
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
       { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(10) } },
