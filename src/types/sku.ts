@@ -2,6 +2,14 @@ import { z } from 'zod'
 import { salesChannelSchema } from './index'
 import type { SkuInventorySummary } from './finished-goods'
 
+// BOM line schema for inline BOM creation during SKU creation
+export const bomLineSchema = z.object({
+  componentId: z.string().uuid('Component ID must be a valid UUID'),
+  quantityPerUnit: z.string().min(1, 'Quantity is required'), // Supports fractions like "1/45"
+})
+
+export type BOMLineInput = z.infer<typeof bomLineSchema>
+
 // SKU create schema
 export const createSKUSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -13,6 +21,8 @@ export const createSKUSchema = z.object({
   salesChannel: salesChannelSchema,
   externalIds: z.record(z.string(), z.string()).default({}),
   notes: z.string().optional().nullable(),
+  // Optional BOM lines for inline BOM creation
+  bomLines: z.array(bomLineSchema).optional(),
 })
 
 export type CreateSKUInput = z.infer<typeof createSKUSchema>

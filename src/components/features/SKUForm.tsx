@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,19 +15,30 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { SKUResponse } from '@/types/sku'
+import type { ComponentResponse } from '@/types/component'
 import { salesChannels } from '@/types'
+
+interface BOMLineState {
+  componentId: string
+  quantityPerUnit: string
+}
 
 interface SKUFormProps {
   sku?: SKUResponse
   onSuccess?: () => void
 }
 
+const EMPTY_VALUE = '__none__'
+
 export function SKUForm({ sku, onSuccess }: SKUFormProps) {
   const router = useRouter()
+  const { data: session } = useSession()
   const isEditing = !!sku
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [components, setComponents] = useState<ComponentResponse[]>([])
+  const [loadingComponents, setLoadingComponents] = useState(true)
 
   const [formData, setFormData] = useState({
     name: sku?.name ?? '',
@@ -36,6 +48,47 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
     asin: sku?.externalIds?.asin ?? '',
     shopifyHandle: sku?.externalIds?.shopifyHandle ?? '',
   })
+
+  // Initialize 15 empty BOM line slots
+  const [bomLines, setBomLines] = useState<BOMLineState[]>(
+    Array(15).fill(null).map(() => ({ componentId: '', quantityPerUnit: '1' }))
+  )
+
+  // Fetch available components on mount
+  useEffect(() => {
+    async function fetchComponents() {
+      try {
+        const res = await fetch('/api/components?isActive=true&pageSize=100')
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          setComponents(data?.data || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch components:', err)
+      } finally {
+        setLoadingComponents(false)
+      }
+    }
+    fetchComponents()
+  }, [])
+
+  // Update a BOM line field
+  const updateBomLine = (index: number, field: 'componentId' | 'quantityPerUnit', value: string) => {
+    setBomLines((prev) =>
+      prev.map((line, i) => {
+        if (i !== index) return line
+        if (field === 'componentId') {
+          // Handle the "None" selection
+          const newValue = value === EMPTY_VALUE ? '' : value
+          return { ...line, componentId: newValue }
+        }
+        return { ...line, [field]: value }
+      })
+    )
+  }
+
+  // Count selected components
+  const selectedCount = bomLines.filter((line) => line.componentId).length
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,16 +103,32 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
       if (formData.asin) externalIds.asin = formData.asin
       if (formData.shopifyHandle) externalIds.shopifyHandle = formData.shopifyHandle
 
+      // Filter BOM lines to only those with a component selected
+      const selectedBomLines = bomLines
+        .filter((line) => line.componentId)
+        .map((line) => ({
+          componentId: line.componentId,
+          quantityPerUnit: line.quantityPerUnit || '1',
+        }))
+
+      // Build request body
+      const body: Record<string, unknown> = {
+        name: formData.name,
+        internalCode: formData.internalCode,
+        salesChannel: formData.salesChannel,
+        externalIds,
+        notes: formData.notes || null,
+      }
+
+      // Include BOM lines only for new SKUs if any selected
+      if (!isEditing && selectedBomLines.length > 0) {
+        body.bomLines = selectedBomLines
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          internalCode: formData.internalCode,
-          salesChannel: formData.salesChannel,
-          externalIds,
-          notes: formData.notes || null,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -87,7 +156,7 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <Card>
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>{isEditing ? 'Edit SKU' : 'New SKU'}</CardTitle>
         </CardHeader>
@@ -98,31 +167,58 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
             </div>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., TT 3-Pack Amazon"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="internalCode">Internal Code *</Label>
-              <Input
-                id="internalCode"
-                value={formData.internalCode}
-                onChange={(e) => setFormData((prev) => ({ ...prev, internalCode: e.target.value }))}
-                placeholder="e.g., TT-3PK-AMZ"
-                required
-                disabled={isEditing}
-              />
-            </div>
+          {/* Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Name *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g., TT 3-Pack Amazon"
+              required
+            />
           </div>
 
+          {/* Internal Code */}
+          <div className="space-y-2">
+            <Label htmlFor="internalCode">Internal Code *</Label>
+            <Input
+              id="internalCode"
+              value={formData.internalCode}
+              onChange={(e) => setFormData((prev) => ({ ...prev, internalCode: e.target.value }))}
+              placeholder="e.g., TT-3PK-AMZ"
+              required
+              disabled={isEditing}
+            />
+          </div>
+
+          {/* Company (read-only from session) */}
+          <div className="space-y-2">
+            <Label>Company</Label>
+            <Input
+              value={session?.user?.selectedCompanyName || 'Loading...'}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              From your current session. Change via the header selector.
+            </p>
+          </div>
+
+          {/* Brand (read-only from session) */}
+          <div className="space-y-2">
+            <Label>Brand</Label>
+            <Input
+              value={session?.user?.selectedBrandName || 'All Brands'}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-xs text-muted-foreground">
+              From your current session. Change via the header selector.
+            </p>
+          </div>
+
+          {/* Sales Channel */}
           <div className="space-y-2">
             <Label htmlFor="salesChannel">Sales Channel *</Label>
             <Select
@@ -143,28 +239,29 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
             </Select>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="asin">Amazon ASIN</Label>
-              <Input
-                id="asin"
-                value={formData.asin}
-                onChange={(e) => setFormData((prev) => ({ ...prev, asin: e.target.value }))}
-                placeholder="e.g., B0123456789"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="shopifyHandle">Shopify Handle</Label>
-              <Input
-                id="shopifyHandle"
-                value={formData.shopifyHandle}
-                onChange={(e) => setFormData((prev) => ({ ...prev, shopifyHandle: e.target.value }))}
-                placeholder="e.g., tt-3-pack"
-              />
-            </div>
+          {/* ASIN */}
+          <div className="space-y-2">
+            <Label htmlFor="asin">Amazon ASIN</Label>
+            <Input
+              id="asin"
+              value={formData.asin}
+              onChange={(e) => setFormData((prev) => ({ ...prev, asin: e.target.value }))}
+              placeholder="e.g., B0123456789"
+            />
           </div>
 
+          {/* Shopify Handle */}
+          <div className="space-y-2">
+            <Label htmlFor="shopifyHandle">Shopify Handle</Label>
+            <Input
+              id="shopifyHandle"
+              value={formData.shopifyHandle}
+              onChange={(e) => setFormData((prev) => ({ ...prev, shopifyHandle: e.target.value }))}
+              placeholder="e.g., tt-3-pack"
+            />
+          </div>
+
+          {/* Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <textarea
@@ -175,6 +272,71 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
               placeholder="Additional notes about this SKU..."
             />
           </div>
+
+          {/* BOM Components Section - Only show for new SKUs */}
+          {!isEditing && (
+            <>
+              <hr className="my-6" />
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <Label className="text-base font-medium">BOM Components (Optional)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Select components to create a BOM version with this SKU.
+                    Components are filtered by your selected company/brand.
+                  </p>
+                  {selectedCount > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedCount} of 15 components selected
+                    </p>
+                  )}
+                </div>
+
+                {loadingComponents ? (
+                  <p className="text-sm text-muted-foreground">Loading components...</p>
+                ) : components.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No active components found. Create components first to add BOM lines.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {bomLines.map((line, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <div className="flex-1">
+                          <Select
+                            value={line.componentId || EMPTY_VALUE}
+                            onValueChange={(value) => updateBomLine(index, 'componentId', value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Component ${index + 1}`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={EMPTY_VALUE}>-- None --</SelectItem>
+                              {components.map((c) => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  {c.name} ({c.skuCode})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-24">
+                          <Input
+                            type="text"
+                            value={line.quantityPerUnit}
+                            onChange={(e) => updateBomLine(index, 'quantityPerUnit', e.target.value)}
+                            placeholder="Qty"
+                            disabled={!line.componentId}
+                            title="Quantity per unit (supports fractions like 1/45)"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
         <CardFooter className="flex justify-between">
           <Button type="button" variant="outline" onClick={() => router.back()}>
