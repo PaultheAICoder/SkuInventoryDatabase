@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { message } = validation.data
-    const response = await sendChatMessage(message)
+    const companyId = session.user.companyId
+    const response = await sendChatMessage(message, [], companyId)
 
     return NextResponse.json({ data: response })
   } catch (error) {

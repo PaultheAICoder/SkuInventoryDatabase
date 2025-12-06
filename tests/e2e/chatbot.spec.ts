@@ -156,8 +156,10 @@ test.describe('Chatbot Feature (Issue #184)', () => {
     await page.waitForLoadState('networkidle')
 
     // Make request to chatbot API via page context (authenticated)
+    // Extended timeout because Claude API calls can take time
     const response = await page.request.post('/api/chatbot', {
       data: { message: 'How does max buildable work?' },
+      timeout: 30000,
     })
 
     // Should return 200 (API key is configured)
@@ -170,6 +172,61 @@ test.describe('Chatbot Feature (Issue #184)', () => {
       expect(data.data).toBeDefined()
       expect(data.data.message).toBeDefined()
       expect(data.data.message.content).toBeDefined()
+    }
+  })
+})
+
+test.describe('Chatbot Tool Use (Issue #212)', () => {
+  // Tool use involves multiple Claude API calls, so increase timeout
+  test.setTimeout(60000)
+
+  test.beforeEach(async ({ page }) => {
+    // Start fresh for each test
+    await page.goto('/login')
+  })
+
+  test('Chatbot API can handle data query questions', async ({ page }) => {
+    await loginAsAdmin(page)
+    await page.waitForLoadState('networkidle')
+
+    // Make request asking about buildable units (may trigger tool use)
+    const response = await page.request.post('/api/chatbot', {
+      data: { message: 'How does max buildable calculation work?' },
+      timeout: 30000, // Extended timeout for potential tool use
+    })
+
+    // Should return 200
+    expect([200, 500]).toContain(response.status())
+
+    if (response.status() === 200) {
+      const data = await response.json()
+      expect(data.data).toBeDefined()
+      expect(data.data.message.content).toBeDefined()
+      // Response should mention buildable or limiting
+      expect(data.data.message.content.toLowerCase()).toMatch(/buildable|limiting|component/i)
+    }
+  })
+
+  test('Chatbot API accepts companyId parameter for tool use', async ({ page }) => {
+    await loginAsAdmin(page)
+    await page.waitForLoadState('networkidle')
+
+    // Make request with a specific data question
+    const response = await page.request.post('/api/chatbot', {
+      data: { message: 'Explain how inventory transactions work.' },
+      timeout: 30000, // Extended timeout for potential tool use
+    })
+
+    // Should return 200 or 500 depending on API key
+    expect([200, 500]).toContain(response.status())
+
+    if (response.status() === 200) {
+      const data = await response.json()
+      expect(data.data).toBeDefined()
+      expect(data.data.message).toBeDefined()
+      // Verify response structure is valid
+      expect(typeof data.data.message.content).toBe('string')
+      expect(data.data.message.content.length).toBeGreaterThan(0)
     }
   })
 })

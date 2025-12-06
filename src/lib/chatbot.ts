@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
+import type { MessageParam, ToolUseBlock, ToolResultBlockParam } from '@anthropic-ai/sdk/resources/messages'
 import { v4 as uuidv4 } from 'uuid'
 import type { ChatResponse } from '@/types/chatbot'
+import { CHATBOT_TOOLS, executeTool } from './chatbot-tools'
 
 // Initialize client lazily to handle missing API key gracefully
 let client: Anthropic | null = null
@@ -25,6 +27,18 @@ function getClient(): Anthropic | null {
  * This provides Claude with comprehensive knowledge about how the system works.
  */
 const SYSTEM_PROMPT = `You are an expert assistant for the Trevor Inventory Tracker system. Your role is to help users understand how the system works, explain calculations, and guide them on whether they've found a bug or need a new feature.
+
+## Tool Capabilities (Phase 2)
+You now have access to real data through these tools:
+- **get_sku_buildable_details**: Get actual max buildable units, limiting components, and BOM for any SKU
+- **get_component_inventory**: Get component quantities by location and recent transactions
+- **get_transaction_history**: Get recent transaction history for SKUs or components
+- **create_bug_issue**: Create a GitHub issue for bug reports
+- **create_feature_issue**: Create a GitHub issue for feature requests
+
+When users ask about specific data (like "why is my max buildable 234?"), USE THE TOOLS to get real information. Don't guess or provide hypothetical examples when you can look up actual data.
+
+When creating issues, always confirm with the user before calling create_bug_issue or create_feature_issue.
 
 ## System Architecture Overview
 This is a Next.js 14 inventory management system with:
@@ -100,13 +114,10 @@ When you "build" X units of an SKU:
 - Be concise but thorough in explanations
 - Use examples when helpful
 
-## Important Limitations
-In this Phase 1 implementation, you do NOT have access to:
-- Live database queries (you cannot look up specific SKU/component data)
-- User's actual inventory quantities
-- Real-time calculations
+## Data Access (Phase 2)
+You now have access to live database queries through your tools. When users ask about specific SKUs or components, use the appropriate tool to look up real data and provide accurate, data-driven answers.
 
-If a user asks about their specific data (like "why is MY max buildable 234?"), acknowledge that you can explain the general calculation but cannot access their specific data in this version. You can suggest they check the SKU detail page which shows limiting factors.
+If a tool returns no data or an error, let the user know the entity wasn't found and ask them to verify the SKU or component code.
 
 ## Response Guidelines
 1. Be helpful and educational
@@ -126,10 +137,12 @@ function generateConversationId(): string {
 /**
  * Send a chat message to Claude and get a response.
  * Returns a ChatResponse with the assistant's message.
+ * Supports tool use when companyId is provided.
  */
 export async function sendChatMessage(
   userMessage: string,
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+  companyId?: string
 ): Promise<ChatResponse> {
   const anthropic = getClient()
 
@@ -149,23 +162,60 @@ export async function sendChatMessage(
 
   try {
     // Build messages array including conversation history
-    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
-      ...conversationHistory,
-      { role: 'user', content: userMessage },
+    const messages: MessageParam[] = [
+      ...conversationHistory.map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      })),
+      { role: 'user' as const, content: userMessage },
     ]
 
-    const response = await anthropic.messages.create({
+    // Initial API call with tools (only if companyId is available)
+    let response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages: messages,
+      messages,
+      tools: companyId ? CHATBOT_TOOLS : undefined,
     })
 
-    // Extract text from response
-    const textContent = response.content.find((block) => block.type === 'text')
+    // Tool use loop - handle tool calls until we get a final response
+    while (response.stop_reason === 'tool_use' && companyId) {
+      // Find all tool use blocks
+      const toolUseBlocks = response.content.filter(
+        (block): block is ToolUseBlock => block.type === 'tool_use'
+      )
+
+      // Execute all tool calls
+      const toolResults: ToolResultBlockParam[] = await Promise.all(
+        toolUseBlocks.map((toolUse) => executeTool(toolUse, companyId))
+      )
+
+      // Add assistant response and tool results to messages
+      messages.push({
+        role: 'assistant',
+        content: response.content,
+      })
+      messages.push({
+        role: 'user',
+        content: toolResults,
+      })
+
+      // Continue the conversation
+      response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages,
+        tools: CHATBOT_TOOLS,
+      })
+    }
+
+    // Extract final text response
+    const textBlock = response.content.find((block) => block.type === 'text')
     const assistantContent =
-      textContent && textContent.type === 'text'
-        ? textContent.text
+      textBlock && 'text' in textBlock
+        ? textBlock.text
         : 'I apologize, but I was unable to generate a response. Please try again.'
 
     return {
