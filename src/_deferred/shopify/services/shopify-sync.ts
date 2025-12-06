@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Shopify Order Sync Service
+ * Moved from src/services/shopify-sync.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/services/ when V2 work begins
+ */
+
+/**
  * Shopify Order Sync Service
  * Handles order synchronization from Shopify, including:
  * - Fetching orders from Shopify API

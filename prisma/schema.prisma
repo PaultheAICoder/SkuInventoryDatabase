@@ -32,7 +32,7 @@ model Company {
   components    Component[]   @relation("CompanyComponents")
   skus          SKU[]         @relation("CompanySKUs")
 
-  // Shopify integration relations
+  // [V2-DEFERRED] Shopify integration relations
   shopifyConnection  ShopifyConnection?
   skuChannelMappings SkuChannelMapping[]
 }
@@ -517,7 +517,10 @@ model ForecastConfig {
 }
 
 // ============================================
-// Shopify Integration Entities
+// [V2-DEFERRED] Shopify Integration Entities
+// These models are preserved for V2 but not actively used in V1.
+// Do not remove - this avoids migration complexity.
+// See /src/_deferred/shopify/ for related code.
 // ============================================
 
 model ShopifyConnection {

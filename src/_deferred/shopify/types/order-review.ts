@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Order Review Types
+ * Moved from src/types/order-review.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/types/ when V2 work begins
+ */
+
+/**
  * Order Review Queue types and Zod schemas
  * Used for order review UI actions: mapping, approve, skip
  */

@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Shopify API Client
+ * Moved from src/services/shopify.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/services/ when V2 work begins
+ */
+
+/**
  * Shopify API client service
  * Handles authentication, order fetching, pagination, and rate limiting
  */

@@ -7,8 +7,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   CLAUDE_CODE_PATH: z.string().optional(),
-  // Shopify token encryption key - optional, falls back to NEXTAUTH_SECRET
-  SHOPIFY_ENCRYPTION_KEY: z.string().min(32).optional(),
+  // [V2-DEFERRED] Shopify token encryption key removed - add back for V2
+  // SHOPIFY_ENCRYPTION_KEY: z.string().min(32).optional(),
   // Cron job secret - required for /api/cron/alerts endpoint authentication
   CRON_SECRET: z.string().min(16).optional(),
   // Email configuration - Resend API key (recommended for serverless)

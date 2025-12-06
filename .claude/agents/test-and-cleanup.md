@@ -18,6 +18,36 @@ color: cyan
 
 **Project Root**: `/home/pbrown/SkuInventory`
 
+**Shared Context**: See `/home/pbrown/SkuInventory/docs/agents/SHARED-CONTEXT.md` for database safety, environment config, output paths.
+
+## DATABASE SAFETY PROTOCOL
+
+**MANDATORY: All validation runs against TEST environment**
+
+| Environment | Target | Port | URL |
+|-------------|--------|------|-----|
+| Production | NEVER access | 4546 | http://172.16.20.50:4545 |
+| **Test** | **USE THIS** | 2346 | http://172.16.20.50:2345 |
+
+**E2E Tests MUST target test environment:**
+```bash
+# Run E2E tests against test environment
+TEST_BASE_URL=http://172.16.20.50:2345 npm run test:e2e
+```
+
+**Production Integrity Check (orchestrator handles, but for manual verification):**
+```bash
+# Verify production counts haven't changed
+docker exec inventory-db-prod psql -U postgres -d inventory -c "
+SELECT
+    (SELECT COUNT(*) FROM \"Component\") as components,
+    (SELECT COUNT(*) FROM \"SKU\") as skus,
+    (SELECT COUNT(*) FROM \"Transaction\") as transactions;
+"
+```
+
+**If production counts differ from workflow start, STOP immediately and report.**
+
 ---
 
 # PHASE A: VALIDATION
@@ -80,14 +110,18 @@ npm run lint
 
 ## A5. Test Execution (15 min MAX)
 
-**NARROW YOUR FILTER** - avoid broad patterns:
-```bash
-# Good (targeted)
-npm test -- --testPathPattern="inventory"  # ~5-10 tests
-npm test -- --testPathPattern="auth"       # Specific module
+**IMPORTANT: This project uses Vitest, NOT Jest**
 
-# Bad (too broad)
-npm test  # All tests = potentially long
+```bash
+# Good (targeted - Vitest syntax)
+npm test -- tests/unit/inventory.test.ts    # Specific file
+npm test -- tests/unit/                      # Specific directory
+npm test -- --testNamePattern="should create" # Pattern match
+
+# Run all tests (use sparingly)
+npm test
+
+# DON'T use Jest syntax like --testPathPattern
 ```
 
 **If >15 min**: STOP, narrow filter, reassess scope.
@@ -131,6 +165,30 @@ npm run test:e2e -- --headed
 1. Check Docker container is running: `docker ps | grep inventory-app`
 2. Rebuild if needed: `cd docker && docker compose -f docker-compose.prod.yml build app && docker compose -f docker-compose.prod.yml up -d app`
 3. Wait for container to be healthy before re-running tests
+
+### A6.1 Known E2E Infrastructure Issues
+
+**IMPORTANT: E2E test failures may be due to pre-existing infrastructure issues, not your changes.**
+
+**Common E2E Failure Patterns (NOT related to your code):**
+
+| Failure Pattern | Cause | Action |
+|-----------------|-------|--------|
+| Login timeout at `waitForURL('/')` | Missing seed data in test DB | Note as "pre-existing infrastructure issue" |
+| Authentication failures | Test users not seeded | Note and skip E2E, document in report |
+| Connection refused | Docker container not running | Rebuild container |
+| Empty page/no data | Test database not seeded | Run `bash scripts/reseed-test-database.sh` |
+
+**When E2E tests fail due to infrastructure:**
+1. **Determine if failure is code-related or infrastructure-related**
+2. If infrastructure: Document in completion report under "Known Limitations"
+3. Do NOT block the workflow for pre-existing infrastructure issues
+4. DO create/update a tracking issue for E2E infrastructure if one doesn't exist
+
+**Check for existing E2E infrastructure issue:**
+```bash
+gh issue list --state open --search "E2E" --json number,title
+```
 
 ## A7. Manual Verification (if E2E tests insufficient)
 
@@ -315,12 +373,22 @@ Write to `/home/pbrown/SkuInventory/completion-docs/YYYY-MM-DD-issue-XXX-descrip
 1. [Specific issue] - [Suggested fix for future]
 2. [Another improvement opportunity]
 
+### Similar Bug Patterns Detected (CHECK THIS)
+**Did the bug fixed in this issue exist in other files?**
+- If YES: List the other files that likely have the same bug
+- Create a follow-up issue if >3 files affected
+
+**Common patterns to check:**
+- Session loading bugs → Check ALL dashboard pages
+- Brand/Company resolution → Check ALL import routes
+- Validation missing → Check ALL API routes with same pattern
+
 ### Process Improvements Identified
 - [ ] [Improvement for Scout-and-Plan agent]
 - [ ] [Improvement for Build agent]
 - [ ] [Improvement for Test-and-Cleanup agent]
 
-**Action**: If process improvements identified, consider updating agent .md files
+**Action**: If process improvements identified, consider updating agent .md files in `.claude/agents/`
 
 ## Git Information
 **Commit**: [message]

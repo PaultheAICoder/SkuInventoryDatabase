@@ -1,6 +1,8 @@
 /**
  * Cryptographic utilities for secure token encryption/decryption
  * Uses AES-256-GCM for authenticated encryption
+ *
+ * [V2-DEFERRED] Currently unused in V1 - preserved for Shopify integration in V2
  */
 
 import {

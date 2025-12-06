@@ -1,3 +1,10 @@
+/**
+ * [V2-DEFERRED] Shopify Connection Types
+ * Moved from src/types/shopify-connection.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/types/ when V2 work begins
+ */
+
 import { z } from 'zod'
 
 // Connection input schema for POST

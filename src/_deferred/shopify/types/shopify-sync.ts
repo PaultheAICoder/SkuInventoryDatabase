@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Shopify Sync Types
+ * Moved from src/types/shopify-sync.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/types/ when V2 work begins
+ */
+
+/**
  * Shopify sync types and Zod schemas
  * Used for order sync trigger requests and order list queries
  */

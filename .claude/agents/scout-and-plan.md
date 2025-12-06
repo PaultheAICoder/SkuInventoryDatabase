@@ -16,6 +16,28 @@ color: green
 
 **Project Root**: `/home/pbrown/SkuInventory`
 
+**Shared Context**: See `/home/pbrown/SkuInventory/docs/agents/SHARED-CONTEXT.md` for database safety, environment config, output paths.
+
+## DATABASE SAFETY PROTOCOL
+
+**MANDATORY: This agent operates on TEST environment ONLY**
+
+| Environment | Target | Port |
+|-------------|--------|------|
+| Production | NEVER access | 4546 |
+| **Test** | **USE THIS** | 2346 |
+
+**For ANY database operations:**
+- Use test container: `inventory-db-test`
+- Use test database: `inventory_test`
+- Use test URL: http://172.16.20.50:2345
+
+**Verification Command (run before any DB work):**
+```bash
+docker exec inventory-db-test psql -U inventory_test -d inventory_test -c "SELECT current_database();"
+# Expected: inventory_test
+```
+
 ## Input Types
 
 - Plain text descriptions, spec files, browser console logs
@@ -129,7 +151,44 @@ grep -r "prisma.modelName" --include="*.ts" src/
 
 # For test files that may need updating
 grep -r "ClassName\|methodName" --include="*.ts" tests/
+
+# For test helper files (cleanup, mocks, fixtures)
+ls tests/helpers/ tests/fixtures/ tests/mocks/ 2>/dev/null
 ```
+
+### A8.1 PATTERN DETECTION - Similar Bugs Across Files (CRITICAL)
+
+**When fixing a bug, ALWAYS scan for the same pattern in other files:**
+
+```bash
+# Example: If fixing missing session status handling in orders/page.tsx
+# Search ALL dashboard pages for the same pattern:
+grep -l "useSession()" src/app/\(dashboard\)/**/page.tsx | xargs grep -L "status"
+
+# Example: If fixing brand resolution pattern in one import route
+# Check ALL import routes for consistency:
+grep -l "selectedBrandId\|selectedCompanyId" src/app/api/import/**/route.ts
+```
+
+**MANDATORY PATTERN SCAN CHECKLIST:**
+
+For BUG_FIX issues, before finalizing the plan:
+- [ ] Identify the bug pattern (e.g., "missing session status check")
+- [ ] Search ALL similar files for the same pattern
+- [ ] List ALL files with the same bug (not just the one reported)
+- [ ] Include ALL affected files in the plan OR create follow-up issues
+
+**Common Pattern Categories:**
+| Pattern Type | Search Command | Common Locations |
+|--------------|---------------|------------------|
+| Session loading state | `grep -l "useSession()" \| xargs grep -L "status"` | dashboard pages |
+| Brand/Company resolution | `grep "selectedCompanyId\|selectedBrandId"` | API routes |
+| Hydration issues | `grep "toLocaleDateString\|toLocaleString"` | client components |
+| Missing validation | `grep "session.user\." \| grep -v "if.*session"` | API routes |
+
+**Batch Fix vs Single Fix Decision:**
+- If ≤3 files have the same bug → Include ALL in this plan
+- If >3 files → Fix the reported one, create GitHub issue for the others with list of affected files
 
 **For EVERY function/type being changed, trace the full call chain**:
 

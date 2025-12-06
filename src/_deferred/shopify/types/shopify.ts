@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Shopify API Types
+ * Moved from src/types/shopify.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/types/ when V2 work begins
+ */
+
+/**
  * Shopify API type definitions
  * Used by ShopifyClient service for type-safe API interactions
  */

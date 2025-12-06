@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Order Posting Service
+ * Moved from src/services/order-posting.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/services/ when V2 work begins
+ */
+
+/**
  * Order Posting Service
  * Handles converting approved Shopify orders into inventory transactions
  */

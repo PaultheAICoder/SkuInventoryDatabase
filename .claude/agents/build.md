@@ -15,6 +15,32 @@ color: orange
 
 **Project Root**: `/home/pbrown/SkuInventory`
 
+**Shared Context**: See `/home/pbrown/SkuInventory/docs/agents/SHARED-CONTEXT.md` for database safety, environment config, output paths.
+
+## DATABASE SAFETY PROTOCOL
+
+**MANDATORY: All database operations target TEST environment**
+
+| Environment | Target | Port |
+|-------------|--------|------|
+| Production | NEVER access | 4546 |
+| **Test** | **USE THIS** | 2346 |
+
+```bash
+# Verify test database connection BEFORE any DB operations
+docker exec inventory-db-test psql -U inventory_test -d inventory_test -c "SELECT 1;"
+
+# For Prisma commands, use test DATABASE_URL
+DATABASE_URL="postgresql://inventory_test:inventory_test_2025@localhost:2346/inventory_test" npx prisma migrate deploy
+DATABASE_URL="postgresql://inventory_test:inventory_test_2025@localhost:2346/inventory_test" npx prisma db push
+```
+
+**NEVER run these on production:**
+- `prisma migrate reset`
+- `prisma db push --force-reset`
+- Direct SQL to `inventory-db-prod`
+- Any DELETE/TRUNCATE without WHERE clause
+
 ## Pre-Build Verification (MANDATORY)
 
 ```bash
@@ -73,6 +99,31 @@ grep -r "changedFunction(" --include="*.ts" --include="*.tsx" .
 2. **Fix them** - don't leave broken code
 3. **Note the gap** - if >20% more files than Plan listed, note this for Cleanup agent
 
+### 4.6. Test File Updates (COMMONLY MISSED)
+
+**When adding new Prisma models or database tables, ALWAYS check:**
+
+```bash
+# Check if test helper cleanup needs updating
+cat tests/helpers/db.ts  # or similar cleanup file
+
+# Check if mocks need updating for changed services
+ls tests/mocks/ tests/__mocks__/
+grep -l "MockedService\|vi.mock\|jest.mock" tests/
+```
+
+**Test File Checklist for Database Changes:**
+- [ ] `tests/helpers/db.ts` - Add cleanup for new tables (DELETE FROM "NewTable")
+- [ ] `tests/helpers/fixtures.ts` - Add seed data if needed
+- [ ] `tests/mocks/*.ts` - Update mocks for changed service signatures
+
+**Test File Checklist for Service Changes:**
+- [ ] Find existing tests: `grep -l "serviceName" tests/`
+- [ ] Update mock return types if function signatures changed
+- [ ] Add new test cases for new functionality
+
+**Common oversight**: Plan says "modify createBuildTransaction" but doesn't list test mock updates. If the function signature changes, mocks WILL break.
+
 **Additional Files Report Format**:
 ```markdown
 ## Additional Files Discovered (Not in Plan)
@@ -114,9 +165,25 @@ For API routes with database operations:
 ### 7. Pre-Handoff Verification
 
 Before marking complete, verify new code actually runs:
-- Run new tests: `npm test -- --testPathPattern="NewTestFile"`
+- Run new tests (Vitest syntax): `npm test -- tests/unit/specific.test.ts`
 - Execute new endpoints: `curl` or manual verification
 - Check for TypeScript errors
+
+**IMPORTANT: This project uses Vitest, NOT Jest**
+
+Vitest CLI syntax differs from Jest:
+```bash
+# Run specific test file (Vitest)
+npm test -- tests/unit/my-feature.test.ts
+
+# Run tests matching a pattern (Vitest)
+npm test -- --testNamePattern="should create"
+
+# Run tests in a directory
+npm test -- tests/unit/
+
+# DON'T use Jest syntax like --testPathPattern
+```
 
 ### 8. Docker Container Rebuild (MANDATORY)
 

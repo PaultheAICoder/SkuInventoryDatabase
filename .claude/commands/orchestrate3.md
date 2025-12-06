@@ -38,6 +38,103 @@ Execute the streamlined 3-agent workflow for implementing features, fixing bugs,
 
 Your ONLY job is to call agents via the Task tool and report their results. Nothing more.
 
+## 🚨 CRITICAL: PRODUCTION DATABASE PROTECTION 🚨
+
+**THIS WORKFLOW PROTECTS PRODUCTION DATA**
+
+- ✅ **Pre-Workflow**: Backup production database to `.backups/`
+- ✅ **Pre-Workflow**: Reseed test database from backup
+- ✅ **Post-Workflow**: Verify production record counts unchanged
+- ✅ **All agents**: Work on test environment ONLY
+- ❌ **Production**: NEVER modified by any agent
+
+### Database Targeting
+
+| Container | Port | Database | Used By |
+|-----------|------|----------|---------|
+| inventory-db-prod | 4546 | inventory | Production (PROTECTED) |
+| inventory-db-test | 2346 | inventory_test | Agents (DISPOSABLE) |
+
+### Pre-Workflow: Database Backup (MANDATORY)
+
+**Purpose**: Preserve production state and capture baseline record counts
+
+**Your Role**:
+1. Report to user: "💾 Creating production database backup..."
+
+2. Execute backup script:
+   ```bash
+   cd /home/pbrown/SkuInventory
+   BACKUP_OUTPUT=$(bash scripts/backup-production.sh "$ISSUE_NUMBER" 2>&1)
+   echo "$BACKUP_OUTPUT"
+
+   # Extract baseline counts for post-workflow verification
+   BASELINE_COMPONENTS=$(echo "$BACKUP_OUTPUT" | grep "COMPONENT_COUNT=" | cut -d= -f2)
+   BASELINE_SKUS=$(echo "$BACKUP_OUTPUT" | grep "SKU_COUNT=" | cut -d= -f2)
+   BASELINE_TRANSACTIONS=$(echo "$BACKUP_OUTPUT" | grep "TRANSACTION_COUNT=" | cut -d= -f2)
+   ```
+
+3. Report to user:
+   ```
+   ✅ Production backup complete
+      Components: [count]
+      SKUs: [count]
+      Transactions: [count]
+   ```
+
+**Safety Rule**: If backup fails, STOP and report error. Do NOT proceed with workflow.
+
+### Pre-Workflow: Test Database Reseed (MANDATORY)
+
+**Purpose**: Ensure test environment has current data from production
+
+**Your Role**:
+1. Report to user: "🔄 Reseeding test database..."
+
+2. Execute reseed script:
+   ```bash
+   bash scripts/reseed-test-database.sh --force --issue "$ISSUE_NUMBER"
+   ```
+
+3. Report to user:
+   ```
+   ✅ Test database ready
+      Database: inventory_test (port 2346)
+      Access: http://172.16.20.50:2345
+   ```
+
+**Safety Rules**:
+- If reseed fails with exit code 99 (catastrophic: no tables), STOP IMMEDIATELY
+- The script will post a comment to the GitHub issue explaining the failure
+- Do NOT proceed until the empty database is investigated
+
+### Post-Workflow: Production Integrity Verification (MANDATORY)
+
+**After Test-and-Cleanup agent completes, BEFORE final report**:
+
+1. Report to user: "🔍 Verifying production database integrity..."
+
+2. Execute verification:
+   ```bash
+   bash scripts/verify-production-integrity.sh "$BASELINE_COMPONENTS" "$BASELINE_SKUS" "$BASELINE_TRANSACTIONS"
+   ```
+
+3. **If verification PASSES**:
+   ```
+   ✅ Production database integrity verified
+      No data was modified during orchestrate3 cycle
+   ```
+
+4. **If verification FAILS**:
+   ```
+   ❌ CRITICAL: Production database may have been modified!
+      DO NOT commit or push until investigated.
+
+   [Show specific discrepancies]
+   ```
+
+   **STOP workflow immediately** - do not proceed to final report or git operations.
+
 ## Usage
 
 ```

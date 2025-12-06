@@ -1,4 +1,11 @@
 /**
+ * [V2-DEFERRED] Channel Mapping Types
+ * Moved from src/types/channel-mapping.ts on 2025-12-06
+ * Reason: PRD V1 explicitly excludes integrations
+ * Restore: Move back to src/types/ when V2 work begins
+ */
+
+/**
  * Channel Mapping Types and Schemas
  * Used for mapping external channel identifiers (Shopify, Amazon, TikTok) to internal SKUs
  */

@@ -50,4 +50,31 @@ We do not tolerate errors or warnings in our code, as we have written all of the
 - `npx tsc --noEmit` must complete without errors
 - All warnings should be resolved, not suppressed
 
+## Test Environment
+
+**IMPORTANT**: The test environment is isolated from production and used exclusively by orchestrate3 agent workflows.
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **Test Web** | **2345** | Test app for agent verification |
+| **Test Database** | **2346** | Test PostgreSQL (disposable data) |
+
+**Test URL**: http://172.16.20.50:2345
+
+### Starting Test Environment
+```bash
+cd docker
+docker compose -f docker-compose.test.yml up -d
+```
+
+### Database Protection
+The orchestrate3 workflow automatically:
+1. Backs up production before each cycle
+2. Reseeds test database from production backup
+3. Verifies production unchanged after cycle
+
+**ALL agent work targets test environment (2345/2346), NEVER production (4545/4546).**
+
+See `docs/database/PROTECTION-STRATEGY.md` for details.
+
 <!-- MANUAL ADDITIONS END -->

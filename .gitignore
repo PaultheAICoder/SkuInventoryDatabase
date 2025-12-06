@@ -59,4 +59,7 @@ docker/nginx/ssl/
 
 # Database backups
 backups/
+.backups/*.dump
+.backups/*.sql
+!.backups/.gitkeep
 docker/.env
