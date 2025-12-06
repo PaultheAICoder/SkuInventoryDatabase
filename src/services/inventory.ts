@@ -45,6 +45,7 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
  */
 export async function getComponentQuantity(
   componentId: string,
+  companyId: string,
   locationId?: string
 ): Promise<number> {
   if (!locationId) {
@@ -52,7 +53,10 @@ export async function getComponentQuantity(
     const result = await prisma.transactionLine.aggregate({
       where: {
         componentId,
-        transaction: { status: 'approved' }, // Exclude drafts and rejected
+        transaction: {
+          companyId,
+          status: 'approved', // Exclude drafts and rejected
+        },
       },
       _sum: { quantityChange: true },
     })
@@ -70,6 +74,7 @@ export async function getComponentQuantity(
     where: {
       componentId,
       transaction: {
+        companyId,
         locationId,
         type: { not: 'transfer' },
         status: 'approved', // Exclude drafts and rejected
@@ -84,6 +89,7 @@ export async function getComponentQuantity(
       componentId,
       quantityChange: { lt: 0 },
       transaction: {
+        companyId,
         type: 'transfer',
         fromLocationId: locationId,
         status: 'approved', // Exclude drafts and rejected
@@ -98,6 +104,7 @@ export async function getComponentQuantity(
       componentId,
       quantityChange: { gt: 0 },
       transaction: {
+        companyId,
         type: 'transfer',
         toLocationId: locationId,
         status: 'approved', // Exclude drafts and rejected
@@ -125,6 +132,7 @@ export async function getComponentQuantity(
  */
 export async function getComponentQuantities(
   componentIds: string[],
+  companyId: string,
   locationId?: string
 ): Promise<Map<string, number>> {
   if (!locationId) {
@@ -133,7 +141,10 @@ export async function getComponentQuantities(
       by: ['componentId'],
       where: {
         componentId: { in: componentIds },
-        transaction: { status: 'approved' }, // Exclude drafts and rejected
+        transaction: {
+          companyId,
+          status: 'approved', // Exclude drafts and rejected
+        },
       },
       _sum: { quantityChange: true },
     })
@@ -167,6 +178,7 @@ export async function getComponentQuantities(
     where: {
       componentId: { in: componentIds },
       transaction: {
+        companyId,
         locationId,
         type: { not: 'transfer' },
         status: 'approved', // Exclude drafts and rejected
@@ -187,6 +199,7 @@ export async function getComponentQuantities(
       componentId: { in: componentIds },
       quantityChange: { lt: 0 },
       transaction: {
+        companyId,
         type: 'transfer',
         fromLocationId: locationId,
         status: 'approved', // Exclude drafts and rejected
@@ -207,6 +220,7 @@ export async function getComponentQuantities(
       componentId: { in: componentIds },
       quantityChange: { gt: 0 },
       transaction: {
+        companyId,
         type: 'transfer',
         toLocationId: locationId,
         status: 'approved', // Exclude drafts and rejected
@@ -248,7 +262,7 @@ export async function getComponentQuantitiesByLocation(
   const result: Array<{ locationId: string; locationName: string; locationType: string; quantity: number }> = []
 
   for (const location of locations) {
-    const quantity = await getComponentQuantity(componentId, location.id)
+    const quantity = await getComponentQuantity(componentId, companyId, location.id)
     if (quantity !== 0) {
       result.push({
         locationId: location.id,
@@ -652,10 +666,11 @@ export interface ExpiredLotItem {
  */
 export async function checkInsufficientInventory(params: {
   bomVersionId: string
+  companyId: string
   unitsToBuild: number
   locationId?: string
 }): Promise<InsufficientInventoryItem[]> {
-  const { bomVersionId, unitsToBuild, locationId } = params
+  const { bomVersionId, companyId, unitsToBuild, locationId } = params
 
   // Get BOM lines with components
   const bomLines = await prisma.bOMLine.findMany({
@@ -677,7 +692,7 @@ export async function checkInsufficientInventory(params: {
 
   // Get component quantities (filtered by location if specified)
   const componentIds = bomLines.map((line) => line.componentId)
-  const quantities = await getComponentQuantities(componentIds, locationId)
+  const quantities = await getComponentQuantities(componentIds, companyId, locationId)
 
   const insufficientItems: InsufficientInventoryItem[] = []
 
@@ -861,6 +876,7 @@ export async function createBuildTransaction(params: {
   // Check for insufficient inventory (at the target location if specified)
   const insufficientItems = await checkInsufficientInventory({
     bomVersionId,
+    companyId,
     unitsToBuild,
     locationId: locationIdToUse ?? undefined,
   })

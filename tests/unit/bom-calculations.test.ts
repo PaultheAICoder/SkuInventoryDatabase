@@ -189,7 +189,7 @@ describe('calculateMaxBuildableUnits', () => {
   it('returns null when no active BOM exists', async () => {
     vi.mocked(prisma.bOMVersion.findFirst).mockResolvedValue(null)
 
-    const result = await calculateMaxBuildableUnits('sku-no-bom')
+    const result = await calculateMaxBuildableUnits('sku-no-bom', 'company-1')
     expect(result).toBeNull()
   })
 
@@ -202,7 +202,7 @@ describe('calculateMaxBuildableUnits', () => {
       lines: [],
     } as never)
 
-    const result = await calculateMaxBuildableUnits('sku-empty-bom')
+    const result = await calculateMaxBuildableUnits('sku-empty-bom', 'company-1')
     expect(result).toBeNull()
   })
 
@@ -226,7 +226,7 @@ describe('calculateMaxBuildableUnits', () => {
       { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(30) } },
     ] as never)
 
-    const result = await calculateMaxBuildableUnits('sku-1')
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(6)
   })
 
@@ -243,7 +243,7 @@ describe('calculateMaxBuildableUnits', () => {
 
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
 
-    const result = await calculateMaxBuildableUnits('sku-1')
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(0)
   })
 
@@ -262,7 +262,7 @@ describe('calculateMaxBuildableUnits', () => {
       { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
     ] as never)
 
-    const result = await calculateMaxBuildableUnits('sku-1')
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(12) // 50 / 4 = 12 (floored)
   })
 
@@ -281,7 +281,7 @@ describe('calculateMaxBuildableUnits', () => {
       { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(10) } },
     ] as never)
 
-    const result = await calculateMaxBuildableUnits('sku-1')
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(3) // 10 / 3 = 3.33, floored to 3
   })
 })

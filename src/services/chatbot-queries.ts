@@ -54,8 +54,8 @@ export async function getSkuBuildableDetails(
   }
 
   // Calculate max buildable and limiting factors
-  const maxBuildable = await calculateMaxBuildableUnits(sku.id)
-  const limitingFactors = await calculateLimitingFactors(sku.id, undefined, 10) // Get top 10
+  const maxBuildable = await calculateMaxBuildableUnits(sku.id, companyId)
+  const limitingFactors = await calculateLimitingFactors(sku.id, companyId, undefined, 10) // Get top 10
 
   // Get BOM lines with current quantities
   const activeBom = sku.bomVersions[0]
@@ -63,7 +63,7 @@ export async function getSkuBuildableDetails(
 
   if (activeBom) {
     for (const line of activeBom.lines) {
-      const qty = await getComponentQuantity(line.componentId)
+      const qty = await getComponentQuantity(line.componentId, companyId)
       bomLines.push({
         componentName: line.component.name,
         skuCode: line.component.skuCode,
@@ -116,7 +116,7 @@ export async function getComponentInventoryDetails(
   }
 
   // Get total quantity
-  const totalQuantity = await getComponentQuantity(component.id)
+  const totalQuantity = await getComponentQuantity(component.id, companyId)
 
   // Get breakdown by location
   const locationBreakdown = await getComponentQuantitiesByLocation(component.id, companyId)

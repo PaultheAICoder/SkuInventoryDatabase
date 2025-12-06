@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
       // Get quantities for ALL components (filtered by location if specified)
       const componentIds = allComponents.map((c) => c.id)
-      const quantities = await getComponentQuantities(componentIds, locationId)
+      const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
       // Transform and compute reorder status for ALL
       const allWithStatus = allComponents.map((component) => {
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
 
     // Get quantities for all components (filtered by location if specified)
     const componentIds = components.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     // Transform response with computed fields
     const data = components.map((component) => {

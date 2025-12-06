@@ -98,7 +98,7 @@ export async function createTransferTransaction(params: {
     }
 
     // 3. Check sufficient inventory at source location
-    const availableQuantity = await getComponentQuantity(componentId, fromLocationId)
+    const availableQuantity = await getComponentQuantity(componentId, companyId, fromLocationId)
     if (availableQuantity < quantity) {
       throw new Error(
         `Insufficient inventory at source location. Available: ${availableQuantity}, Required: ${quantity}`

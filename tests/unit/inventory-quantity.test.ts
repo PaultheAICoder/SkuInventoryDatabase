@@ -28,12 +28,12 @@ describe('getComponentQuantity', () => {
       _sum: { quantityChange: new Prisma.Decimal(150) },
     } as never)
 
-    const result = await getComponentQuantity('comp-1')
+    const result = await getComponentQuantity('comp-1', 'company-1')
     expect(result).toBe(150)
     expect(prisma.transactionLine.aggregate).toHaveBeenCalledWith({
       where: {
         componentId: 'comp-1',
-        transaction: { status: 'approved' },
+        transaction: { companyId: 'company-1', status: 'approved' },
       },
       _sum: { quantityChange: true },
     })
@@ -44,7 +44,7 @@ describe('getComponentQuantity', () => {
       _sum: { quantityChange: null },
     } as never)
 
-    const result = await getComponentQuantity('comp-new')
+    const result = await getComponentQuantity('comp-new', 'company-1')
     expect(result).toBe(0)
   })
 
@@ -53,7 +53,7 @@ describe('getComponentQuantity', () => {
       _sum: { quantityChange: new Prisma.Decimal(-25) },
     } as never)
 
-    const result = await getComponentQuantity('comp-depleted')
+    const result = await getComponentQuantity('comp-depleted', 'company-1')
     expect(result).toBe(-25)
   })
 
@@ -62,7 +62,7 @@ describe('getComponentQuantity', () => {
       _sum: { quantityChange: new Prisma.Decimal(1000000) },
     } as never)
 
-    const result = await getComponentQuantity('comp-large')
+    const result = await getComponentQuantity('comp-large', 'company-1')
     expect(result).toBe(1000000)
   })
 
@@ -71,7 +71,7 @@ describe('getComponentQuantity', () => {
       _sum: { quantityChange: new Prisma.Decimal(50.5) },
     } as never)
 
-    const result = await getComponentQuantity('comp-decimal')
+    const result = await getComponentQuantity('comp-decimal', 'company-1')
     expect(result).toBe(50.5)
   })
 })
@@ -87,7 +87,7 @@ describe('getComponentQuantities', () => {
       { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
     ] as never)
 
-    const result = await getComponentQuantities(['comp-1', 'comp-2', 'comp-3'])
+    const result = await getComponentQuantities(['comp-1', 'comp-2', 'comp-3'], 'company-1')
 
     expect(result.get('comp-1')).toBe(100)
     expect(result.get('comp-2')).toBe(50)
@@ -97,14 +97,14 @@ describe('getComponentQuantities', () => {
   it('handles empty component list', async () => {
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
 
-    const result = await getComponentQuantities([])
+    const result = await getComponentQuantities([], 'company-1')
     expect(result.size).toBe(0)
   })
 
   it('returns 0 for components with no transactions', async () => {
     vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
 
-    const result = await getComponentQuantities(['comp-new'])
+    const result = await getComponentQuantities(['comp-new'], 'company-1')
     expect(result.get('comp-new')).toBe(0)
   })
 
@@ -113,7 +113,7 @@ describe('getComponentQuantities', () => {
       { componentId: 'comp-1', _sum: { quantityChange: null } },
     ] as never)
 
-    const result = await getComponentQuantities(['comp-1'])
+    const result = await getComponentQuantities(['comp-1'], 'company-1')
     expect(result.get('comp-1')).toBe(0)
   })
 
@@ -122,7 +122,7 @@ describe('getComponentQuantities', () => {
       { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
     ] as never)
 
-    const result = await getComponentQuantities(['comp-1', 'comp-2', 'comp-3', 'comp-4'])
+    const result = await getComponentQuantities(['comp-1', 'comp-2', 'comp-3', 'comp-4'], 'company-1')
 
     expect(result.size).toBe(4)
     expect(result.has('comp-1')).toBe(true)
@@ -152,7 +152,7 @@ describe('getComponentQuantity with locationId', () => {
         _sum: { quantityChange: new Prisma.Decimal(0) },
       } as never)
 
-    const result = await getComponentQuantity('comp-1', 'loc-1')
+    const result = await getComponentQuantity('comp-1', 'company-1', 'loc-1')
 
     // 100 (regular) - 20 (transfer out) + 0 (transfer in) = 80
     expect(result).toBe(80)
@@ -161,6 +161,7 @@ describe('getComponentQuantity with locationId', () => {
       where: {
         componentId: 'comp-1',
         transaction: {
+          companyId: 'company-1',
           locationId: 'loc-1',
           type: { not: 'transfer' },
           status: 'approved',
@@ -182,7 +183,7 @@ describe('getComponentQuantity with locationId', () => {
         _sum: { quantityChange: null },
       } as never)
 
-    const result = await getComponentQuantity('comp-1', 'loc-1')
+    const result = await getComponentQuantity('comp-1', 'company-1', 'loc-1')
 
     expect(result).toBe(150)
   })
@@ -199,7 +200,7 @@ describe('getComponentQuantity with locationId', () => {
         _sum: { quantityChange: null },
       } as never)
 
-    const result = await getComponentQuantity('comp-1', 'loc-1')
+    const result = await getComponentQuantity('comp-1', 'company-1', 'loc-1')
 
     // 100 - 30 = 70
     expect(result).toBe(70)
@@ -217,7 +218,7 @@ describe('getComponentQuantity with locationId', () => {
         _sum: { quantityChange: new Prisma.Decimal(25) },
       } as never)
 
-    const result = await getComponentQuantity('comp-1', 'loc-1')
+    const result = await getComponentQuantity('comp-1', 'company-1', 'loc-1')
 
     // 50 + 25 = 75
     expect(result).toBe(75)
@@ -235,7 +236,7 @@ describe('getComponentQuantity with locationId', () => {
         _sum: { quantityChange: new Prisma.Decimal(30) }, // Transfer in
       } as never)
 
-    const result = await getComponentQuantity('comp-1', 'loc-1')
+    const result = await getComponentQuantity('comp-1', 'company-1', 'loc-1')
 
     // 200 - 50 + 30 = 180
     expect(result).toBe(180)
@@ -263,7 +264,7 @@ describe('getComponentQuantities with locationId', () => {
         { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(10) } },
       ] as never)
 
-    const result = await getComponentQuantities(['comp-1', 'comp-2'], 'loc-1')
+    const result = await getComponentQuantities(['comp-1', 'comp-2'], 'company-1', 'loc-1')
 
     // comp-1: 100 - 20 = 80
     expect(result.get('comp-1')).toBe(80)
@@ -283,7 +284,7 @@ describe('getComponentQuantities with locationId', () => {
         { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(25) } },
       ] as never)
 
-    const result = await getComponentQuantities(['comp-1'], 'loc-1')
+    const result = await getComponentQuantities(['comp-1'], 'company-1', 'loc-1')
 
     // 200 - 75 + 25 = 150
     expect(result.get('comp-1')).toBe(150)
@@ -294,6 +295,7 @@ describe('getComponentQuantities with locationId', () => {
       where: {
         componentId: { in: ['comp-1'] },
         transaction: {
+          companyId: 'company-1',
           locationId: 'loc-1',
           type: { not: 'transfer' },
           status: 'approved',
@@ -316,7 +318,7 @@ describe('Performance', () => {
     } as never)
 
     const start = Date.now()
-    await getComponentQuantity('comp-1')
+    await getComponentQuantity('comp-1', 'company-1')
     const duration = Date.now() - start
 
     // With mocks, this should be nearly instant (under 100ms)
@@ -329,7 +331,7 @@ describe('Performance', () => {
     const componentIds = Array.from({ length: 100 }, (_, i) => `comp-${i}`)
 
     const start = Date.now()
-    await getComponentQuantities(componentIds)
+    await getComponentQuantities(componentIds, 'company-1')
     const duration = Date.now() - start
 
     // With mocks, batch query should be fast (under 200ms)

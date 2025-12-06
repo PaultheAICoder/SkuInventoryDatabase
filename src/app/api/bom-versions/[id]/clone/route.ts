@@ -62,7 +62,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Get component quantities (filtered by location if specified)
     const componentIds = newBomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     return created({
       id: newBomVersion.id,

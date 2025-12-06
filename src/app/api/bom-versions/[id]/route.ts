@@ -70,7 +70,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     // Calculate unit cost
     const unitCost = bomVersion.lines.reduce((sum, line) => {
@@ -175,7 +175,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     return success({
       id: bomVersion.id,

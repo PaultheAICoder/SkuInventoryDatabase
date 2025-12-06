@@ -214,7 +214,7 @@ export async function evaluateLowStockAlerts(
 
   // Get current quantities for all components
   const componentIds = components.map((c) => c.id)
-  const quantities = await getComponentQuantities(componentIds)
+  const quantities = await getComponentQuantities(componentIds, companyId)
 
   // Get previous states for all components
   const previousStates = await prisma.componentAlertState.findMany({
@@ -321,7 +321,7 @@ export async function getComponentsInAlertStatus(
   })
 
   const componentIds = components.map((c) => c.id)
-  const quantities = await getComponentQuantities(componentIds)
+  const quantities = await getComponentQuantities(componentIds, companyId)
 
   const warnings: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }> = []
   const criticals: Array<{ componentId: string; componentName: string; quantityOnHand: number; reorderPoint: number }> = []

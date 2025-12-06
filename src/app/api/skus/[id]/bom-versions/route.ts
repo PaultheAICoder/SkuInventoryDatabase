@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         allComponentIds.add(line.componentId)
       }
     }
-    const quantities = await getComponentQuantities(Array.from(allComponentIds), locationId)
+    const quantities = await getComponentQuantities(Array.from(allComponentIds), selectedCompanyId!, locationId)
 
     // Transform response
     const data = bomVersions.map((version) => {
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const unitCost = await calculateBOMUnitCost(bomVersion.id)
 
     // Get component quantities (filtered by location if specified)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     return created({
       id: bomVersion.id,

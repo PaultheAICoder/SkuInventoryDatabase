@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const bomCosts = await calculateBOMUnitCosts(bomVersionIds)
 
     // Calculate max buildable units (filtered by location if specified)
-    const maxBuildableUnits = await calculateMaxBuildableUnits(id, locationId)
+    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!, locationId)
 
     // Get finished goods inventory
     const finishedGoodsInventory = await getSkuInventorySummary(id)
@@ -203,7 +203,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       activeBomCost = costs.get(activeBom.id) ?? 0
     }
 
-    const maxBuildableUnits = await calculateMaxBuildableUnits(id)
+    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!)
 
     return success({
       id: sku.id,

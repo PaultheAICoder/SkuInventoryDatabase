@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Calculate limiting factors
-    const limitingFactors = await calculateLimitingFactors(id, locationId)
+    const limitingFactors = await calculateLimitingFactors(id, selectedCompanyId!, locationId)
 
     return success(limitingFactors)
   } catch (error) {

@@ -44,6 +44,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 10,
     })
 
@@ -69,6 +70,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 10,
     })
 
@@ -87,6 +89,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'empty-bom',
+      companyId: 'company-1',
       unitsToBuild: 10,
     })
 
@@ -122,6 +125,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 10,
     })
 
@@ -158,6 +162,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 5,
     })
 
@@ -183,6 +188,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 5,
     })
 
@@ -210,6 +216,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 1,
     })
 
@@ -237,6 +244,7 @@ describe('checkInsufficientInventory', () => {
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
+      companyId: 'company-1',
       unitsToBuild: 10,
     })
 

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
         if (activeBom) {
           bomCost = await calculateBOMUnitCost(activeBom.id).then((c) => c?.toString() ?? null)
-          maxBuildableUnits = await calculateMaxBuildableUnits(sku.id, locationId)
+          maxBuildableUnits = await calculateMaxBuildableUnits(sku.id, selectedCompanyId!, locationId)
         }
 
         // Get FG balance (0 if none)

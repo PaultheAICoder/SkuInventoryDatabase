@@ -215,6 +215,7 @@ export async function postShopifyOrder(params: {
     if (!allowInsufficient) {
       const insufficientItems = await checkInsufficientInventory({
         bomVersionId: bomVersion.id,
+        companyId,
         unitsToBuild: sku.totalQuantity,
       })
 

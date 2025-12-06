@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Get quantities for all components (filtered by location if specified)
     const componentIds = components.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     // Transform to export format
     const exportData: ComponentExportData[] = components.map((component) => {

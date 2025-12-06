@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
 
     // Get quantities for all components (filtered by location if specified)
     const componentIds = components.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds, locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
 
     // Calculate stats
     let critical = 0
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
       .map((s) => s.bomVersions[0].id)
 
     const [buildableUnits, bomCosts] = await Promise.all([
-      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, locationId) : new Map<string, number | null>(),
+      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId!, locationId) : new Map<string, number | null>(),
       activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
     ])
 

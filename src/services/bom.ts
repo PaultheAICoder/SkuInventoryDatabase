@@ -61,6 +61,7 @@ export async function calculateBOMUnitCosts(
  */
 export async function calculateMaxBuildableUnits(
   skuId: string,
+  companyId: string,
   locationId?: string
 ): Promise<number | null> {
   // Get active BOM for this SKU
@@ -86,7 +87,7 @@ export async function calculateMaxBuildableUnits(
 
   // Get component quantities (filtered by location if specified)
   const componentIds = activeBom.lines.map((line) => line.component.id)
-  const quantities = await getComponentQuantities(componentIds, locationId)
+  const quantities = await getComponentQuantities(componentIds, companyId, locationId)
 
   // Calculate max buildable for each line, return minimum
   let minBuildable = Infinity
@@ -107,6 +108,7 @@ export async function calculateMaxBuildableUnits(
  */
 export async function calculateMaxBuildableUnitsForSKUs(
   skuIds: string[],
+  companyId: string,
   locationId?: string
 ): Promise<Map<string, number | null>> {
   // Get all active BOMs for these SKUs
@@ -141,7 +143,7 @@ export async function calculateMaxBuildableUnitsForSKUs(
   }
 
   // Get all component quantities at once (filtered by location if specified)
-  const quantities = await getComponentQuantities(Array.from(allComponentIds), locationId)
+  const quantities = await getComponentQuantities(Array.from(allComponentIds), companyId, locationId)
 
   // Calculate max buildable for each SKU
   const result = new Map<string, number | null>()
@@ -175,6 +177,7 @@ export async function calculateMaxBuildableUnitsForSKUs(
  */
 export async function calculateLimitingFactors(
   skuId: string,
+  companyId: string,
   locationId?: string,
   limit: number = 3
 ): Promise<LimitingComponent[] | null> {
@@ -205,7 +208,7 @@ export async function calculateLimitingFactors(
 
   // Get component quantities (filtered by location if specified)
   const componentIds = activeBom.lines.map((line) => line.component.id)
-  const quantities = await getComponentQuantities(componentIds, locationId)
+  const quantities = await getComponentQuantities(componentIds, companyId, locationId)
 
   // Calculate buildable for each component and collect all factors
   const factors: LimitingComponent[] = []

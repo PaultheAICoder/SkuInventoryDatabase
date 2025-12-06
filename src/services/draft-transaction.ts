@@ -387,6 +387,7 @@ export async function approveDraftTransaction(params: {
     if (draft.type === 'build' && draft.bomVersionId && draft.unitsBuild) {
       const insufficientItems = await checkInsufficientInventory({
         bomVersionId: draft.bomVersionId,
+        companyId,
         unitsToBuild: draft.unitsBuild,
         locationId: draft.locationId ?? undefined,
       })

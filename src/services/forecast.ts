@@ -235,7 +235,7 @@ export async function getComponentForecasts(
 
   // Batch fetch quantities and consumption rates
   const [quantities, consumptionRates] = await Promise.all([
-    getComponentQuantities(componentIds),
+    getComponentQuantities(componentIds, companyId),
     calculateConsumptionRates(componentIds, config.lookbackDays, config.excludedTransactionTypes),
   ])
 
@@ -321,7 +321,7 @@ export async function getComponentForecastById(
   )
 
   // Get quantity on hand
-  const quantities = await getComponentQuantities([componentId])
+  const quantities = await getComponentQuantities([componentId], component.companyId)
   const quantityOnHand = quantities.get(componentId) ?? 0
 
   // Calculate runout

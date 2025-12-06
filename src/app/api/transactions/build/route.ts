@@ -196,6 +196,7 @@ export async function POST(request: NextRequest) {
         // Return 400 with insufficient items so frontend can show warning
         const insufficientItems = await checkInsufficientInventory({
           bomVersionId: selectedBomVersionId,
+          companyId: selectedCompanyId!,
           unitsToBuild: data.unitsToBuild,
         })
 

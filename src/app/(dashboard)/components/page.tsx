@@ -70,7 +70,7 @@ async function getComponents(
 
     // Get quantities for ALL components (filtered by location if specified)
     const componentIds = allComponents.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds, params.locationId)
+    const quantities = await getComponentQuantities(componentIds, selectedCompanyId, params.locationId)
 
     // Transform and compute reorder status for ALL
     const allWithStatus: ComponentResponse[] = allComponents.map((component) => {
@@ -125,7 +125,7 @@ async function getComponents(
 
   // Get quantities (filtered by location if specified)
   const componentIds = components.map((c) => c.id)
-  const quantities = await getComponentQuantities(componentIds, params.locationId)
+  const quantities = await getComponentQuantities(componentIds, selectedCompanyId, params.locationId)
 
   // Transform response with computed fields
   const data: ComponentResponse[] = components.map((component) => {
