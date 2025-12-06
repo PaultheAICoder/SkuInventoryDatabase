@@ -30,25 +30,10 @@ export async function POST(request: NextRequest) {
     const { brandId } = bodyResult.data
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // If brandId is null, user is deselecting brand (show all brands data)
+    // If brandId is null, reject the request - "All Brands" mode is no longer supported
     if (brandId === null) {
-      await logSecurityEvent({
-        companyId: selectedCompanyId,
-        userId: session.user.id,
-        eventType: 'brand_switch',
-        details: {
-          fromBrandId: session.user.selectedBrandId,
-          fromBrandName: session.user.selectedBrandName,
-          toBrandId: null,
-          toBrandName: null,
-        },
-      })
-
-      return success({
-        selectedBrandId: null,
-        selectedBrandName: null,
-        message: 'Brand deselected - showing all brands',
-      })
+      console.warn('Deprecated: null brandId in brand switch - All Brands mode has been removed')
+      return forbidden('All Brands mode is no longer supported. Please select a specific brand.')
     }
 
     // Verify brand exists and belongs to user's selected company

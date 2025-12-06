@@ -13,7 +13,7 @@ test.describe('Company/Brand Selector', () => {
     // It shows as a button with company/brand text and building icon
     const selector = page.locator('button:has-text("/")')
 
-    // Should be visible (selector shows "Company / Brand" or "Company / All Brands")
+    // Should be visible (selector shows "Company / Brand" format)
     await expect(selector).toBeVisible({ timeout: 10000 })
   })
 
@@ -77,12 +77,13 @@ test.describe('Company/Brand Selector', () => {
     // Wait a moment for submenu to appear
     await page.waitForTimeout(500)
 
-    // Look for "All Brands" option in submenu (indicator that submenu opened)
+    // Verify "All Brands" option is NOT present (removed in issue #185)
     const allBrandsOption = page.getByText('All Brands')
-    // Submenu should appear (may or may not depending on data)
-    const _visible = await allBrandsOption.isVisible().catch(() => false)
-    // This test passes if the dropdown mechanism works
-    expect(true).toBe(true)
+    await expect(allBrandsOption).not.toBeVisible()
+
+    // Brand submenu should show individual brands (with tag icons)
+    const submenu = page.locator('[data-radix-menu-content]')
+    await expect(submenu.first()).toBeVisible({ timeout: 5000 })
   })
 
   test('selector shows checkmark on current selection', async ({ page }) => {

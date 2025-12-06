@@ -1,6 +1,7 @@
 'use client'
 
 import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   DropdownMenu,
@@ -17,6 +18,7 @@ import { toast } from 'sonner'
 
 export function CompanyBrandSelector() {
   const { data: session, update: updateSession } = useSession()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [open, setOpen] = useState(false)
 
@@ -38,7 +40,7 @@ export function CompanyBrandSelector() {
     }
   }
 
-  const handleBrandSelect = async (companyId: string, brandId: string | null, _brandName: string | null) => {
+  const handleBrandSelect = async (companyId: string, brandId: string, brandName: string) => {
     const isCompanySwitch = companyId !== session.user.selectedCompanyId
     const isBrandSwitch = brandId !== session.user.selectedBrandId
 
@@ -53,7 +55,6 @@ export function CompanyBrandSelector() {
     try {
       if (isCompanySwitch) {
         // Switching company - use company switch API which auto-selects first brand
-        // But we want to select specific brand, so we need to call both
         const companyRes = await fetch('/api/companies/switch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,9 +77,9 @@ export function CompanyBrandSelector() {
           selectedBrandName: companyData.data.selectedBrandName,
         })
 
-        // If user selected a specific brand (not "All Brands" and not the auto-selected first brand)
+        // If user selected a specific brand different from the auto-selected first brand,
         // we need to switch to that brand
-        if (brandId !== null && brandId !== companyData.data.selectedBrandId) {
+        if (brandId !== companyData.data.selectedBrandId) {
           const brandRes = await fetch('/api/brands/switch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -100,34 +101,15 @@ export function CompanyBrandSelector() {
           toast.success('Switched company and brand', {
             description: `${companyData.data.selectedCompanyName} / ${brandData.data.selectedBrandName}`,
           })
-        } else if (brandId === null && companyData.data.selectedBrandId !== null) {
-          // User wants "All Brands" but company switch auto-selected first brand
-          const brandRes = await fetch('/api/brands/switch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ brandId: null }),
-          })
-
-          if (!brandRes.ok) {
-            const data = await brandRes.json().catch(() => ({}))
-            throw new Error(data?.error || 'Failed to switch brand')
-          }
-
-          await updateSession({
-            selectedBrandId: null,
-            selectedBrandName: null,
-          })
-
-          toast.success('Switched company', {
-            description: `${companyData.data.selectedCompanyName} / All Brands`,
-          })
         } else {
-          // Company switch only, with first brand auto-selected or "All Brands"
-          const brandDisplay = companyData.data.selectedBrandName || 'All Brands'
+          // Company switch only, with first brand auto-selected
           toast.success('Switched company', {
-            description: `${companyData.data.selectedCompanyName} / ${brandDisplay}`,
+            description: `${companyData.data.selectedCompanyName} / ${companyData.data.selectedBrandName}`,
           })
         }
+
+        // Refresh page to update server-rendered components
+        router.refresh()
       } else {
         // Same company, just brand switch
         const res = await fetch('/api/brands/switch', {
@@ -149,8 +131,11 @@ export function CompanyBrandSelector() {
         })
 
         toast.success('Switched brand', {
-          description: data.data.selectedBrandName || 'All Brands',
+          description: brandName,
         })
+
+        // Refresh page to update server-rendered components
+        router.refresh()
       }
     } catch (error) {
       console.error('Error switching company/brand:', error)
@@ -163,9 +148,7 @@ export function CompanyBrandSelector() {
     }
   }
 
-  const currentDisplay = session.user.selectedBrandName
-    ? `${session.user.selectedCompanyName} / ${session.user.selectedBrandName}`
-    : `${session.user.selectedCompanyName} / All Brands`
+  const currentDisplay = `${session.user.selectedCompanyName} / ${session.user.selectedBrandName || 'No Brand'}`
 
   return (
     <div className="px-4 py-2 border-b">
@@ -200,17 +183,6 @@ export function CompanyBrandSelector() {
                 )}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-[180px]">
-                <DropdownMenuItem
-                  className="cursor-pointer"
-                  onClick={() => handleBrandSelect(company.id, null, null)}
-                >
-                  <Tag className="mr-2 h-4 w-4" />
-                  <span className="flex-1">All Brands</span>
-                  {company.id === session.user.selectedCompanyId &&
-                   session.user.selectedBrandId === null && (
-                    <Check className="ml-2 h-4 w-4 shrink-0" />
-                  )}
-                </DropdownMenuItem>
                 {company.brands.map((brand) => (
                   <DropdownMenuItem
                     key={brand.id}
