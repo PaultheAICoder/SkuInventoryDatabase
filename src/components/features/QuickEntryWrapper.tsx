@@ -33,7 +33,7 @@ export function QuickEntryWrapper() {
       const params = new URLSearchParams()
       params.set('type', parsed.transactionType.value)
 
-      if (parsed.transactionType.value === 'build' && parsed.itemId.value) {
+      if (parsed.transactionType.value === 'outbound' && parsed.itemId.value) {
         params.set('skuId', parsed.itemId.value)
         if (parsed.salesChannel?.value) {
           params.set('channel', parsed.salesChannel.value)
@@ -76,13 +76,13 @@ export function QuickEntryWrapper() {
           supplier: parsed.supplier?.value || 'Unknown',
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
-      } else if (transactionType === 'build') {
-        endpoint = '/api/transactions/build'
+      } else if (transactionType === 'outbound') {
+        endpoint = '/api/transactions/outbound'
         payload = {
           skuId: parsed.itemId.value,
           date,
-          unitsToBuild: parsed.quantity.value,
-          salesChannel: parsed.salesChannel?.value || undefined,
+          quantity: parsed.quantity.value,
+          salesChannel: parsed.salesChannel?.value || 'Generic',
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
       } else {

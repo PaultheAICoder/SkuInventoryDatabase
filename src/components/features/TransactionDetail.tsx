@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Package, Receipt, Minus, Settings, ArrowLeftRight } from 'lucide-react'
+import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus } from 'lucide-react'
 
 interface TransactionLine {
   id: string
@@ -29,7 +29,7 @@ interface TransactionLine {
 interface TransactionDetailProps {
   transaction: {
     id: string
-    type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer'
+    type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer' | 'outbound'
     date: string
     company?: { id: string; name: string }
     sku?: { id: string; name: string; internalCode?: string } | null
@@ -88,6 +88,12 @@ const transactionTypeConfig = {
     icon: ArrowLeftRight,
     variant: 'default' as const,
     description: 'Inventory transfer between locations',
+  },
+  outbound: {
+    label: 'Outbound',
+    icon: PackageMinus,
+    variant: 'destructive' as const,
+    description: 'SKUs shipped out of warehouse',
   },
 }
 
@@ -180,6 +186,26 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 <div>
                   <p className="text-sm text-muted-foreground">To Location</p>
                   <p className="font-medium">{transaction.toLocation?.name || '-'}</p>
+                </div>
+              </>
+            )}
+
+            {/* Outbound-specific info */}
+            {transaction.type === 'outbound' && transaction.sku && (
+              <>
+                <div>
+                  <p className="text-sm text-muted-foreground">SKU</p>
+                  <Link
+                    href={`/skus/${transaction.sku.id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {transaction.sku.name}
+                  </Link>
+                  {transaction.sku.internalCode && (
+                    <p className="text-xs text-muted-foreground font-mono">
+                      {transaction.sku.internalCode}
+                    </p>
+                  )}
                 </div>
               </>
             )}

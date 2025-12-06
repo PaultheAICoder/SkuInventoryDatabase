@@ -83,6 +83,18 @@ export const createBuildSchema = z.object({
 
 export type CreateBuildInput = z.infer<typeof createBuildSchema>
 
+// Outbound transaction schema (shipping SKUs out of warehouse)
+export const createOutboundSchema = z.object({
+  date: z.coerce.date(),
+  skuId: z.string().uuid('Invalid SKU ID'),
+  salesChannel: z.string().min(1, 'Sales channel is required'),
+  quantity: z.coerce.number().int().positive('Quantity must be positive'),
+  notes: z.string().optional().nullable(),
+  locationId: z.string().uuid('Invalid location ID').optional(),
+})
+
+export type CreateOutboundInput = z.infer<typeof createOutboundSchema>
+
 // Insufficient inventory item type (matches service)
 export interface InsufficientInventoryItem {
   componentId: string
@@ -116,7 +128,7 @@ export interface BuildTransactionResponse {
 export const transactionListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(50),
-  type: z.enum(['receipt', 'build', 'adjustment', 'initial', 'transfer']).optional(),
+  type: z.enum(['receipt', 'build', 'adjustment', 'initial', 'transfer', 'outbound']).optional(),
   componentId: z.string().uuid().optional(),
   skuId: z.string().uuid().optional(),
   salesChannel: z.string().optional(),
@@ -132,7 +144,7 @@ export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>
 // Transaction response type
 export interface TransactionResponse {
   id: string
-  type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer'
+  type: 'receipt' | 'build' | 'adjustment' | 'initial' | 'transfer' | 'outbound'
   date: string
   sku?: { id: string; name: string } | null
   bomVersion?: { id: string; versionName: string } | null

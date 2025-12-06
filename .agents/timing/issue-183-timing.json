@@ -1,0 +1,14 @@
+{
+  "issue": "183",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-06T04:39:55Z",
+  "cleanup_start": "2025-12-06T05:02:00Z",
+  "cleanup_end": "2025-12-06T05:15:00Z",
+  "phases": {
+    "pre_flight": { "duration_minutes": 3 },
+    "unit_tests": { "duration_minutes": 1 },
+    "e2e_tests": { "duration_minutes": 3 },
+    "warnings_check": { "duration_minutes": 1 },
+    "documentation": { "duration_minutes": 5 }
+  }
+}

@@ -2,9 +2,9 @@
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { PackagePlus, Hammer, Scale } from 'lucide-react'
+import { PackagePlus, PackageMinus, Scale } from 'lucide-react'
 
-export type TransactionTypeValue = 'receipt' | 'build' | 'adjustment'
+export type TransactionTypeValue = 'inbound' | 'outbound' | 'adjustment'
 
 interface TransactionTypeSelectorProps {
   value: TransactionTypeValue
@@ -13,8 +13,8 @@ interface TransactionTypeSelectorProps {
 }
 
 const TRANSACTION_TYPES = [
-  { value: 'receipt' as const, label: 'Receipt', icon: PackagePlus, description: 'Receive components' },
-  { value: 'build' as const, label: 'Build', icon: Hammer, description: 'Build SKUs' },
+  { value: 'inbound' as const, label: 'Inbound', icon: PackagePlus, description: 'Receive components' },
+  { value: 'outbound' as const, label: 'Outbound', icon: PackageMinus, description: 'Ship SKUs' },
   { value: 'adjustment' as const, label: 'Adjustment', icon: Scale, description: 'Adjust inventory' },
 ]
 

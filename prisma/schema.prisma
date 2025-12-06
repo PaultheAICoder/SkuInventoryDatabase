@@ -241,6 +241,7 @@ enum TransactionType {
   adjustment
   initial
   transfer
+  outbound
 }
 
 enum TransactionStatus {

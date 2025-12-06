@@ -276,3 +276,58 @@ export async function transferFinishedGoods(params: {
     return transaction
   })
 }
+
+/**
+ * Create an outbound transaction (shipping SKUs out of warehouse)
+ * Decrements finished goods inventory at the specified location
+ */
+export async function createOutboundTransaction(params: {
+  companyId: string
+  skuId: string
+  locationId: string
+  quantity: number
+  salesChannel: string
+  notes?: string | null
+  date: Date
+  createdById: string
+}): Promise<{ id: string; newBalance: number }> {
+  const { companyId, skuId, locationId, quantity, salesChannel, notes, date, createdById } = params
+
+  return prisma.$transaction(async (tx) => {
+    // Check sufficient inventory at location
+    const currentQty = await getSkuQuantity(skuId, locationId)
+    if (currentQty < quantity) {
+      throw new Error(
+        `Insufficient finished goods at location. Available: ${currentQty}, Required: ${quantity}`
+      )
+    }
+
+    // Create outbound transaction with finished goods line
+    const transaction = await tx.transaction.create({
+      data: {
+        companyId,
+        type: 'outbound',
+        date,
+        skuId,
+        salesChannel,
+        notes,
+        locationId,
+        createdById,
+        finishedGoodsLines: {
+          create: {
+            skuId,
+            locationId,
+            quantityChange: new Prisma.Decimal(-quantity), // Negative to decrement
+            costPerUnit: null,
+          },
+        },
+      },
+      select: { id: true },
+    })
+
+    // Get new balance at this location
+    const newBalance = await getSkuQuantity(skuId, locationId)
+
+    return { id: transaction.id, newBalance }
+  })
+}

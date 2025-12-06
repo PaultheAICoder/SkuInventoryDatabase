@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 // Transaction action types that can be parsed
-export type ParsedTransactionType = 'receipt' | 'build' | 'adjustment'
+export type ParsedTransactionType = 'receipt' | 'outbound' | 'adjustment'
 
 // Confidence level for parsed values
 export type ConfidenceLevel = 'high' | 'medium' | 'low'
@@ -79,7 +79,7 @@ export interface ParserContext {
 
 // Raw response from Claude before processing
 export interface RawClaudeParseResponse {
-  action: 'ship' | 'receive' | 'adjust' | 'build'
+  action: 'ship' | 'receive' | 'adjust' | 'outbound'
   item: string
   quantity: number
   channel: string | null

@@ -14,11 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertTriangle } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
 import { salesChannels } from '@/types'
-import type { InsufficientInventoryItem } from '@/types/transaction'
 
 interface ComponentOption {
   id: string
@@ -55,16 +53,12 @@ export function QuickEntryForm() {
   const searchParams = useSearchParams()
 
   // Transaction type state
-  const [transactionType, setTransactionType] = useState<TransactionTypeValue>('receipt')
+  const [transactionType, setTransactionType] = useState<TransactionTypeValue>('inbound')
 
   // Submission states
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-
-  // Build warnings
-  const [insufficientItems, setInsufficientItems] = useState<InsufficientInventoryItem[]>([])
-  const [showWarning, setShowWarning] = useState(false)
 
   // Draft mode
   const [saveAsDraft, setSaveAsDraft] = useState(false)
@@ -79,8 +73,8 @@ export function QuickEntryForm() {
   const [skus, setSkus] = useState<SKUOption[]>([])
   const [locations, setLocations] = useState<LocationOption[]>([])
 
-  // Receipt form data
-  const [receiptFormData, setReceiptFormData] = useState({
+  // Inbound form data (receiving components)
+  const [inboundFormData, setInboundFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     componentId: '',
     quantity: '',
@@ -92,12 +86,12 @@ export function QuickEntryForm() {
     notes: '',
   })
 
-  // Build form data
-  const [buildFormData, setBuildFormData] = useState({
+  // Outbound form data (shipping SKUs)
+  const [outboundFormData, setOutboundFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     skuId: '',
-    unitsToBuild: '',
     salesChannel: '',
+    quantity: '',
     locationId: '',
     notes: '',
   })
@@ -116,24 +110,24 @@ export function QuickEntryForm() {
   // Initialize from URL params
   useEffect(() => {
     const typeParam = searchParams.get('type')
-    if (typeParam && ['receipt', 'build', 'adjustment'].includes(typeParam)) {
+    if (typeParam && ['inbound', 'outbound', 'adjustment'].includes(typeParam)) {
       setTransactionType(typeParam as TransactionTypeValue)
     }
-    // Pre-fill sales channel from URL
+    // Pre-fill sales channel from URL (for outbound)
     const channelParam = searchParams.get('channel')
     if (channelParam) {
-      setBuildFormData((prev) => ({ ...prev, salesChannel: channelParam }))
+      setOutboundFormData((prev) => ({ ...prev, salesChannel: channelParam }))
     }
-    // Pre-fill component ID from URL
+    // Pre-fill component ID from URL (for inbound/adjustment)
     const componentParam = searchParams.get('componentId')
     if (componentParam) {
-      setReceiptFormData((prev) => ({ ...prev, componentId: componentParam }))
+      setInboundFormData((prev) => ({ ...prev, componentId: componentParam }))
       setAdjustmentFormData((prev) => ({ ...prev, componentId: componentParam }))
     }
-    // Pre-fill SKU ID from URL
+    // Pre-fill SKU ID from URL (for outbound)
     const skuParam = searchParams.get('skuId')
     if (skuParam) {
-      setBuildFormData((prev) => ({ ...prev, skuId: skuParam }))
+      setOutboundFormData((prev) => ({ ...prev, skuId: skuParam }))
     }
   }, [searchParams])
 
@@ -159,10 +153,8 @@ export function QuickEntryForm() {
       const res = await fetch('/api/skus?isActive=true&pageSize=100')
       if (res.ok) {
         const data = await res.json()
-        // Filter to only SKUs with active BOMs
-        setSkus(
-          (data.data || []).filter((sku: SKUOption) => sku.activeBom !== null)
-        )
+        // For outbound, show all active SKUs (no BOM filter needed)
+        setSkus(data.data || [])
       }
     } catch (err) {
       console.error('Failed to fetch SKUs:', err)
@@ -201,21 +193,9 @@ export function QuickEntryForm() {
       : selectedAdjustmentComponent.quantityOnHand + adjustmentQuantityNum
     : null
 
-  // Get selected SKU for build preview
-  const selectedBuildSku = skus.find((s) => s.id === buildFormData.skuId)
-  const unitsToBuildNum = parseInt(buildFormData.unitsToBuild) || 0
-  const exceedsBuildable =
-    selectedBuildSku?.maxBuildableUnits != null && unitsToBuildNum > selectedBuildSku.maxBuildableUnits
-
   // Handle form submission
-  const handleSubmit = async (e: React.FormEvent, forceSubmit = false) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    // Reset warning state on fresh submit
-    if (!forceSubmit) {
-      setInsufficientItems([])
-      setShowWarning(false)
-    }
 
     setIsLoading(true)
     setError(null)
@@ -229,28 +209,28 @@ export function QuickEntryForm() {
       // If saving as draft, use the draft endpoint
       if (saveAsDraft) {
         endpoint = '/api/transactions/drafts'
-        if (transactionType === 'receipt') {
+        if (transactionType === 'inbound') {
           payload = {
             type: 'receipt',
-            componentId: receiptFormData.componentId,
-            date: receiptFormData.date,
-            quantity: parseFloat(receiptFormData.quantity),
-            supplier: receiptFormData.supplier,
-            costPerUnit: receiptFormData.costPerUnit ? parseFloat(receiptFormData.costPerUnit) : undefined,
-            locationId: receiptFormData.locationId || undefined,
-            lotNumber: receiptFormData.lotNumber || undefined,
-            expiryDate: receiptFormData.expiryDate || undefined,
-            notes: receiptFormData.notes || null,
+            componentId: inboundFormData.componentId,
+            date: inboundFormData.date,
+            quantity: parseFloat(inboundFormData.quantity),
+            supplier: inboundFormData.supplier,
+            costPerUnit: inboundFormData.costPerUnit ? parseFloat(inboundFormData.costPerUnit) : undefined,
+            locationId: inboundFormData.locationId || undefined,
+            lotNumber: inboundFormData.lotNumber || undefined,
+            expiryDate: inboundFormData.expiryDate || undefined,
+            notes: inboundFormData.notes || null,
           }
-        } else if (transactionType === 'build') {
+        } else if (transactionType === 'outbound') {
           payload = {
-            type: 'build',
-            skuId: buildFormData.skuId,
-            date: buildFormData.date,
-            unitsToBuild: parseInt(buildFormData.unitsToBuild),
-            salesChannel: buildFormData.salesChannel || undefined,
-            locationId: buildFormData.locationId || undefined,
-            notes: buildFormData.notes || null,
+            type: 'outbound',
+            skuId: outboundFormData.skuId,
+            date: outboundFormData.date,
+            quantity: parseInt(outboundFormData.quantity),
+            salesChannel: outboundFormData.salesChannel,
+            locationId: outboundFormData.locationId || undefined,
+            notes: outboundFormData.notes || null,
           }
         } else {
           // adjustment
@@ -266,29 +246,28 @@ export function QuickEntryForm() {
             notes: adjustmentFormData.notes || null,
           }
         }
-      } else if (transactionType === 'receipt') {
+      } else if (transactionType === 'inbound') {
         endpoint = '/api/transactions/receipt'
         payload = {
-          componentId: receiptFormData.componentId,
-          date: receiptFormData.date,
-          quantity: parseFloat(receiptFormData.quantity),
-          supplier: receiptFormData.supplier,
-          costPerUnit: receiptFormData.costPerUnit ? parseFloat(receiptFormData.costPerUnit) : undefined,
-          locationId: receiptFormData.locationId || undefined,
-          lotNumber: receiptFormData.lotNumber || undefined,
-          expiryDate: receiptFormData.expiryDate || undefined,
-          notes: receiptFormData.notes || null,
+          componentId: inboundFormData.componentId,
+          date: inboundFormData.date,
+          quantity: parseFloat(inboundFormData.quantity),
+          supplier: inboundFormData.supplier,
+          costPerUnit: inboundFormData.costPerUnit ? parseFloat(inboundFormData.costPerUnit) : undefined,
+          locationId: inboundFormData.locationId || undefined,
+          lotNumber: inboundFormData.lotNumber || undefined,
+          expiryDate: inboundFormData.expiryDate || undefined,
+          notes: inboundFormData.notes || null,
         }
-      } else if (transactionType === 'build') {
-        endpoint = '/api/transactions/build'
+      } else if (transactionType === 'outbound') {
+        endpoint = '/api/transactions/outbound'
         payload = {
-          skuId: buildFormData.skuId,
-          date: buildFormData.date,
-          unitsToBuild: parseInt(buildFormData.unitsToBuild),
-          salesChannel: buildFormData.salesChannel || undefined,
-          locationId: buildFormData.locationId || undefined,
-          notes: buildFormData.notes || null,
-          allowInsufficientInventory: forceSubmit,
+          skuId: outboundFormData.skuId,
+          date: outboundFormData.date,
+          quantity: parseInt(outboundFormData.quantity),
+          salesChannel: outboundFormData.salesChannel,
+          locationId: outboundFormData.locationId || undefined,
+          notes: outboundFormData.notes || null,
         }
       } else {
         // adjustment
@@ -314,28 +293,22 @@ export function QuickEntryForm() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        // Handle insufficient inventory error for builds
-        if (transactionType === 'build' && data?.insufficientItems && data.insufficientItems.length > 0) {
-          setInsufficientItems(data.insufficientItems)
-          setShowWarning(true)
-          return
-        }
         throw new Error(data?.error || data?.message || 'Failed to record transaction')
       }
 
       // Success
       let successText = 'Transaction recorded successfully!'
       const isDraft = saveAsDraft
-      if (transactionType === 'receipt') {
-        const component = components.find((c) => c.id === receiptFormData.componentId)
+      if (transactionType === 'inbound') {
+        const component = components.find((c) => c.id === inboundFormData.componentId)
         successText = isDraft
-          ? `Draft saved: Receipt for +${receiptFormData.quantity} ${component?.name || 'component'}`
-          : `Receipt recorded: +${receiptFormData.quantity} ${component?.name || 'component'}`
-      } else if (transactionType === 'build') {
-        const sku = skus.find((s) => s.id === buildFormData.skuId)
+          ? `Draft saved: Inbound for +${inboundFormData.quantity} ${component?.name || 'component'}`
+          : `Inbound recorded: +${inboundFormData.quantity} ${component?.name || 'component'}`
+      } else if (transactionType === 'outbound') {
+        const sku = skus.find((s) => s.id === outboundFormData.skuId)
         successText = isDraft
-          ? `Draft saved: Build for ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
-          : `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
+          ? `Draft saved: Outbound for ${outboundFormData.quantity} x ${sku?.name || 'SKU'}`
+          : `Outbound recorded: ${outboundFormData.quantity} x ${sku?.name || 'SKU'}`
       } else {
         const component = components.find((c) => c.id === adjustmentFormData.componentId)
         const sign = adjustmentFormData.adjustmentType === 'add' ? '+' : '-'
@@ -352,21 +325,15 @@ export function QuickEntryForm() {
     }
   }
 
-  const handleForceSubmit = (e: React.FormEvent) => {
-    handleSubmit(e, true)
-  }
-
   // Handle "Record Another" - reset form but keep transaction type
   const handleRecordAnother = () => {
     setSuccessMessage(null)
     setError(null)
-    setInsufficientItems([])
-    setShowWarning(false)
 
     const today = new Date().toISOString().split('T')[0]
 
-    if (transactionType === 'receipt') {
-      setReceiptFormData({
+    if (transactionType === 'inbound') {
+      setInboundFormData({
         date: today,
         componentId: '',
         quantity: '',
@@ -377,12 +344,12 @@ export function QuickEntryForm() {
         expiryDate: '',
         notes: '',
       })
-    } else if (transactionType === 'build') {
-      setBuildFormData({
+    } else if (transactionType === 'outbound') {
+      setOutboundFormData({
         date: today,
         skuId: '',
-        unitsToBuild: '',
-        salesChannel: buildFormData.salesChannel, // Keep sales channel
+        salesChannel: outboundFormData.salesChannel, // Keep sales channel
+        quantity: '',
         locationId: '',
         notes: '',
       })
@@ -404,8 +371,6 @@ export function QuickEntryForm() {
     setTransactionType(type)
     setSuccessMessage(null)
     setError(null)
-    setInsufficientItems([])
-    setShowWarning(false)
   }
 
   // Render success state
@@ -455,51 +420,8 @@ export function QuickEntryForm() {
             </div>
           )}
 
-          {/* Insufficient Inventory Warning (Build only) */}
-          {showWarning && insufficientItems.length > 0 && (
-            <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-yellow-800">Insufficient Inventory</p>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    The following components have insufficient inventory:
-                  </p>
-                  <ul className="mt-2 text-sm text-yellow-700 space-y-1">
-                    {insufficientItems.map((item) => (
-                      <li key={item.componentId} suppressHydrationWarning>
-                        <span className="font-medium">{item.componentName}</span>:{' '}
-                        Need {item.required.toLocaleString()}, have {item.available.toLocaleString()}{' '}
-                        (short {item.shortage.toLocaleString()})
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowWarning(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={handleForceSubmit}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Building...' : 'Build Anyway'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Receipt Form Fields */}
-          {transactionType === 'receipt' && (
+          {/* Inbound Form Fields */}
+          {transactionType === 'inbound' && (
             <div className="space-y-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="receipt-date" className="text-right">
@@ -509,8 +431,8 @@ export function QuickEntryForm() {
                   id="receipt-date"
                   type="date"
                   className="col-span-3"
-                  value={receiptFormData.date}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, date: e.target.value }))}
+                  value={inboundFormData.date}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, date: e.target.value }))}
                   required
                 />
               </div>
@@ -520,8 +442,8 @@ export function QuickEntryForm() {
                   Component *
                 </Label>
                 <Select
-                  value={receiptFormData.componentId}
-                  onValueChange={(value) => setReceiptFormData((prev) => ({ ...prev, componentId: value }))}
+                  value={inboundFormData.componentId}
+                  onValueChange={(value) => setInboundFormData((prev) => ({ ...prev, componentId: value }))}
                   disabled={isLoadingComponents}
                 >
                   <SelectTrigger className="col-span-3">
@@ -553,8 +475,8 @@ export function QuickEntryForm() {
                   min="1"
                   className="col-span-3"
                   placeholder="e.g., 100"
-                  value={receiptFormData.quantity}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, quantity: e.target.value }))}
+                  value={inboundFormData.quantity}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, quantity: e.target.value }))}
                   required
                 />
               </div>
@@ -567,8 +489,8 @@ export function QuickEntryForm() {
                   id="receipt-supplier"
                   className="col-span-3"
                   placeholder="e.g., XYZ Corp"
-                  value={receiptFormData.supplier}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, supplier: e.target.value }))}
+                  value={inboundFormData.supplier}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, supplier: e.target.value }))}
                   required
                 />
               </div>
@@ -584,8 +506,8 @@ export function QuickEntryForm() {
                   min="0"
                   className="col-span-3"
                   placeholder="Leave blank to use component default"
-                  value={receiptFormData.costPerUnit}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))}
+                  value={inboundFormData.costPerUnit}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))}
                 />
               </div>
 
@@ -594,8 +516,8 @@ export function QuickEntryForm() {
                   Location
                 </Label>
                 <Select
-                  value={receiptFormData.locationId}
-                  onValueChange={(value) => setReceiptFormData((prev) => ({ ...prev, locationId: value }))}
+                  value={inboundFormData.locationId}
+                  onValueChange={(value) => setInboundFormData((prev) => ({ ...prev, locationId: value }))}
                   disabled={isLoadingLocations}
                 >
                   <SelectTrigger className="col-span-3">
@@ -619,8 +541,8 @@ export function QuickEntryForm() {
                   id="receipt-lot"
                   className="col-span-3"
                   placeholder="e.g., LOT-2024-001"
-                  value={receiptFormData.lotNumber}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, lotNumber: e.target.value }))}
+                  value={inboundFormData.lotNumber}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, lotNumber: e.target.value }))}
                 />
               </div>
 
@@ -632,9 +554,9 @@ export function QuickEntryForm() {
                   id="receipt-expiry"
                   type="date"
                   className="col-span-3"
-                  value={receiptFormData.expiryDate}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, expiryDate: e.target.value }))}
-                  disabled={!receiptFormData.lotNumber}
+                  value={inboundFormData.expiryDate}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, expiryDate: e.target.value }))}
+                  disabled={!inboundFormData.lotNumber}
                 />
               </div>
 
@@ -646,98 +568,67 @@ export function QuickEntryForm() {
                   id="receipt-notes"
                   className="col-span-3"
                   placeholder="e.g., PO #12345"
-                  value={receiptFormData.notes}
-                  onChange={(e) => setReceiptFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  value={inboundFormData.notes}
+                  onChange={(e) => setInboundFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 />
               </div>
             </div>
           )}
 
-          {/* Build Form Fields */}
-          {transactionType === 'build' && (
+          {/* Outbound Form Fields */}
+          {transactionType === 'outbound' && (
             <div className="space-y-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="build-date" className="text-right">
+                <Label htmlFor="outbound-date" className="text-right">
                   Date *
                 </Label>
                 <Input
-                  id="build-date"
+                  id="outbound-date"
                   type="date"
                   className="col-span-3"
-                  value={buildFormData.date}
-                  onChange={(e) => setBuildFormData((prev) => ({ ...prev, date: e.target.value }))}
+                  value={outboundFormData.date}
+                  onChange={(e) => setOutboundFormData((prev) => ({ ...prev, date: e.target.value }))}
                   required
                 />
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="build-sku" className="text-right">
+                <Label htmlFor="outbound-sku" className="text-right">
                   SKU *
                 </Label>
-                <div className="col-span-3">
-                  <Select
-                    value={buildFormData.skuId}
-                    onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, skuId: value }))}
-                    disabled={isLoadingSkus}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {skus.map((sku) => (
-                        <SelectItem key={sku.id} value={sku.id}>
-                          <div className="flex items-center justify-between gap-2">
-                            <span>{sku.name}</span>
-                            <span className="text-xs text-muted-foreground" suppressHydrationWarning>
-                              ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {selectedBuildSku && (
-                    <p className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
-                      Max buildable: {selectedBuildSku.maxBuildableUnits?.toLocaleString() ?? '0'} units
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="build-units" className="text-right">
-                  Units *
-                </Label>
-                <div className="col-span-3">
-                  <Input
-                    id="build-units"
-                    type="number"
-                    step="1"
-                    min="1"
-                    className={exceedsBuildable ? 'border-yellow-500' : ''}
-                    placeholder="e.g., 10"
-                    value={buildFormData.unitsToBuild}
-                    onChange={(e) => setBuildFormData((prev) => ({ ...prev, unitsToBuild: e.target.value }))}
-                    required
-                  />
-                  {exceedsBuildable && (
-                    <p className="text-xs text-yellow-600 mt-1" suppressHydrationWarning>
-                      Exceeds max buildable units ({selectedBuildSku?.maxBuildableUnits?.toLocaleString()})
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="build-channel" className="text-right">
-                  Sales Channel
-                </Label>
                 <Select
-                  value={buildFormData.salesChannel}
-                  onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, salesChannel: value }))}
+                  value={outboundFormData.skuId}
+                  onValueChange={(value) => setOutboundFormData((prev) => ({ ...prev, skuId: value }))}
+                  disabled={isLoadingSkus}
                 >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select channel (optional)" />
+                    <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skus.map((sku) => (
+                      <SelectItem key={sku.id} value={sku.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{sku.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({sku.internalCode})
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="outbound-channel" className="text-right">
+                  Sales Channel *
+                </Label>
+                <Select
+                  value={outboundFormData.salesChannel}
+                  onValueChange={(value) => setOutboundFormData((prev) => ({ ...prev, salesChannel: value }))}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select channel" />
                   </SelectTrigger>
                   <SelectContent>
                     {salesChannels.map((channel) => (
@@ -750,12 +641,29 @@ export function QuickEntryForm() {
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="build-location" className="text-right">
+                <Label htmlFor="outbound-quantity" className="text-right">
+                  Quantity *
+                </Label>
+                <Input
+                  id="outbound-quantity"
+                  type="number"
+                  step="1"
+                  min="1"
+                  className="col-span-3"
+                  placeholder="e.g., 10"
+                  value={outboundFormData.quantity}
+                  onChange={(e) => setOutboundFormData((prev) => ({ ...prev, quantity: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="outbound-location" className="text-right">
                   Location
                 </Label>
                 <Select
-                  value={buildFormData.locationId}
-                  onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, locationId: value }))}
+                  value={outboundFormData.locationId}
+                  onValueChange={(value) => setOutboundFormData((prev) => ({ ...prev, locationId: value }))}
                   disabled={isLoadingLocations}
                 >
                   <SelectTrigger className="col-span-3">
@@ -772,15 +680,15 @@ export function QuickEntryForm() {
               </div>
 
               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="build-notes" className="text-right pt-2">
+                <Label htmlFor="outbound-notes" className="text-right pt-2">
                   Notes
                 </Label>
                 <Textarea
-                  id="build-notes"
+                  id="outbound-notes"
                   className="col-span-3"
-                  placeholder="e.g., Order batch #123"
-                  value={buildFormData.notes}
-                  onChange={(e) => setBuildFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="e.g., Order #12345"
+                  value={outboundFormData.notes}
+                  onChange={(e) => setOutboundFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 />
               </div>
             </div>
@@ -938,8 +846,7 @@ export function QuickEntryForm() {
           )}
         </CardContent>
 
-        {!showWarning && (
-          <CardFooter className="flex flex-col gap-4">
+        <CardFooter className="flex flex-col gap-4">
             {/* Save as Draft Option */}
             <div className="w-full flex items-center space-x-2 border-t pt-4">
               <Checkbox
@@ -968,16 +875,15 @@ export function QuickEntryForm() {
                 type="submit"
                 disabled={
                   isLoading ||
-                  (transactionType === 'receipt' && (!receiptFormData.componentId || !receiptFormData.quantity || !receiptFormData.supplier)) ||
-                  (transactionType === 'build' && (!buildFormData.skuId || !buildFormData.unitsToBuild)) ||
+                  (transactionType === 'inbound' && (!inboundFormData.componentId || !inboundFormData.quantity || !inboundFormData.supplier)) ||
+                  (transactionType === 'outbound' && (!outboundFormData.skuId || !outboundFormData.quantity || !outboundFormData.salesChannel)) ||
                   (transactionType === 'adjustment' && (!adjustmentFormData.componentId || !adjustmentFormData.quantity || !adjustmentFormData.reason))
                 }
               >
                 {isLoading ? (saveAsDraft ? 'Saving...' : 'Recording...') : (saveAsDraft ? 'Save Draft' : 'Record Transaction')}
               </Button>
             </div>
-          </CardFooter>
-        )}
+        </CardFooter>
       </form>
     </Card>
   )

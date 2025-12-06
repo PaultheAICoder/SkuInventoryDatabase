@@ -144,17 +144,17 @@ function calculateConfidence(
 /**
  * Map action to transaction type
  */
-function mapActionToType(action: string): 'receipt' | 'build' | 'adjustment' {
+function mapActionToType(action: string): 'receipt' | 'outbound' | 'adjustment' {
   switch (action) {
     case 'receive':
       return 'receipt'
     case 'ship':
-    case 'build':
-      return 'build'
+    case 'outbound':
+      return 'outbound'
     case 'adjust':
       return 'adjustment'
     default:
-      return 'build' // Default to build for unknown actions
+      return 'outbound' // Default to outbound for unknown actions
   }
 }
 
@@ -271,7 +271,7 @@ function createFallbackParse(text: string, _context: ParserContext): ParsedTrans
   const quantity = quantityMatch ? parseInt(quantityMatch[1], 10) : 0
 
   // Detect transaction type from keywords
-  let transactionType: 'receipt' | 'build' | 'adjustment' = 'build'
+  let transactionType: 'receipt' | 'outbound' | 'adjustment' = 'outbound'
   if (/receiv|got\s+in|came\s+in|from\s+supplier/i.test(text)) {
     transactionType = 'receipt'
   } else if (/adjust|correct|damag|lost|missing/i.test(text)) {
@@ -412,7 +412,7 @@ export async function parseTransactionText(
     }
 
     // Add optional fields based on transaction type
-    if (transactionType === 'build') {
+    if (transactionType === 'outbound') {
       parsed.salesChannel = {
         value: rawParsed.channel,
         confidence: calculateConfidence('salesChannel', rawParsed.channel),
