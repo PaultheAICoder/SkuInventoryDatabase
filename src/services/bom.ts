@@ -366,6 +366,86 @@ export async function activateBOMVersion(bomVersionId: string) {
 }
 
 /**
+ * Update a BOM version's details and optionally its lines
+ */
+export async function updateBOMVersion(params: {
+  bomVersionId: string
+  versionName?: string
+  effectiveStartDate?: Date
+  notes?: string | null
+  defectNotes?: string | null
+  qualityMetadata?: Record<string, unknown>
+  lines?: Array<{
+    componentId: string
+    quantityPerUnit: number
+    notes?: string | null
+  }>
+}) {
+  const { bomVersionId, lines, ...updateData } = params
+
+  return prisma.$transaction(async (tx) => {
+    // Check if BOM version exists
+    const existing = await tx.bOMVersion.findUnique({
+      where: { id: bomVersionId },
+    })
+
+    if (!existing) {
+      throw new Error('BOM version not found')
+    }
+
+    // If lines are provided, delete existing and recreate
+    if (lines && lines.length > 0) {
+      await tx.bOMLine.deleteMany({
+        where: { bomVersionId },
+      })
+
+      await tx.bOMLine.createMany({
+        data: lines.map((line) => ({
+          bomVersionId,
+          componentId: line.componentId,
+          quantityPerUnit: new Prisma.Decimal(line.quantityPerUnit),
+          notes: line.notes,
+        })),
+      })
+    }
+
+    // Update BOM version metadata
+    const updated = await tx.bOMVersion.update({
+      where: { id: bomVersionId },
+      data: {
+        ...(updateData.versionName !== undefined && { versionName: updateData.versionName }),
+        ...(updateData.effectiveStartDate !== undefined && { effectiveStartDate: updateData.effectiveStartDate }),
+        ...(updateData.notes !== undefined && { notes: updateData.notes }),
+        ...(updateData.defectNotes !== undefined && { defectNotes: updateData.defectNotes }),
+        ...(updateData.qualityMetadata !== undefined && {
+          qualityMetadata: updateData.qualityMetadata as Prisma.InputJsonValue
+        }),
+      },
+      include: {
+        lines: {
+          include: {
+            component: {
+              select: {
+                id: true,
+                name: true,
+                skuCode: true,
+                costPerUnit: true,
+                unitOfMeasure: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: { id: true, name: true },
+        },
+      },
+    })
+
+    return updated
+  })
+}
+
+/**
  * Get BOM lines with calculated costs
  */
 export function calculateLineCosts(

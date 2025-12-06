@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Copy, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Copy, CheckCircle, ChevronDown, ChevronRight, Edit } from 'lucide-react'
 import type { BOMVersionResponse } from '@/types/bom'
 
 interface BOMVersionListProps {
@@ -156,6 +156,13 @@ export function BOMVersionList({ versions, skuId, onRefresh }: BOMVersionListPro
                     </div>
                   </div>
                   <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/skus/${skuId}/bom/${version.id}/edit`)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

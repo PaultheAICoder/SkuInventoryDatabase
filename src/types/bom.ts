@@ -48,6 +48,18 @@ export const createBOMVersionSchema = z.object({
 
 export type CreateBOMVersionInput = z.infer<typeof createBOMVersionSchema>
 
+// BOM version update schema (partial updates allowed)
+export const updateBOMVersionSchema = z.object({
+  versionName: z.string().min(1).max(50).optional(),
+  effectiveStartDate: z.coerce.date().optional(),
+  notes: z.string().optional().nullable(),
+  defectNotes: z.string().optional().nullable(),
+  qualityMetadata: z.record(z.string(), z.unknown()).optional(),
+  lines: z.array(bomLineSchema).optional(),
+})
+
+export type UpdateBOMVersionInput = z.infer<typeof updateBOMVersionSchema>
+
 // BOM version clone schema
 export const cloneBOMVersionSchema = z.object({
   versionName: z.string().min(1, 'Version name is required').max(50),
