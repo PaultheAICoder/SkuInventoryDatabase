@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         let maxBuildableUnits: number | null = null
 
         if (activeBom) {
-          bomCost = await calculateBOMUnitCost(activeBom.id).then((c) => c?.toString() ?? null)
+          bomCost = await calculateBOMUnitCost(activeBom.id, selectedCompanyId!).then((c) => c?.toString() ?? null)
           maxBuildableUnits = await calculateMaxBuildableUnits(sku.id, selectedCompanyId!, locationId)
         }
 

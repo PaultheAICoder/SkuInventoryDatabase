@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
 
     const [buildableUnits, bomCosts] = await Promise.all([
       skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId!, locationId) : new Map<string, number | null>(),
-      activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
+      activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds, selectedCompanyId!) : new Map<string, number>(),
     ])
 
     // Get top buildable SKUs (sorted by buildable units descending)

@@ -6,9 +6,12 @@ import type { LimitingComponent } from '@/types/sku'
 /**
  * Calculate the unit cost of a BOM version by summing component costs * quantities
  */
-export async function calculateBOMUnitCost(bomVersionId: string): Promise<number> {
+export async function calculateBOMUnitCost(bomVersionId: string, companyId: string): Promise<number> {
   const lines = await prisma.bOMLine.findMany({
-    where: { bomVersionId },
+    where: {
+      bomVersionId,
+      bomVersion: { sku: { companyId } },
+    },
     include: {
       component: {
         select: { costPerUnit: true },
@@ -26,10 +29,14 @@ export async function calculateBOMUnitCost(bomVersionId: string): Promise<number
  * Calculate unit costs for multiple BOM versions at once
  */
 export async function calculateBOMUnitCosts(
-  bomVersionIds: string[]
+  bomVersionIds: string[],
+  companyId: string
 ): Promise<Map<string, number>> {
   const lines = await prisma.bOMLine.findMany({
-    where: { bomVersionId: { in: bomVersionIds } },
+    where: {
+      bomVersionId: { in: bomVersionIds },
+      bomVersion: { sku: { companyId } },
+    },
     include: {
       component: {
         select: { costPerUnit: true },
@@ -69,6 +76,7 @@ export async function calculateMaxBuildableUnits(
     where: {
       skuId,
       isActive: true,
+      sku: { companyId },
     },
     include: {
       lines: {
@@ -116,6 +124,7 @@ export async function calculateMaxBuildableUnitsForSKUs(
     where: {
       skuId: { in: skuIds },
       isActive: true,
+      sku: { companyId },
     },
     include: {
       lines: {
@@ -186,6 +195,7 @@ export async function calculateLimitingFactors(
     where: {
       skuId,
       isActive: true,
+      sku: { companyId },
     },
     include: {
       lines: {
@@ -246,6 +256,7 @@ export async function calculateLimitingFactors(
  */
 export async function createBOMVersion(params: {
   skuId: string
+  companyId: string
   versionName: string
   effectiveStartDate: Date
   isActive: boolean
@@ -259,7 +270,15 @@ export async function createBOMVersion(params: {
   }>
   createdById: string
 }) {
-  const { skuId, versionName, effectiveStartDate, isActive, notes, defectNotes, qualityMetadata, lines, createdById } = params
+  const { skuId, companyId, versionName, effectiveStartDate, isActive, notes, defectNotes, qualityMetadata, lines, createdById } = params
+
+  // Verify SKU belongs to company
+  const sku = await prisma.sKU.findFirst({
+    where: { id: skuId, companyId },
+  })
+  if (!sku) {
+    throw new Error('SKU not found or does not belong to company')
+  }
 
   return prisma.$transaction(async (tx) => {
     // If this version should be active, deactivate any existing active version
@@ -324,14 +343,18 @@ export async function createBOMVersion(params: {
  */
 export async function cloneBOMVersion(params: {
   bomVersionId: string
+  companyId: string
   newVersionName: string
   createdById: string
 }) {
-  const { bomVersionId, newVersionName, createdById } = params
+  const { bomVersionId, companyId, newVersionName, createdById } = params
 
-  // Get the source BOM version with lines
-  const sourceBom = await prisma.bOMVersion.findUnique({
-    where: { id: bomVersionId },
+  // Get the source BOM version with lines, verifying company ownership
+  const sourceBom = await prisma.bOMVersion.findFirst({
+    where: {
+      id: bomVersionId,
+      sku: { companyId },
+    },
     include: {
       lines: true,
     },
@@ -384,11 +407,14 @@ export async function cloneBOMVersion(params: {
 /**
  * Activate a BOM version (deactivates any other active version for the same SKU)
  */
-export async function activateBOMVersion(bomVersionId: string) {
+export async function activateBOMVersion(bomVersionId: string, companyId: string) {
   return prisma.$transaction(async (tx) => {
-    // Get the BOM version to activate
-    const bomVersion = await tx.bOMVersion.findUnique({
-      where: { id: bomVersionId },
+    // Get the BOM version to activate, verifying company ownership
+    const bomVersion = await tx.bOMVersion.findFirst({
+      where: {
+        id: bomVersionId,
+        sku: { companyId },
+      },
     })
 
     if (!bomVersion) {
@@ -444,6 +470,7 @@ export async function activateBOMVersion(bomVersionId: string) {
  */
 export async function updateBOMVersion(params: {
   bomVersionId: string
+  companyId: string
   versionName?: string
   effectiveStartDate?: Date
   notes?: string | null
@@ -455,12 +482,15 @@ export async function updateBOMVersion(params: {
     notes?: string | null
   }>
 }) {
-  const { bomVersionId, lines, ...updateData } = params
+  const { bomVersionId, companyId, lines, ...updateData } = params
 
   return prisma.$transaction(async (tx) => {
-    // Check if BOM version exists
-    const existing = await tx.bOMVersion.findUnique({
-      where: { id: bomVersionId },
+    // Check if BOM version exists and belongs to company
+    const existing = await tx.bOMVersion.findFirst({
+      where: {
+        id: bomVersionId,
+        sku: { companyId },
+      },
     })
 
     if (!existing) {
@@ -536,12 +566,13 @@ export function calculateLineCosts(
 /**
  * Check if a component is used in any active BOM
  */
-export async function isComponentInActiveBOM(componentId: string): Promise<boolean> {
+export async function isComponentInActiveBOM(componentId: string, companyId: string): Promise<boolean> {
   const count = await prisma.bOMLine.count({
     where: {
       componentId,
       bomVersion: {
         isActive: true,
+        sku: { companyId },
       },
     },
   })

@@ -266,6 +266,7 @@ export async function POST(request: NextRequest) {
             try {
               await createBOMVersion({
                 skuId: newSku.id,
+                companyId,
                 versionName: 'v1-import',
                 effectiveStartDate: new Date(),
                 isActive: true,

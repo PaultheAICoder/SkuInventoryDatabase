@@ -53,12 +53,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const newBomVersion = await cloneBOMVersion({
       bomVersionId: id,
+      companyId: selectedCompanyId!,
       newVersionName: versionName,
       createdById: session.user.id,
     })
 
     // Calculate unit cost
-    const unitCost = await calculateBOMUnitCost(newBomVersion.id)
+    const unitCost = await calculateBOMUnitCost(newBomVersion.id, selectedCompanyId!)
 
     // Get component quantities (filtered by location if specified)
     const componentIds = newBomVersion.lines.map((l) => l.componentId)

@@ -5,6 +5,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 
+// Test company ID for multi-tenancy enforcement
+const TEST_COMPANY_ID = 'company-1'
+
 vi.mock('@/lib/db', () => ({
   prisma: {
     bOMLine: {
@@ -53,7 +56,7 @@ describe('calculateBOMUnitCost', () => {
       },
     ] as never)
 
-    const result = await calculateBOMUnitCost('bom-1')
+    const result = await calculateBOMUnitCost('bom-1', TEST_COMPANY_ID)
 
     // (2 * 10) + (3 * 5) = 20 + 15 = 35
     expect(result).toBe(35)
@@ -62,7 +65,7 @@ describe('calculateBOMUnitCost', () => {
   it('returns 0 for BOM with no lines', async () => {
     vi.mocked(prisma.bOMLine.findMany).mockResolvedValue([])
 
-    const result = await calculateBOMUnitCost('empty-bom')
+    const result = await calculateBOMUnitCost('empty-bom', TEST_COMPANY_ID)
     expect(result).toBe(0)
   })
 
@@ -78,7 +81,7 @@ describe('calculateBOMUnitCost', () => {
       },
     ] as never)
 
-    const result = await calculateBOMUnitCost('bom-1')
+    const result = await calculateBOMUnitCost('bom-1', TEST_COMPANY_ID)
 
     // 1.5 * 3.33 = 4.995
     expect(result).toBeCloseTo(4.995, 3)
@@ -96,7 +99,7 @@ describe('calculateBOMUnitCost', () => {
       },
     ] as never)
 
-    const result = await calculateBOMUnitCost('bom-1')
+    const result = await calculateBOMUnitCost('bom-1', TEST_COMPANY_ID)
     expect(result).toBe(25)
   })
 
@@ -112,7 +115,7 @@ describe('calculateBOMUnitCost', () => {
 
     vi.mocked(prisma.bOMLine.findMany).mockResolvedValue(lines as never)
 
-    const result = await calculateBOMUnitCost('bom-1')
+    const result = await calculateBOMUnitCost('bom-1', TEST_COMPANY_ID)
     expect(result).toBe(100) // 10 components * 1 qty * $10 each = $100
   })
 })
@@ -142,7 +145,7 @@ describe('calculateBOMUnitCosts', () => {
       },
     ] as never)
 
-    const result = await calculateBOMUnitCosts(['bom-1', 'bom-2', 'bom-3'])
+    const result = await calculateBOMUnitCosts(['bom-1', 'bom-2', 'bom-3'], TEST_COMPANY_ID)
 
     expect(result.get('bom-1')).toBe(20)
     expect(result.get('bom-2')).toBe(50)
@@ -152,7 +155,7 @@ describe('calculateBOMUnitCosts', () => {
   it('handles empty BOM list', async () => {
     vi.mocked(prisma.bOMLine.findMany).mockResolvedValue([])
 
-    const result = await calculateBOMUnitCosts([])
+    const result = await calculateBOMUnitCosts([], TEST_COMPANY_ID)
     expect(result.size).toBe(0)
   })
 
@@ -176,7 +179,7 @@ describe('calculateBOMUnitCosts', () => {
       },
     ] as never)
 
-    const result = await calculateBOMUnitCosts(['bom-1'])
+    const result = await calculateBOMUnitCosts(['bom-1'], TEST_COMPANY_ID)
     expect(result.get('bom-1')).toBe(35) // 20 + 15
   })
 })

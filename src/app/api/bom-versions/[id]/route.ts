@@ -167,11 +167,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Update BOM version
     const bomVersion = await updateBOMVersion({
       bomVersionId: id,
+      companyId: selectedCompanyId!,
       ...data,
     })
 
     // Calculate unit cost
-    const unitCost = await calculateBOMUnitCost(bomVersion.id)
+    const unitCost = await calculateBOMUnitCost(bomVersion.id, selectedCompanyId!)
 
     // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)

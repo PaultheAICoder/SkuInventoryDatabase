@@ -44,10 +44,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return notFound('BOM version')
     }
 
-    const bomVersion = await activateBOMVersion(id)
+    const bomVersion = await activateBOMVersion(id, selectedCompanyId!)
 
     // Calculate unit cost
-    const unitCost = await calculateBOMUnitCost(bomVersion.id)
+    const unitCost = await calculateBOMUnitCost(bomVersion.id, selectedCompanyId!)
 
     // Get component quantities (filtered by location if specified)
     const componentIds = bomVersion.lines.map((l) => l.componentId)

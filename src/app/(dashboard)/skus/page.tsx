@@ -71,7 +71,7 @@ async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
     .map((s) => s.bomVersions[0].id)
 
   const [bomCosts, buildableUnits] = await Promise.all([
-    activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds) : new Map<string, number>(),
+    activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds, selectedCompanyId) : new Map<string, number>(),
     skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId, locationId) : new Map<string, number | null>(),
   ])
 

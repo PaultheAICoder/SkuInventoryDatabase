@@ -73,7 +73,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Calculate costs for all BOM versions
     const bomVersionIds = sku.bomVersions.map((v) => v.id)
-    const bomCosts = await calculateBOMUnitCosts(bomVersionIds)
+    const bomCosts = await calculateBOMUnitCosts(bomVersionIds, selectedCompanyId!)
 
     // Calculate max buildable units (filtered by location if specified)
     const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!, locationId)
@@ -199,7 +199,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const activeBom = sku.bomVersions[0]
     let activeBomCost: number | null = null
     if (activeBom) {
-      const costs = await calculateBOMUnitCosts([activeBom.id])
+      const costs = await calculateBOMUnitCosts([activeBom.id], selectedCompanyId!)
       activeBomCost = costs.get(activeBom.id) ?? 0
     }
 

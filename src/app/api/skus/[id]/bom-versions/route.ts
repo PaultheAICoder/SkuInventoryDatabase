@@ -176,6 +176,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Create BOM version with lines
     const bomVersion = await createBOMVersion({
       skuId,
+      companyId: selectedCompanyId!,
       versionName: data.versionName,
       effectiveStartDate: data.effectiveStartDate,
       isActive: data.isActive,
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     // Calculate unit cost
-    const unitCost = await calculateBOMUnitCost(bomVersion.id)
+    const unitCost = await calculateBOMUnitCost(bomVersion.id, selectedCompanyId!)
 
     // Get component quantities (filtered by location if specified)
     const quantities = await getComponentQuantities(componentIds, selectedCompanyId!, locationId)
