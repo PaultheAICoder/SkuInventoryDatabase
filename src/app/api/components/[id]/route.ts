@@ -379,7 +379,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Check if component can be safely deactivated (not used in transactions, BOMs, or lots)
-    const deleteCheck = await canDeleteComponent(id)
+    const deleteCheck = await canDeleteComponent(id, selectedCompanyId!)
     if (!deleteCheck.canDelete) {
       return conflict(deleteCheck.reason ?? 'Cannot deactivate component due to existing references')
     }

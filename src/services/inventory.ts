@@ -48,6 +48,15 @@ export async function getComponentQuantity(
   companyId: string,
   locationId?: string
 ): Promise<number> {
+  // Verify component belongs to company
+  const component = await prisma.component.findFirst({
+    where: { id: componentId, companyId },
+    select: { id: true }
+  })
+  if (!component) {
+    throw new Error('Component not found or access denied')
+  }
+
   if (!locationId) {
     // Global total - sum all lines for this component (only approved transactions)
     const result = await prisma.transactionLine.aggregate({
@@ -135,12 +144,31 @@ export async function getComponentQuantities(
   companyId: string,
   locationId?: string
 ): Promise<Map<string, number>> {
+  // Filter to only components the company owns
+  if (componentIds.length === 0) {
+    return new Map()
+  }
+  const validComponents = await prisma.component.findMany({
+    where: { id: { in: componentIds }, companyId },
+    select: { id: true }
+  })
+  const validIds = validComponents.map(c => c.id)
+
+  // If no valid components, return empty map with zeros for requested IDs
+  if (validIds.length === 0) {
+    const quantities = new Map<string, number>()
+    for (const id of componentIds) {
+      quantities.set(id, 0)
+    }
+    return quantities
+  }
+
   if (!locationId) {
     // Global totals - no location filtering needed (only approved transactions)
     const results = await prisma.transactionLine.groupBy({
       by: ['componentId'],
       where: {
-        componentId: { in: componentIds },
+        componentId: { in: validIds },
         transaction: {
           companyId,
           status: 'approved', // Exclude drafts and rejected
@@ -154,7 +182,7 @@ export async function getComponentQuantities(
       quantities.set(result.componentId, result._sum.quantityChange?.toNumber() ?? 0)
     }
 
-    // Ensure all requested components have an entry (even if 0)
+    // Ensure all originally requested components have an entry (even if 0)
     for (const id of componentIds) {
       if (!quantities.has(id)) {
         quantities.set(id, 0)
@@ -167,7 +195,7 @@ export async function getComponentQuantities(
   // Location-specific totals require handling transfers specially
   const quantities = new Map<string, number>()
 
-  // Initialize all to 0
+  // Initialize all to 0 (for all originally requested IDs)
   for (const id of componentIds) {
     quantities.set(id, 0)
   }
@@ -176,7 +204,7 @@ export async function getComponentQuantities(
   const regularResults = await prisma.transactionLine.groupBy({
     by: ['componentId'],
     where: {
-      componentId: { in: componentIds },
+      componentId: { in: validIds },
       transaction: {
         companyId,
         locationId,
@@ -196,7 +224,7 @@ export async function getComponentQuantities(
   const transferFromResults = await prisma.transactionLine.groupBy({
     by: ['componentId'],
     where: {
-      componentId: { in: componentIds },
+      componentId: { in: validIds },
       quantityChange: { lt: 0 },
       transaction: {
         companyId,
@@ -217,7 +245,7 @@ export async function getComponentQuantities(
   const transferToResults = await prisma.transactionLine.groupBy({
     by: ['componentId'],
     where: {
-      componentId: { in: componentIds },
+      componentId: { in: validIds },
       quantityChange: { gt: 0 },
       transaction: {
         companyId,
@@ -245,6 +273,15 @@ export async function getComponentQuantitiesByLocation(
   componentId: string,
   companyId: string
 ): Promise<Array<{ locationId: string; locationName: string; locationType: string; quantity: number }>> {
+  // Verify component belongs to company
+  const component = await prisma.component.findFirst({
+    where: { id: componentId, companyId },
+    select: { id: true }
+  })
+  if (!component) {
+    throw new Error('Component not found or access denied')
+  }
+
   // Get all active locations for the company
   const locations = await prisma.location.findMany({
     where: {
@@ -624,11 +661,24 @@ export async function createInitialTransaction(params: {
  * Returns detailed reason if deletion is blocked
  */
 export async function canDeleteComponent(
-  componentId: string
+  componentId: string,
+  companyId: string
 ): Promise<{ canDelete: boolean; reason?: string }> {
-  // Check 1: Transaction history - most common blocker
+  // Verify component belongs to company
+  const component = await prisma.component.findFirst({
+    where: { id: componentId, companyId },
+    select: { id: true }
+  })
+  if (!component) {
+    return { canDelete: false, reason: 'Component not found or access denied' }
+  }
+
+  // Check 1: Transaction history - most common blocker (scoped by company)
   const transactionLineCount = await prisma.transactionLine.count({
-    where: { componentId },
+    where: {
+      componentId,
+      transaction: { companyId }
+    },
   })
   if (transactionLineCount > 0) {
     return {
@@ -637,9 +687,12 @@ export async function canDeleteComponent(
     }
   }
 
-  // Check 2: BOM references (active AND inactive)
+  // Check 2: BOM references (active AND inactive, scoped by company)
   const bomLineCount = await prisma.bOMLine.count({
-    where: { componentId },
+    where: {
+      componentId,
+      bomVersion: { sku: { companyId } }
+    },
   })
   if (bomLineCount > 0) {
     return {
@@ -648,7 +701,7 @@ export async function canDeleteComponent(
     }
   }
 
-  // Check 3: Lot references
+  // Check 3: Lot references (component is already verified to belong to company)
   const lotCount = await prisma.lot.count({
     where: { componentId },
   })

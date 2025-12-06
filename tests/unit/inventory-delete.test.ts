@@ -15,6 +15,9 @@ vi.mock('@/lib/db', () => ({
     lot: {
       count: vi.fn(),
     },
+    component: {
+      findFirst: vi.fn(),
+    },
   },
 }))
 
@@ -24,6 +27,8 @@ import { prisma } from '@/lib/db'
 describe('canDeleteComponent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: component exists and belongs to company
+    vi.mocked(prisma.component.findFirst).mockResolvedValue({ id: 'comp-1' } as never)
   })
 
   it('returns canDelete: true when component has no references', async () => {
@@ -31,7 +36,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(0)
     vi.mocked(prisma.lot.count).mockResolvedValue(0)
 
-    const result = await canDeleteComponent('unused-comp')
+    const result = await canDeleteComponent('unused-comp', 'company-1')
 
     expect(result.canDelete).toBe(true)
     expect(result.reason).toBeUndefined()
@@ -42,7 +47,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(0)
     vi.mocked(prisma.lot.count).mockResolvedValue(0)
 
-    const result = await canDeleteComponent('used-in-transactions')
+    const result = await canDeleteComponent('used-in-transactions', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('5 transaction record(s)')
@@ -54,7 +59,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(2)
     vi.mocked(prisma.lot.count).mockResolvedValue(0)
 
-    const result = await canDeleteComponent('in-any-bom')
+    const result = await canDeleteComponent('in-any-bom', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('2 BOM(s)')
@@ -66,7 +71,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(0)
     vi.mocked(prisma.lot.count).mockResolvedValue(3)
 
-    const result = await canDeleteComponent('has-lots')
+    const result = await canDeleteComponent('has-lots', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('3 lot(s)')
@@ -79,7 +84,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(5)
     vi.mocked(prisma.lot.count).mockResolvedValue(3)
 
-    const result = await canDeleteComponent('multi-reference')
+    const result = await canDeleteComponent('multi-reference', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('10 transaction record(s)')
@@ -93,7 +98,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(7)
     vi.mocked(prisma.lot.count).mockResolvedValue(4)
 
-    const result = await canDeleteComponent('bom-reference')
+    const result = await canDeleteComponent('bom-reference', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('7 BOM(s)')
@@ -108,7 +113,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(0)
     vi.mocked(prisma.lot.count).mockResolvedValue(1)
 
-    const result = await canDeleteComponent('lot-reference')
+    const result = await canDeleteComponent('lot-reference', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('1 lot(s)')
@@ -123,7 +128,7 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(1)
     vi.mocked(prisma.lot.count).mockResolvedValue(0)
 
-    const result = await canDeleteComponent('used-in-one')
+    const result = await canDeleteComponent('used-in-one', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('1 BOM(s)')
@@ -134,9 +139,18 @@ describe('canDeleteComponent', () => {
     vi.mocked(prisma.bOMLine.count).mockResolvedValue(100)
     vi.mocked(prisma.lot.count).mockResolvedValue(0)
 
-    const result = await canDeleteComponent('heavily-used')
+    const result = await canDeleteComponent('heavily-used', 'company-1')
 
     expect(result.canDelete).toBe(false)
     expect(result.reason).toContain('100 BOM(s)')
+  })
+
+  it('returns canDelete: false for component from different company', async () => {
+    vi.mocked(prisma.component.findFirst).mockResolvedValue(null)
+
+    const result = await canDeleteComponent('comp-1', 'other-company')
+
+    expect(result.canDelete).toBe(false)
+    expect(result.reason).toBe('Component not found or access denied')
   })
 })

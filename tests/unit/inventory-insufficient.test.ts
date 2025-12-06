@@ -13,6 +13,9 @@ vi.mock('@/lib/db', () => ({
     transactionLine: {
       groupBy: vi.fn(),
     },
+    component: {
+      findMany: vi.fn(),
+    },
   },
 }))
 
@@ -22,6 +25,11 @@ import { prisma } from '@/lib/db'
 describe('checkInsufficientInventory', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: all requested components exist and belong to company
+    vi.mocked(prisma.component.findMany).mockImplementation(((args: { where?: { id?: { in: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? []
+      return Promise.resolve(ids.map(id => ({ id })))
+    }) as never)
   })
 
   it('returns empty array when sufficient inventory exists', async () => {

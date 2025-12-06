@@ -12,6 +12,10 @@ vi.mock('@/lib/db', () => ({
       aggregate: vi.fn(),
       groupBy: vi.fn(),
     },
+    component: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
   },
 }))
 
@@ -21,6 +25,8 @@ import { prisma } from '@/lib/db'
 describe('getComponentQuantity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: component exists and belongs to company
+    vi.mocked(prisma.component.findFirst).mockResolvedValue({ id: 'comp-1' } as never)
   })
 
   it('returns sum of quantity changes for a component', async () => {
@@ -79,6 +85,11 @@ describe('getComponentQuantity', () => {
 describe('getComponentQuantities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: all requested components exist and belong to company
+    vi.mocked(prisma.component.findMany).mockImplementation(((args: { where?: { id?: { in: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? []
+      return Promise.resolve(ids.map(id => ({ id })))
+    }) as never)
   })
 
   it('returns quantities for multiple components', async () => {
@@ -135,6 +146,8 @@ describe('getComponentQuantities', () => {
 describe('getComponentQuantity with locationId', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: component exists and belongs to company
+    vi.mocked(prisma.component.findFirst).mockResolvedValue({ id: 'comp-1' } as never)
   })
 
   it('returns quantity at specific location', async () => {
@@ -246,6 +259,11 @@ describe('getComponentQuantity with locationId', () => {
 describe('getComponentQuantities with locationId', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: all requested components exist and belong to company
+    vi.mocked(prisma.component.findMany).mockImplementation(((args: { where?: { id?: { in: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? []
+      return Promise.resolve(ids.map(id => ({ id })))
+    }) as never)
   })
 
   it('returns location-filtered quantities for multiple components', async () => {
@@ -309,6 +327,12 @@ describe('getComponentQuantities with locationId', () => {
 describe('Performance', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: component exists and belongs to company
+    vi.mocked(prisma.component.findFirst).mockResolvedValue({ id: 'comp-1' } as never)
+    vi.mocked(prisma.component.findMany).mockImplementation(((args: { where?: { id?: { in: string[] } } }) => {
+      const ids = args?.where?.id?.in ?? []
+      return Promise.resolve(ids.map(id => ({ id })))
+    }) as never)
   })
 
   it('queries component quantity across multiple locations efficiently', async () => {
@@ -336,5 +360,49 @@ describe('Performance', () => {
 
     // With mocks, batch query should be fast (under 200ms)
     expect(duration).toBeLessThan(200)
+  })
+})
+
+describe('Multi-tenant isolation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('getComponentQuantity throws for component from different company', async () => {
+    // Mock component lookup to return null (not found)
+    vi.mocked(prisma.component.findFirst).mockResolvedValue(null)
+
+    await expect(
+      getComponentQuantity('comp-1', 'company-different')
+    ).rejects.toThrow('Component not found or access denied')
+  })
+
+  it('getComponentQuantities filters out components from different companies', async () => {
+    // Mock component lookup to return only some valid components
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' }
+    ] as never)
+
+    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } }
+    ] as never)
+
+    const result = await getComponentQuantities(['comp-1', 'comp-2'], 'company-1')
+
+    // comp-1 should have real quantity, comp-2 (not owned) should have 0
+    expect(result.get('comp-1')).toBe(100)
+    expect(result.get('comp-2')).toBe(0)
+  })
+
+  it('getComponentQuantities returns zeros for all when no components owned', async () => {
+    // Mock component lookup to return empty (no valid components)
+    vi.mocked(prisma.component.findMany).mockResolvedValue([])
+
+    const result = await getComponentQuantities(['comp-1', 'comp-2'], 'company-1')
+
+    // All should be 0 since no valid components
+    expect(result.get('comp-1')).toBe(0)
+    expect(result.get('comp-2')).toBe(0)
+    expect(result.size).toBe(2)
   })
 })
