@@ -9,6 +9,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Package } from 'lucide-react'
+import { LimitingComponentsPopover } from './LimitingComponentsPopover'
 
 interface TopBuildableSku {
   id: string
@@ -80,9 +81,17 @@ export function TopBuildableSkusList({ skus, locationName }: TopBuildableSkusLis
                   </div>
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-green-600'} suppressHydrationWarning>
-                    {sku.maxBuildableUnits.toLocaleString()}
-                  </span>
+                  <LimitingComponentsPopover
+                    skuId={sku.id}
+                    maxBuildableUnits={sku.maxBuildableUnits}
+                  >
+                    <span
+                      className={`cursor-pointer hover:underline ${sku.maxBuildableUnits === 0 ? 'text-red-600' : 'text-green-600'}`}
+                      suppressHydrationWarning
+                    >
+                      {sku.maxBuildableUnits.toLocaleString()}
+                    </span>
+                  </LimitingComponentsPopover>
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   ${parseFloat(sku.unitCost).toFixed(2)}

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { getComponentQuantities } from './inventory'
+import type { LimitingComponent } from '@/types/sku'
 
 /**
  * Calculate the unit cost of a BOM version by summing component costs * quantities
@@ -163,6 +164,76 @@ export async function calculateMaxBuildableUnitsForSKUs(
 
     result.set(skuId, minBuildable === Infinity ? null : minBuildable)
   }
+
+  return result
+}
+
+/**
+ * Calculate the top N limiting components for a SKU's buildable units
+ * Returns components sorted by how much they limit production (ascending by maxBuildable)
+ * Optionally filter by location - if locationId is omitted, uses global inventory
+ */
+export async function calculateLimitingFactors(
+  skuId: string,
+  locationId?: string,
+  limit: number = 3
+): Promise<LimitingComponent[] | null> {
+  // Get active BOM for this SKU
+  const activeBom = await prisma.bOMVersion.findFirst({
+    where: {
+      skuId,
+      isActive: true,
+    },
+    include: {
+      lines: {
+        include: {
+          component: {
+            select: {
+              id: true,
+              name: true,
+              skuCode: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!activeBom || activeBom.lines.length === 0) {
+    return null
+  }
+
+  // Get component quantities (filtered by location if specified)
+  const componentIds = activeBom.lines.map((line) => line.component.id)
+  const quantities = await getComponentQuantities(componentIds, locationId)
+
+  // Calculate buildable for each component and collect all factors
+  const factors: LimitingComponent[] = []
+
+  for (const line of activeBom.lines) {
+    const quantityOnHand = quantities.get(line.componentId) ?? 0
+    const quantityPerUnit = line.quantityPerUnit.toNumber()
+    const maxBuildable = Math.floor(quantityOnHand / quantityPerUnit)
+
+    factors.push({
+      componentId: line.component.id,
+      componentName: line.component.name,
+      skuCode: line.component.skuCode,
+      quantityOnHand,
+      quantityPerUnit,
+      maxBuildable,
+      rank: 0, // Will be assigned after sorting
+    })
+  }
+
+  // Sort by maxBuildable ascending (most limiting first)
+  factors.sort((a, b) => a.maxBuildable - b.maxBuildable)
+
+  // Assign ranks and return top N
+  const result = factors.slice(0, limit).map((f, index) => ({
+    ...f,
+    rank: index + 1,
+  }))
 
   return result
 }

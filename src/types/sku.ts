@@ -50,6 +50,17 @@ export const skuListQuerySchema = z.object({
 
 export type SKUListQuery = z.infer<typeof skuListQuerySchema>
 
+// Limiting component for buildable units calculation
+export interface LimitingComponent {
+  componentId: string
+  componentName: string
+  skuCode: string
+  quantityOnHand: number
+  quantityPerUnit: number
+  maxBuildable: number // floor(quantityOnHand / quantityPerUnit)
+  rank: number // 1 = most limiting, 2 = second, etc.
+}
+
 // SKU response type (what API returns)
 export interface SKUResponse {
   id: string
@@ -68,6 +79,7 @@ export interface SKUResponse {
     unitCost: string
   } | null
   maxBuildableUnits?: number | null
+  limitingComponents?: LimitingComponent[] | null
   finishedGoodsQuantity?: number | null
 }
 

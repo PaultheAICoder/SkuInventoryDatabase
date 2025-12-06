@@ -187,6 +187,8 @@ export default function SKUDetailPage() {
               <BuildableUnitsDisplay
                 maxBuildableUnits={sku.maxBuildableUnits}
                 size="lg"
+                skuId={sku.id}
+                clickable={true}
               />
             </div>
 

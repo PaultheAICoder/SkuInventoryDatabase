@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { LocationFilter } from './LocationFilter'
+import { LimitingComponentsPopover } from './LimitingComponentsPopover'
 import type { SKUResponse } from '@/types/sku'
 import { salesChannels } from '@/types'
 
@@ -197,9 +198,18 @@ export function SKUTable({ skus, total, page, pageSize, locationId }: SKUTablePr
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {sku.maxBuildableUnits != null ? (
-                      <span className={sku.maxBuildableUnits === 0 ? 'text-red-600' : ''} suppressHydrationWarning>
-                        {sku.maxBuildableUnits.toLocaleString()}
-                      </span>
+                      <LimitingComponentsPopover
+                        skuId={sku.id}
+                        maxBuildableUnits={sku.maxBuildableUnits}
+                        locationId={locationId}
+                      >
+                        <span
+                          className={`cursor-pointer hover:underline ${sku.maxBuildableUnits === 0 ? 'text-red-600' : ''}`}
+                          suppressHydrationWarning
+                        >
+                          {sku.maxBuildableUnits.toLocaleString()}
+                        </span>
+                      </LimitingComponentsPopover>
                     ) : (
                       '-'
                     )}
