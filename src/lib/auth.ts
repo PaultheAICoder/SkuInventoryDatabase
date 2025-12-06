@@ -158,6 +158,35 @@ export const authOptions: NextAuthOptions = {
         token.selectedBrandName = user.selectedBrandName
       }
 
+      // Validate user still exists and is active in database
+      // This runs on every session access to catch deleted/deactivated users
+      // Skip validation on initial login (user object present - user was just validated)
+      if (token.id && !user) {
+        const validUser = await validateUserExists(token.id as string)
+        if (!validUser || !validUser.isActive) {
+          // User deleted or deactivated - invalidate token
+          // Fire-and-forget security logging (don't await to avoid performance impact)
+          logSecurityEvent({
+            companyId: token.companyId as string,
+            userId: token.id as string,
+            eventType: SECURITY_EVENTS.TOKEN_INVALIDATED,
+            details: {
+              reason: validUser ? 'user_deactivated' : 'user_not_found',
+              email: token.email as string,
+            },
+          }).catch(() => {}) // Ignore logging failures
+
+          // Return minimal token that will fail session checks
+          return {
+            ...token,
+            id: undefined,
+            role: undefined,
+            companyId: undefined,
+            error: (validUser ? 'user_deactivated' : 'user_not_found') as 'user_deactivated' | 'user_not_found',
+          }
+        }
+      }
+
       // Ensure selectedCompanyId has a fallback value for backward compatibility
       // This handles tokens created before multi-company support was added
       if (!token.selectedCompanyId && token.companyId) {
@@ -202,6 +231,12 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
+      // Check if token was invalidated due to user deletion/deactivation
+      if (!token.id || token.error) {
+        // Return expired session to trigger re-authentication
+        return { ...session, user: undefined as unknown as typeof session.user, expires: new Date(0).toISOString() }
+      }
+
       if (session.user) {
         session.user.id = token.id as string
         session.user.role = token.role as string
@@ -255,9 +290,9 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    id: string
-    role: string
-    companyId: string
+    id?: string // Optional to allow invalidation for deleted/deactivated users
+    role?: string // Optional to allow invalidation for deleted/deactivated users
+    companyId?: string // Optional to allow invalidation for deleted/deactivated users
     companyName: string
     companies: Array<{ id: string; name: string; role?: string }>
     companiesWithBrands: Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
@@ -266,6 +301,7 @@ declare module 'next-auth/jwt' {
     brands: Array<{ id: string; name: string }>
     selectedBrandId: string | null
     selectedBrandName: string | null
+    error?: 'user_deactivated' | 'user_not_found' // Set when token is invalidated
   }
 }
 
@@ -313,6 +349,7 @@ export const SECURITY_EVENTS = {
   ROLE_CHANGED: 'role_changed',
   SETTINGS_CHANGED: 'settings_changed',
   COMPANY_SWITCH: 'company_switch',
+  TOKEN_INVALIDATED: 'token_invalidated',
 } as const
 
 /**

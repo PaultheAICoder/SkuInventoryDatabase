@@ -195,4 +195,36 @@ describe('API Authentication', () => {
       expect(result.error).toContain('company')
     })
   })
+
+  describe('Stale JWT Token Handling', () => {
+    /**
+     * Note: The JWT callback validation runs before API routes receive the session.
+     * Since we mock getServerSession directly in tests, these tests validate
+     * the expected behavior when sessions have null/undefined user after JWT
+     * callback invalidation. The actual JWT callback is tested via the
+     * validateUserExists unit tests.
+     */
+    it('returns 401 when session user is undefined (simulates invalidated token)', async () => {
+      // Simulate what happens after JWT callback invalidates a token:
+      // The session callback returns a session with undefined user
+      clearTestSession()
+
+      const request = createTestRequest('/api/components')
+      const response = await getComponents(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('GET /api/settings returns 401 when session is invalidated', async () => {
+      // Clear session to simulate invalidated token scenario
+      clearTestSession()
+
+      const response = await getSettings()
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(401)
+    })
+  })
 })

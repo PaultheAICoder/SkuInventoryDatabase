@@ -155,7 +155,11 @@ export async function POST(request: NextRequest) {
       return error('Company context is required. Please select a company and try again.', 400, 'BadRequest')
     }
 
-    // Validate user still exists in database (catches stale JWT tokens after DB reseed)
+    // Defense-in-depth: Validate user still exists in database
+    // Note: This check is now also performed in the JWT callback (auth.ts) which invalidates
+    // tokens for deleted/deactivated users. This route-level check provides an additional
+    // layer of protection for critical write operations like SKU creation.
+    // See Issue #192: Stale Authentication (JWT) Persists After User Deletion
     const validUser = await validateUserExists(session.user.id)
     if (!validUser) {
       console.error('SKU creation failed: User ID not found in database (stale JWT token)', {
