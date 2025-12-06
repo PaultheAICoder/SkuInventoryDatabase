@@ -29,6 +29,8 @@ import {
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
 import { FeedbackDialog } from '@/components/features/FeedbackDialog'
+import { ChatbotButton } from '@/components/features/ChatbotButton'
+import { ChatbotPanel } from '@/components/features/ChatbotPanel'
 import { CompanyBrandSelector } from '@/components/features/CompanyBrandSelector'
 
 const navigation = [
@@ -54,6 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [chatbotOpen, setChatbotOpen] = useState(false)
 
   const filteredNavigation = navigation.filter(
     (item) => !item.adminOnly || session?.user?.role === 'admin'
@@ -140,7 +143,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             <span className="font-semibold lg:hidden">Inventory Tracker</span>
           </div>
-          <FeedbackButton onClick={() => setFeedbackOpen(true)} />
+          <div className="flex items-center gap-2">
+            <ChatbotButton onClick={() => setChatbotOpen(true)} />
+            <FeedbackButton onClick={() => setFeedbackOpen(true)} />
+          </div>
         </header>
 
         <main className="flex-1 p-4 lg:p-8">{children}</main>
@@ -148,6 +154,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <ChatbotPanel open={chatbotOpen} onOpenChange={setChatbotOpen} />
     </div>
   )
 }
