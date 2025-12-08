@@ -368,10 +368,16 @@ export async function parseTransactionText(
     const transactionType = mapActionToType(rawParsed.action)
     const itemType = inferItemType(rawParsed.action, rawParsed.item, context)
 
-    // Parse the date
+    // Parse the date - IMPORTANT: Append time to prevent UTC midnight interpretation
+    // Without time component, "2025-11-17" is parsed as midnight UTC, which displays
+    // as 11/16 in Pacific Time. By appending T00:00:00, the date is parsed as local time.
     let parsedDate: Date
     try {
-      parsedDate = new Date(rawParsed.date)
+      // Append time component if date is in YYYY-MM-DD format
+      const dateString = rawParsed.date.includes('T')
+        ? rawParsed.date
+        : `${rawParsed.date}T00:00:00`
+      parsedDate = new Date(dateString)
       if (isNaN(parsedDate.getTime())) {
         parsedDate = new Date()
       }
