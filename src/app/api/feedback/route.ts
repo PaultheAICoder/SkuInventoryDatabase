@@ -69,7 +69,16 @@ export async function POST(request: NextRequest) {
     })
 
     const title = enhanced.title
-    const issueBody = enhanced.body
+
+    // Add submitter information to the issue body
+    const submitterInfo = `## Submitter Information
+**Submitted by**: ${session.user.name || 'Unknown'} (${session.user.email || 'no email'})
+**Submitted at**: ${new Date().toISOString()}
+
+---
+
+`
+    const issueBody = submitterInfo + enhanced.body
 
     // Log if enhancement failed (but still create issue with fallback)
     if (!enhanced.success) {
