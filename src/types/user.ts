@@ -55,6 +55,7 @@ export interface UserCompanyAssignment {
   companyId: string
   companyName: string
   role: 'admin' | 'ops' | 'viewer'
+  isPrimary: boolean
   assignedAt: string
 }
 

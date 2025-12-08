@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
               },
             },
             role: true,
+            isPrimary: true,
             assignedAt: true,
           },
         },
@@ -108,6 +109,7 @@ export async function GET(request: NextRequest) {
           companyId: uc.companyId,
           companyName: uc.company.name,
           role: uc.role,
+          isPrimary: uc.isPrimary,
           assignedAt: uc.assignedAt.toISOString(),
         })),
         userCompanies: undefined,
@@ -172,25 +174,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create user in the selected company
-    const user = await prisma.user.create({
-      data: {
-        companyId: selectedCompanyId,
-        email,
-        passwordHash,
-        name,
-        role,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    // Create user in the selected company with UserCompany record
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          companyId: selectedCompanyId,
+          email,
+          passwordHash,
+          name,
+          role,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          lastLoginAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      })
+
+      // Create UserCompany record (source of truth for company access)
+      await tx.userCompany.create({
+        data: {
+          userId: newUser.id,
+          companyId: selectedCompanyId,
+          role,
+          isPrimary: true,
+        },
+      })
+
+      return newUser
     })
 
     return NextResponse.json(

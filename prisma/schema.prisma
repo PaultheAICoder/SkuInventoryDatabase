@@ -145,7 +145,9 @@ model UserCompany {
   companyId  String
   company    Company  @relation("UserCompanies", fields: [companyId], references: [id], onDelete: Cascade)
   role       UserRole @default(ops)
+  isPrimary  Boolean  @default(false) // Designates user's default company
   assignedAt DateTime @default(now())
+  // Note: Application logic enforces one isPrimary=true per userId
 
   @@unique([userId, companyId])
   @@index([userId])
@@ -289,11 +291,11 @@ model Transaction {
   createdBy      User            @relation(fields: [createdById], references: [id])
 
   // Draft workflow fields
-  status         TransactionStatus @default(approved)
-  reviewedAt     DateTime?
-  reviewedById   String?
-  reviewedBy     User?             @relation("TransactionReviewedBy", fields: [reviewedById], references: [id])
-  rejectReason   String?           @db.VarChar(500)
+  status       TransactionStatus @default(approved)
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewedBy   User?             @relation("TransactionReviewedBy", fields: [reviewedById], references: [id])
+  rejectReason String?           @db.VarChar(500)
 
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
@@ -604,11 +606,11 @@ model SkuChannelMapping {
 // ============================================
 
 enum FeedbackStatus {
-  pending      // Issue created, awaiting resolution
-  in_progress  // Developer working on it
-  resolved     // Issue closed, awaiting user verification
-  verified     // User confirmed fix works
-  reopened     // User requested changes, follow-up created
+  pending // Issue created, awaiting resolution
+  in_progress // Developer working on it
+  resolved // Issue closed, awaiting user verification
+  verified // User confirmed fix works
+  reopened // User requested changes, follow-up created
 }
 
 model Feedback {
@@ -640,7 +642,7 @@ model FeedbackReply {
   emailMessageId      String?  @db.VarChar(255) // Email message ID for tracking
   content             String   @db.Text
   action              String   @db.VarChar(20) // 'verified' | 'changes_requested'
-  followUpIssueNumber Int?     // If changes requested, the new issue number
+  followUpIssueNumber Int? // If changes requested, the new issue number
   followUpIssueUrl    String?  @db.VarChar(500)
   createdAt           DateTime @default(now())
 

@@ -41,6 +41,7 @@ export async function GET(
               },
             },
             role: true,
+            isPrimary: true,
             assignedAt: true,
           },
         },
@@ -57,6 +58,7 @@ export async function GET(
         companyId: uc.companyId,
         companyName: uc.company.name,
         role: uc.role,
+        isPrimary: uc.isPrimary,
         assignedAt: uc.assignedAt.toISOString(),
       })),
     })
@@ -135,29 +137,38 @@ export async function PUT(
 
     // Use transaction to update assignments
     const result = await prisma.$transaction(async (tx) => {
+      // Get current primary company
+      const currentPrimary = await tx.userCompany.findFirst({
+        where: { userId: id, isPrimary: true },
+      })
+
+      // Determine new primary: keep current if still in list, otherwise first
+      const newPrimaryCompanyId = currentPrimary && companyIds.includes(currentPrimary.companyId)
+        ? currentPrimary.companyId
+        : companyIds[0]
+
       // Delete existing UserCompany records for this user
       await tx.userCompany.deleteMany({
         where: { userId: id },
       })
 
-      // Create new UserCompany records
+      // Create new UserCompany records with proper isPrimary
       const userCompanyRecords = companyIds.map((companyId) => ({
         userId: id,
         companyId,
         role: user.companyId === companyId ? UserRole.admin : UserRole.ops,
+        isPrimary: companyId === newPrimaryCompanyId,
       }))
 
       await tx.userCompany.createMany({
         data: userCompanyRecords,
       })
 
-      // Update User.companyId if it's not in the new list (set to first company)
-      if (!companyIds.includes(user.companyId)) {
-        await tx.user.update({
-          where: { id },
-          data: { companyId: companyIds[0] },
-        })
-      }
+      // Keep User.companyId in sync (backward compatibility)
+      await tx.user.update({
+        where: { id },
+        data: { companyId: newPrimaryCompanyId },
+      })
 
       // Fetch updated assignments
       return tx.userCompany.findMany({
@@ -171,6 +182,7 @@ export async function PUT(
             },
           },
           role: true,
+          isPrimary: true,
           assignedAt: true,
         },
       })
@@ -182,6 +194,7 @@ export async function PUT(
         companyId: uc.companyId,
         companyName: uc.company.name,
         role: uc.role,
+        isPrimary: uc.isPrimary,
         assignedAt: uc.assignedAt.toISOString(),
       })),
       message: 'Company assignments updated successfully',
