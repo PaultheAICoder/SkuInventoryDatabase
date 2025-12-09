@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { dateSchema } from './index'
 
 // =============================================================================
 // Transaction Status Types
@@ -16,7 +17,7 @@ export type TransactionStatus = 'draft' | 'approved' | 'rejected'
  */
 export const createDraftSchema = z.object({
   type: z.enum(['receipt', 'build', 'adjustment', 'initial', 'transfer']),
-  date: z.coerce.date(),
+  date: dateSchema,
   // Receipt/Adjustment/Initial/Transfer fields
   componentId: z.string().uuid('Invalid component ID').optional(),
   quantity: z.coerce.number().optional(),

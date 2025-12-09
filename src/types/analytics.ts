@@ -1,9 +1,10 @@
 import { z } from 'zod'
+import { dateSchema } from './index'
 
 // Query parameters for analytics endpoint
 export const defectAnalyticsQuerySchema = z.object({
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  dateFrom: dateSchema.optional(),
+  dateTo: dateSchema.optional(),
   skuId: z.string().uuid().optional(),
   bomVersionId: z.string().uuid().optional(),
   salesChannel: z.string().optional(),

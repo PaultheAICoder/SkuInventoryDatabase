@@ -6,6 +6,26 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Parse a date string ensuring local timezone interpretation.
+ *
+ * IMPORTANT: JavaScript's new Date("YYYY-MM-DD") parses as UTC midnight,
+ * which can shift the date by -1 day for users west of UTC.
+ * By appending "T00:00:00", we force local timezone interpretation.
+ *
+ * @param value - Date string (YYYY-MM-DD) or Date object
+ * @returns Date object in local timezone
+ */
+export function parseLocalDate(value: string | Date): Date {
+  if (value instanceof Date) {
+    return value
+  }
+
+  // If no time component, append T00:00:00 to force local timezone
+  const dateString = value.includes('T') ? value : `${value}T00:00:00`
+  return new Date(dateString)
+}
+
+/**
  * Parse a fraction string (e.g., "1/45") or decimal number to a numeric value.
  * Returns null if the input is invalid.
  */

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseLocalDate } from '@/lib/utils'
 
 // Common pagination schema
 export const paginationSchema = z.object({
@@ -36,8 +37,18 @@ export type SalesChannel = (typeof salesChannels)[number]
 
 export const salesChannelSchema = z.enum(salesChannels)
 
-// Date validation helper
-export const dateSchema = z.coerce.date()
+/**
+ * Date schema that handles timezone-safe parsing.
+ * Uses parseLocalDate to prevent off-by-one day bugs for UTC- timezones.
+ */
+export const dateSchema = z.preprocess(
+  (val) => {
+    if (val instanceof Date) return val
+    if (typeof val === 'string') return parseLocalDate(val)
+    return val
+  },
+  z.date()
+)
 
 // Decimal validation (for quantities and costs)
 export const decimalSchema = z.coerce.number().nonnegative()

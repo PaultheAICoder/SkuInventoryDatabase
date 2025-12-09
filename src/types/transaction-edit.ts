@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { dateSchema } from './index'
 
 // =============================================================================
 // Update Transaction Schemas
@@ -8,7 +9,7 @@ import { z } from 'zod'
  * Base update schema for common fields across all transaction types
  */
 export const updateTransactionBaseSchema = z.object({
-  date: z.coerce.date().optional(),
+  date: dateSchema.optional(),
   notes: z.string().optional().nullable(),
   locationId: z.string().uuid('Invalid location ID').optional(),
 })
@@ -53,7 +54,7 @@ export type UpdateInitialInput = z.infer<typeof updateInitialSchema>
  * Transfer transaction update schema
  */
 export const updateTransferSchema = z.object({
-  date: z.coerce.date().optional(),
+  date: dateSchema.optional(),
   notes: z.string().optional().nullable(),
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),

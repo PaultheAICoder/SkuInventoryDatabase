@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { dateSchema } from './index'
 
 // Receipt transaction schema
 export const createReceiptSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   supplier: z.string().min(1, 'Supplier is required').max(100),
@@ -18,7 +19,7 @@ export type CreateReceiptInput = z.infer<typeof createReceiptSchema>
 
 // Adjustment transaction schema
 export const createAdjustmentSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().refine((val) => val !== 0, 'Quantity cannot be zero'),
   reason: z.string().min(1, 'Reason is required').max(200),
@@ -30,7 +31,7 @@ export type CreateAdjustmentInput = z.infer<typeof createAdjustmentSchema>
 
 // Initial transaction schema (opening balance)
 export const createInitialSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   costPerUnit: z.coerce.number().nonnegative().optional(),
@@ -43,7 +44,7 @@ export type CreateInitialInput = z.infer<typeof createInitialSchema>
 
 // Transfer transaction schema
 export const createTransferSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   fromLocationId: z.string().uuid('Invalid from location ID'),
@@ -55,7 +56,7 @@ export type CreateTransferInput = z.infer<typeof createTransferSchema>
 
 // Build transaction schema
 export const createBuildSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   skuId: z.string().uuid('Invalid SKU ID'),
   unitsToBuild: z.coerce.number().int().positive('Units must be positive'),
   salesChannel: z.string().optional(),
@@ -85,7 +86,7 @@ export type CreateBuildInput = z.infer<typeof createBuildSchema>
 
 // Outbound transaction schema (shipping SKUs out of warehouse)
 export const createOutboundSchema = z.object({
-  date: z.coerce.date(),
+  date: dateSchema,
   skuId: z.string().uuid('Invalid SKU ID'),
   salesChannel: z.string().min(1, 'Sales channel is required'),
   quantity: z.coerce.number().int().positive('Quantity must be positive'),
@@ -132,8 +133,8 @@ export const transactionListQuerySchema = z.object({
   componentId: z.string().uuid().optional(),
   skuId: z.string().uuid().optional(),
   salesChannel: z.string().optional(),
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  dateFrom: dateSchema.optional(),
+  dateTo: dateSchema.optional(),
   locationId: z.string().uuid().optional(),
   sortBy: z.enum(['date', 'createdAt', 'type']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),

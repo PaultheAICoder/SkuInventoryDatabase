@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { dateSchema } from './index'
 
 // Finished goods adjustment schema
 export const adjustFinishedGoodsSchema = z.object({
@@ -7,7 +8,7 @@ export const adjustFinishedGoodsSchema = z.object({
   quantity: z.coerce.number().refine((val) => val !== 0, 'Quantity cannot be zero'),
   reason: z.string().min(1, 'Reason is required').max(200),
   notes: z.string().optional().nullable(),
-  date: z.coerce.date(),
+  date: dateSchema,
 })
 
 export type AdjustFinishedGoodsInput = z.infer<typeof adjustFinishedGoodsSchema>
@@ -19,7 +20,7 @@ export const transferFinishedGoodsSchema = z.object({
   toLocationId: z.string().uuid('Invalid to location ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   notes: z.string().optional().nullable(),
-  date: z.coerce.date(),
+  date: dateSchema,
 })
 
 export type TransferFinishedGoodsInput = z.infer<typeof transferFinishedGoodsSchema>
@@ -45,7 +46,7 @@ export const receiveFinishedGoodsSchema = z.object({
   source: z.string().min(1, 'Source is required').max(100), // e.g., "Customer Return", "Correction"
   costPerUnit: z.coerce.number().nonnegative().optional(),
   notes: z.string().optional().nullable(),
-  date: z.coerce.date(),
+  date: dateSchema,
 })
 
 export type ReceiveFinishedGoodsInput = z.infer<typeof receiveFinishedGoodsSchema>
