@@ -11,7 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus } from 'lucide-react'
+import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useSession } from 'next-auth/react'
 
 interface TransactionLine {
   id: string
@@ -100,6 +102,10 @@ const transactionTypeConfig = {
 export function TransactionDetail({ transaction }: TransactionDetailProps) {
   const config = transactionTypeConfig[transaction.type]
   const Icon = config.icon
+  const { data: session } = useSession()
+
+  // Check if user can edit (not a viewer)
+  const canEdit = session?.user?.role !== 'viewer'
 
   return (
     <div className="space-y-6">
@@ -117,9 +123,19 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 <CardDescription>{config.description}</CardDescription>
               </div>
             </div>
-            <div className="text-right text-sm text-muted-foreground">
-              <p suppressHydrationWarning>{new Date(transaction.date).toLocaleDateString()}</p>
-              <p className="font-mono text-xs">{transaction.id.slice(0, 8)}...</p>
+            <div className="flex items-start gap-4">
+              {canEdit && (
+                <Link href={`/transactions/${transaction.id}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </Link>
+              )}
+              <div className="text-right text-sm text-muted-foreground">
+                <p suppressHydrationWarning>{new Date(transaction.date).toLocaleDateString()}</p>
+                <p className="font-mono text-xs">{transaction.id.slice(0, 8)}...</p>
+              </div>
             </div>
           </div>
         </CardHeader>

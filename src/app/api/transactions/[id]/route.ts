@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { updateTransaction } from '@/services/transaction-edit'
+import {
+  updateReceiptSchema,
+  updateAdjustmentSchema,
+  updateInitialSchema,
+  updateTransferSchema,
+  updateBuildSchema,
+  updateOutboundSchema,
+} from '@/types/transaction-edit'
 
 export async function GET(
   request: NextRequest,
@@ -137,5 +146,140 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching transaction:', error)
     return NextResponse.json({ error: 'Failed to fetch transaction' }, { status: 500 })
+  }
+}
+
+// PUT /api/transactions/[id] - Update an approved transaction
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check role - Viewer cannot update transactions
+    if (session.user.role === 'viewer') {
+      return NextResponse.json(
+        { error: 'You do not have permission to update transactions' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+    const body = await request.json()
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    // First fetch the transaction to determine its type
+    const existingTransaction = await prisma.transaction.findFirst({
+      where: {
+        id,
+        companyId: selectedCompanyId,
+        status: 'approved', // Can only edit approved transactions
+      },
+    })
+
+    if (!existingTransaction) {
+      return NextResponse.json(
+        { error: 'Transaction not found or cannot be edited' },
+        { status: 404 }
+      )
+    }
+
+    // Validate input based on transaction type
+    let validatedInput: Record<string, unknown>
+    switch (existingTransaction.type) {
+      case 'receipt': {
+        const receiptResult = updateReceiptSchema.safeParse(body)
+        if (!receiptResult.success) {
+          return NextResponse.json(
+            { error: receiptResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = receiptResult.data
+        break
+      }
+      case 'adjustment': {
+        const adjustmentResult = updateAdjustmentSchema.safeParse(body)
+        if (!adjustmentResult.success) {
+          return NextResponse.json(
+            { error: adjustmentResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = adjustmentResult.data
+        break
+      }
+      case 'initial': {
+        const initialResult = updateInitialSchema.safeParse(body)
+        if (!initialResult.success) {
+          return NextResponse.json(
+            { error: initialResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = initialResult.data
+        break
+      }
+      case 'transfer': {
+        const transferResult = updateTransferSchema.safeParse(body)
+        if (!transferResult.success) {
+          return NextResponse.json(
+            { error: transferResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = transferResult.data
+        break
+      }
+      case 'build': {
+        const buildResult = updateBuildSchema.safeParse(body)
+        if (!buildResult.success) {
+          return NextResponse.json(
+            { error: buildResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = buildResult.data
+        break
+      }
+      case 'outbound': {
+        const outboundResult = updateOutboundSchema.safeParse(body)
+        if (!outboundResult.success) {
+          return NextResponse.json(
+            { error: outboundResult.error.issues[0].message },
+            { status: 400 }
+          )
+        }
+        validatedInput = outboundResult.data
+        break
+      }
+      default:
+        return NextResponse.json(
+          { error: `Unsupported transaction type: ${existingTransaction.type}` },
+          { status: 400 }
+        )
+    }
+
+    // Call the update service
+    const updated = await updateTransaction({
+      transactionId: id,
+      companyId: selectedCompanyId,
+      userId: session.user.id,
+      type: existingTransaction.type,
+      input: validatedInput,
+    })
+
+    return NextResponse.json({ data: updated })
+  } catch (error) {
+    console.error('Error updating transaction:', error)
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 })
   }
 }
