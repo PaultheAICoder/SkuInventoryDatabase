@@ -61,11 +61,26 @@ async function main() {
     where: { email: 'admin@tonsil.tech' },
     update: {},
     create: {
-      companyId: company.id,
       email: 'admin@tonsil.tech',
       passwordHash: adminPassword,
       name: 'Admin User',
       role: 'admin',
+    },
+  })
+  // Create UserCompany for admin
+  await prisma.userCompany.upsert({
+    where: {
+      userId_companyId: {
+        userId: admin.id,
+        companyId: company.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: admin.id,
+      companyId: company.id,
+      role: 'admin',
+      isPrimary: true,
     },
   })
   console.log('Created admin user:', admin.email)
@@ -76,11 +91,26 @@ async function main() {
     where: { email: 'ops@tonsil.tech' },
     update: {},
     create: {
-      companyId: company.id,
       email: 'ops@tonsil.tech',
       passwordHash: opsPassword,
       name: 'Operations User',
       role: 'ops',
+    },
+  })
+  // Create UserCompany for ops user
+  await prisma.userCompany.upsert({
+    where: {
+      userId_companyId: {
+        userId: opsUser.id,
+        companyId: company.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: opsUser.id,
+      companyId: company.id,
+      role: 'ops',
+      isPrimary: true,
     },
   })
   console.log('Created ops user:', opsUser.email)
@@ -91,11 +121,26 @@ async function main() {
     where: { email: 'viewer@tonsil.tech' },
     update: {},
     create: {
-      companyId: company.id,
       email: 'viewer@tonsil.tech',
       passwordHash: viewerPassword,
       name: 'Viewer User',
       role: 'viewer',
+    },
+  })
+  // Create UserCompany for viewer user
+  await prisma.userCompany.upsert({
+    where: {
+      userId_companyId: {
+        userId: viewerUser.id,
+        companyId: company.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: viewerUser.id,
+      companyId: company.id,
+      role: 'viewer',
+      isPrimary: true,
     },
   })
   console.log('Created viewer user:', viewerUser.email)

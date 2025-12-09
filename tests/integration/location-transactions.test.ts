@@ -234,7 +234,7 @@ describe('Location-Aware Transactions', () => {
       // Create SKU with BOM
       const sku = await createTestSKUInDb(companyId)
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
       const bomVersion = await prisma.bOMVersion.create({
         data: {
@@ -310,7 +310,7 @@ describe('Location-Aware Transactions', () => {
       // Create SKU with BOM
       const sku = await createTestSKUInDb(companyId)
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
       const bomVersion = await prisma.bOMVersion.create({
         data: {
@@ -368,7 +368,7 @@ describe('Location-Aware Transactions', () => {
       // Create SKU with BOM
       const sku = await createTestSKUInDb(companyId)
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
       const bomVersion = await prisma.bOMVersion.create({
         data: {

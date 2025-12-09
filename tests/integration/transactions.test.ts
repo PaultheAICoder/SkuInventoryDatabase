@@ -417,7 +417,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version with line
@@ -474,7 +474,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version with line
@@ -524,7 +524,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version
@@ -579,7 +579,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       const bomVersion = await prisma.bOMVersion.create({
@@ -640,7 +640,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version effective from today (no end date = current)
@@ -702,7 +702,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create OLD BOM version (effective 30 days ago, ended 10 days ago)
@@ -787,7 +787,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version that starts tomorrow (not effective yet)
@@ -852,7 +852,7 @@ describe('Transaction Flows', () => {
       const sku = await createTestSKUInDb(companyId)
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create OLDER BOM (effective 30 days ago, no end date)
@@ -987,7 +987,7 @@ describe('Transaction Flows', () => {
       })
 
       const admin = await prisma.user.findFirst({
-        where: { companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
       })
 
       // Create BOM version for the SKU

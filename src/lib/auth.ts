@@ -27,7 +27,6 @@ export const authOptions: NextAuthOptions = {
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: {
-            company: true,
             userCompanies: {
               include: {
                 company: {
@@ -69,10 +68,12 @@ export const authOptions: NextAuthOptions = {
         const isPasswordValid = await compare(credentials.password, user.passwordHash)
 
         if (!isPasswordValid) {
-          // Log failed login attempt
+          // Log failed login attempt - use primary company from UserCompany
+          const primaryUC = user.userCompanies.find(uc => uc.isPrimary) || user.userCompanies[0]
+          const primaryCompanyId = primaryUC?.company.id ?? ''
           await prisma.securityEvent.create({
             data: {
-              companyId: user.companyId,
+              companyId: primaryCompanyId,
               userId: user.id,
               eventType: 'login_failed',
               details: { reason: 'invalid_password' },
@@ -81,7 +82,9 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password')
         }
 
-        // Update last login and log successful login
+        // Update last login and log successful login - use primary company from UserCompany
+        const loginPrimaryUC = user.userCompanies.find(uc => uc.isPrimary) || user.userCompanies[0]
+        const loginCompanyId = loginPrimaryUC?.company.id ?? ''
         await prisma.$transaction([
           prisma.user.update({
             where: { id: user.id },
@@ -89,7 +92,7 @@ export const authOptions: NextAuthOptions = {
           }),
           prisma.securityEvent.create({
             data: {
-              companyId: user.companyId,
+              companyId: loginCompanyId,
               userId: user.id,
               eventType: 'login',
             },
@@ -123,8 +126,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
-          companyId: user.companyId,
-          companyName: user.company.name,
+          companyId: selectedCompanyId,
+          companyName: selectedCompanyName,
           companies,
           companiesWithBrands,
           selectedCompanyId,

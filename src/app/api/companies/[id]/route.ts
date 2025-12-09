@@ -45,7 +45,7 @@ export async function GET(
         },
         _count: {
           select: {
-            users: true,
+            userCompanies: true,
             brands: true,
           },
         },
@@ -60,7 +60,7 @@ export async function GET(
       data: {
         id: company.id,
         name: company.name,
-        userCount: company._count.users,
+        userCount: company._count.userCompanies,
         brandCount: company._count.brands,
         brands: company.brands.map((b) => ({
           id: b.id,
@@ -247,7 +247,7 @@ export async function PATCH(
         },
         _count: {
           select: {
-            users: true,
+            userCompanies: true,
             brands: true,
           },
         },
@@ -258,7 +258,7 @@ export async function PATCH(
       data: {
         id: company.id,
         name: company.name,
-        userCount: company._count.users,
+        userCount: company._count.userCompanies,
         brandCount: company._count.brands,
         brands: company.brands.map((b) => ({
           id: b.id,
@@ -302,13 +302,12 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-            users: true,
+            userCompanies: true,
             brands: true,
             locations: true,
             transactions: true,
             components: true,
             skus: true,
-            userCompanies: true,
           },
         },
       },
@@ -328,20 +327,18 @@ export async function DELETE(
 
     // Check if company has any associated data
     const totalCount =
-      existingCompany._count.users +
+      existingCompany._count.userCompanies +
       existingCompany._count.brands +
       existingCompany._count.locations +
       existingCompany._count.transactions +
       existingCompany._count.components +
-      existingCompany._count.skus +
-      existingCompany._count.userCompanies
+      existingCompany._count.skus
 
     if (totalCount > 0) {
       const details = []
-      if (existingCompany._count.users > 0) details.push(`${existingCompany._count.users} users`)
+      if (existingCompany._count.userCompanies > 0) details.push(`${existingCompany._count.userCompanies} users`)
       if (existingCompany._count.brands > 0) details.push(`${existingCompany._count.brands} brands`)
       if (existingCompany._count.locations > 0) details.push(`${existingCompany._count.locations} locations`)
-      if (existingCompany._count.userCompanies > 0) details.push(`${existingCompany._count.userCompanies} user assignments`)
 
       return NextResponse.json(
         {

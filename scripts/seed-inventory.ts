@@ -57,9 +57,14 @@ async function main() {
     console.log('Found existing brand: Tonsil Tech')
   }
 
-  // Get admin user for audit fields
+  // Get admin user for audit fields (via UserCompany)
   const adminUser = await prisma.user.findFirst({
-    where: { companyId: company.id, role: 'admin' },
+    where: {
+      userCompanies: {
+        some: { companyId: company.id },
+      },
+      role: 'admin',
+    },
   })
   if (!adminUser) {
     throw new Error('No admin user found. Please run the main seed first.')

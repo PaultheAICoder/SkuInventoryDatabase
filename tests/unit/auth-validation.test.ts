@@ -65,10 +65,18 @@ describeWithDb('validateUserExists', () => {
           name: 'Inactive Test User',
           passwordHash: 'not-a-real-hash',
           role: 'viewer',
-          companyId: company.id,
           isActive: false,
         },
         select: { id: true },
+      })
+      // Create UserCompany for test user
+      await prisma.userCompany.create({
+        data: {
+          userId: inactiveUser.id,
+          companyId: company.id,
+          role: 'viewer',
+          isPrimary: true,
+        },
       })
     }
     inactiveUserId = inactiveUser.id

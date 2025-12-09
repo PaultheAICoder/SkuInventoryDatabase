@@ -116,9 +116,14 @@ export async function createTestComponentInDb(
     throw new Error('No brand found for company')
   }
 
-  // Get admin user for createdById
+  // Get admin user for createdById (via UserCompany)
   const admin = await db.user.findFirst({
-    where: { companyId, role: 'admin' },
+    where: {
+      userCompanies: {
+        some: { companyId },
+      },
+      role: 'admin',
+    },
   })
 
   const timestamp = Date.now()
@@ -164,7 +169,12 @@ export async function createTestSKUInDb(
   }
 
   const admin = await db.user.findFirst({
-    where: { companyId, role: 'admin' },
+    where: {
+      userCompanies: {
+        some: { companyId },
+      },
+      role: 'admin',
+    },
   })
 
   const timestamp = Date.now()
@@ -195,7 +205,12 @@ export async function createTestReceiptInDb(
   const db = getIntegrationPrisma()
 
   const admin = await db.user.findFirst({
-    where: { companyId, role: 'admin' },
+    where: {
+      userCompanies: {
+        some: { companyId },
+      },
+      role: 'admin',
+    },
   })
 
   // Get location ID - use provided or get default

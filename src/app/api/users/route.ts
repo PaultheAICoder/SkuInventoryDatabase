@@ -41,9 +41,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Build where clause - scope by selected company
+    // Build where clause - scope by selected company using UserCompany
     const where: Prisma.UserWhereInput = {
-      companyId: selectedCompanyId,
+      userCompanies: {
+        some: {
+          companyId: selectedCompanyId,
+        },
+      },
     }
 
     if (search) {
@@ -178,7 +182,6 @@ export async function POST(request: NextRequest) {
     const user = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
-          companyId: selectedCompanyId,
           email,
           passwordHash,
           name,

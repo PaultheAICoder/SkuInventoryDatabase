@@ -87,7 +87,7 @@ describe('Import/Export API', () => {
 
         const prisma = getIntegrationPrisma()
         const admin = await prisma.user.findFirst({
-          where: { companyId: TEST_SESSIONS.admin!.user.companyId, role: 'admin' },
+          where: { userCompanies: { some: { companyId: TEST_SESSIONS.admin!.user.companyId } }, role: 'admin' },
         })
 
         // Add inventory via transaction
@@ -159,7 +159,7 @@ describe('Import/Export API', () => {
         const prisma = getIntegrationPrisma()
         const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
         const admin = await prisma.user.findFirst({
-          where: { companyId: TEST_SESSIONS.admin!.user.companyId, role: 'admin' },
+          where: { userCompanies: { some: { companyId: TEST_SESSIONS.admin!.user.companyId } }, role: 'admin' },
         })
 
         await prisma.transaction.create({
@@ -447,7 +447,7 @@ INV-001,500,15.00`
         })
 
         const admin = await prisma.user.findFirst({
-          where: { companyId: TEST_SESSIONS.admin!.user.companyId, role: 'admin' },
+          where: { userCompanies: { some: { companyId: TEST_SESSIONS.admin!.user.companyId } }, role: 'admin' },
         })
 
         // Create existing initial transaction
@@ -896,7 +896,7 @@ SKU No BOM,SKU-NOBOM-001,Amazon,,`
         orderBy: { createdAt: 'asc' },
       })
       const admin = await prisma.user.findFirst({
-        where: { companyId: TEST_SESSIONS.admin!.user.companyId, role: 'admin' },
+        where: { userCompanies: { some: { companyId: TEST_SESSIONS.admin!.user.companyId } }, role: 'admin' },
       })
 
       await prisma.component.create({

@@ -54,11 +54,19 @@ describe('Tenant Scoping', () => {
     const passwordHash = await hash('password123', 12)
     const otherUser = await prisma.user.create({
       data: {
-        companyId: otherCompany.id,
         email: 'other@test.com',
         passwordHash,
         name: 'Other User',
         role: 'admin',
+      },
+    })
+    // Create UserCompany record for otherUser
+    await prisma.userCompany.create({
+      data: {
+        userId: otherUser.id,
+        companyId: otherCompany.id,
+        role: 'admin',
+        isPrimary: true,
       },
     })
 
@@ -85,7 +93,9 @@ describe('Tenant Scoping', () => {
     // Clean up test company (only if it was created)
     if (otherCompanyId) {
       await prisma.location.deleteMany({ where: { companyId: otherCompanyId } })
-      await prisma.user.deleteMany({ where: { companyId: otherCompanyId } })
+      // Delete UserCompany records first, then users
+      await prisma.userCompany.deleteMany({ where: { companyId: otherCompanyId } })
+      await prisma.user.deleteMany({ where: { email: 'other@test.com' } })
       await prisma.brand.deleteMany({ where: { companyId: otherCompanyId } })
       await prisma.company.delete({ where: { id: otherCompanyId } })
     }

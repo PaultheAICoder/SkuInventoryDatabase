@@ -44,18 +44,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Also check if it's the user's primary company
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: { company: { select: { id: true, name: true } } },
-    })
-
-    const hasAccess = userCompany || user?.companyId === companyId
-    const company = userCompany?.company || (user?.companyId === companyId ? user.company : null)
-
-    if (!hasAccess || !company) {
+    // UserCompany check is sufficient - userCompany already has company data
+    if (!userCompany) {
       return forbidden('You do not have access to this company')
     }
+
+    const company = userCompany.company
 
     // Fetch brands for the new company
     const brands = await prisma.brand.findMany({

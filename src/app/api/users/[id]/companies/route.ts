@@ -23,11 +23,15 @@ export async function GET(
 
     const { id } = await params
 
-    // Verify user exists and belongs to admin's company
-    const user = await prisma.user.findUnique({
+    // Verify user exists and belongs to admin's company (via UserCompany)
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        companyId: session.user.companyId,
+        userCompanies: {
+          some: {
+            companyId: session.user.companyId,
+          },
+        },
       },
       select: {
         id: true,
@@ -99,15 +103,18 @@ export async function PUT(
 
     const { companyIds } = validation.data
 
-    // Verify user exists and belongs to admin's company
-    const user = await prisma.user.findUnique({
+    // Verify user exists and belongs to admin's company (via UserCompany)
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        companyId: session.user.companyId,
+        userCompanies: {
+          some: {
+            companyId: session.user.companyId,
+          },
+        },
       },
       select: {
         id: true,
-        companyId: true,
       },
     })
 
@@ -147,6 +154,9 @@ export async function PUT(
         ? currentPrimary.companyId
         : companyIds[0]
 
+      // Get user's primary company to determine role
+      const userPrimaryCompanyId = currentPrimary?.companyId
+
       // Delete existing UserCompany records for this user
       await tx.userCompany.deleteMany({
         where: { userId: id },
@@ -156,19 +166,12 @@ export async function PUT(
       const userCompanyRecords = companyIds.map((companyId) => ({
         userId: id,
         companyId,
-        role: user.companyId === companyId ? UserRole.admin : UserRole.ops,
+        role: userPrimaryCompanyId === companyId ? UserRole.admin : UserRole.ops,
         isPrimary: companyId === newPrimaryCompanyId,
       }))
 
       await tx.userCompany.createMany({
         data: userCompanyRecords,
-      })
-
-      // Keep User.companyId in sync with isPrimary UserCompany
-      // TODO: Remove in Phase 3 when User.companyId column is dropped
-      await tx.user.update({
-        where: { id },
-        data: { companyId: newPrimaryCompanyId },
       })
 
       // Fetch updated assignments

@@ -23,10 +23,14 @@ export async function GET(
 
     const { id } = await params
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: {
         id,
-        companyId: session.user.companyId,
+        userCompanies: {
+          some: {
+            companyId: session.user.companyId,
+          },
+        },
       },
       select: {
         id: true,
@@ -109,11 +113,15 @@ export async function PATCH(
       )
     }
 
-    // Check if user exists and belongs to the same company
-    const existingUser = await prisma.user.findUnique({
+    // Check if user exists and belongs to the same company (via UserCompany)
+    const existingUser = await prisma.user.findFirst({
       where: {
         id,
-        companyId: session.user.companyId,
+        userCompanies: {
+          some: {
+            companyId: session.user.companyId,
+          },
+        },
       },
     })
 
@@ -130,7 +138,11 @@ export async function PATCH(
     if (id === session.user.id && validation.data.role && validation.data.role !== 'admin') {
       const adminCount = await prisma.user.count({
         where: {
-          companyId: session.user.companyId,
+          userCompanies: {
+            some: {
+              companyId: session.user.companyId,
+            },
+          },
           role: 'admin',
           isActive: true,
         },
@@ -220,11 +232,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'You cannot delete your own account' }, { status: 400 })
     }
 
-    // Check if user exists and belongs to the same company
-    const existingUser = await prisma.user.findUnique({
+    // Check if user exists and belongs to the same company (via UserCompany)
+    const existingUser = await prisma.user.findFirst({
       where: {
         id,
-        companyId: session.user.companyId,
+        userCompanies: {
+          some: {
+            companyId: session.user.companyId,
+          },
+        },
       },
     })
 
