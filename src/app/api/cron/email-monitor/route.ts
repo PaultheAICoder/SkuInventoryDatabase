@@ -25,9 +25,7 @@ import {
   getFeedbackByIssueNumber,
   updateFeedbackStatus,
 } from '@/services/feedback'
-
-const GITHUB_OWNER = 'PaultheAICoder'
-const GITHUB_REPO = 'SkuInventoryDatabase'
+import { getProjectConfig, DEFAULT_PROJECT_ID } from '@/lib/projects'
 
 /**
  * Extract submitter email from issue body
@@ -120,17 +118,31 @@ export async function GET(request: NextRequest) {
           continue
         }
 
+        // Fetch feedback record first to get project info
+        const feedback = await getFeedbackByIssueNumber(issueNumber)
+        if (!feedback) {
+          const skipReason = `No feedback record for issue #${issueNumber}`
+          console.log(`[Email Monitor] ${skipReason}, skipping`)
+          results.skipped++
+          results.skippedReasons.push(skipReason)
+          continue
+        }
+
+        // Extract project from feedback record
+        const projectId = feedback.projectId ?? DEFAULT_PROJECT_ID
+        const project = getProjectConfig(projectId)
+
         // Fetch the original issue from GitHub
         let issue
         try {
           const response = await octokit.issues.get({
-            owner: GITHUB_OWNER,
-            repo: GITHUB_REPO,
+            owner: project.owner,
+            repo: project.repo,
             issue_number: issueNumber,
           })
           issue = response.data
         } catch {
-          console.log(`[Email Monitor] Issue #${issueNumber} not found on GitHub`)
+          console.log(`[Email Monitor] Issue #${issueNumber} not found on GitHub (${project.repo})`)
           continue
         }
 
@@ -156,16 +168,6 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`[Email Monitor] Processing reply for issue #${issueNumber} from ${email.from}`)
-
-        // Fetch feedback record for idempotency and status checks
-        const feedback = await getFeedbackByIssueNumber(issueNumber)
-        if (!feedback) {
-          const skipReason = `No feedback record for issue #${issueNumber}`
-          console.log(`[Email Monitor] ${skipReason}, skipping`)
-          results.skipped++
-          results.skippedReasons.push(skipReason)
-          continue
-        }
 
         // Check if this email was already processed (idempotency)
         if (feedback.responseEmailId === email.id) {
@@ -211,8 +213,8 @@ export async function GET(request: NextRequest) {
 
           // Add comment to issue confirming verification
           await octokit.issues.createComment({
-            owner: GITHUB_OWNER,
-            repo: GITHUB_REPO,
+            owner: project.owner,
+            repo: project.repo,
             issue_number: issueNumber,
             body: `✅ **User Verified**: The submitter confirmed the fix works.\n\n> ${cleanedBody.substring(0, 200)}${cleanedBody.length > 200 ? '...' : ''}`,
           })
@@ -225,10 +227,11 @@ export async function GET(request: NextRequest) {
           const issueType = (issue.labels as Array<{ name: string }>).some(l => l.name === 'bug') ? 'bug' : 'enhancement'
 
           const { data: followUpIssue } = await octokit.issues.create({
-            owner: GITHUB_OWNER,
-            repo: GITHUB_REPO,
+            owner: project.owner,
+            repo: project.repo,
             title: `[Follow-up] Re: #${issueNumber} - ${issue.title}`,
             body: `## Submitter Information
+**Project**: ${projectId}
 **Submitted by**: ${submitterEmail.split('@')[0]} (${submitterEmail})
 **Submitted at**: ${new Date().toISOString()}
 
@@ -267,8 +270,8 @@ This follow-up was automatically created when the user replied to the resolution
 
           // Add comment to original issue linking to follow-up
           await octokit.issues.createComment({
-            owner: GITHUB_OWNER,
-            repo: GITHUB_REPO,
+            owner: project.owner,
+            repo: project.repo,
             issue_number: issueNumber,
             body: `🔄 **Changes Requested**: The submitter reported the fix didn't fully resolve their issue.\n\nFollow-up issue created: #${followUpIssue.number}\n\n> ${cleanedBody.substring(0, 200)}${cleanedBody.length > 200 ? '...' : ''}`,
           })

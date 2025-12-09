@@ -18,9 +18,7 @@ import {
   createFeedback,
   updateFeedbackStatus,
 } from '@/services/feedback'
-
-const GITHUB_OWNER = 'PaultheAICoder'
-const GITHUB_REPO = 'SkuInventoryDatabase'
+import { getProjectConfig, extractProjectFromBody, DEFAULT_PROJECT_ID } from '@/lib/projects'
 
 /**
  * Extract submitter info from issue body
@@ -115,6 +113,10 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Webhook] Found submitter: ${submitter.name} (${submitter.email})`)
 
+        // Extract project from issue body
+        const projectId = issue.body ? extractProjectFromBody(issue.body) : DEFAULT_PROJECT_ID
+        const project = getProjectConfig(projectId)
+
         // Look up user by email
         const user = await getUserByEmail(submitter.email)
         if (!user) {
@@ -207,8 +209,8 @@ export async function POST(request: NextRequest) {
             try {
               const octokit = new Octokit({ auth: githubToken })
               await octokit.issues.createComment({
-                owner: GITHUB_OWNER,
-                repo: GITHUB_REPO,
+                owner: project.owner,
+                repo: project.repo,
                 issue_number: issueNumber,
                 body: `📧 Notification sent to submitter (${submitter.email}) requesting verification.${feedback ? `\nTracking: Feedback #${feedback.id.substring(0, 8)}` : ''}`,
               })

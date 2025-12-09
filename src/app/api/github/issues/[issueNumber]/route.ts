@@ -4,10 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { success, unauthorized, serverError, error, parseBody } from '@/lib/api-response'
 import { Octokit } from '@octokit/rest'
 import { z } from 'zod'
+import { getProjectConfig, DEFAULT_PROJECT_ID } from '@/lib/projects'
 
-// GitHub repo configuration (same as feedback route)
-const GITHUB_OWNER = 'PaultheAICoder'
-const GITHUB_REPO = 'SkuInventoryDatabase'
+// Get project config for this project
+const project = getProjectConfig(DEFAULT_PROJECT_ID)
 
 const updateIssueSchema = z.object({
   state: z.enum(['open', 'closed']),
@@ -49,8 +49,8 @@ export async function PATCH(
     const octokit = new Octokit({ auth: githubToken })
 
     const { data: issue } = await octokit.issues.update({
-      owner: GITHUB_OWNER,
-      repo: GITHUB_REPO,
+      owner: project.owner,
+      repo: project.repo,
       issue_number: issueNum,
       state: data.state,
     })

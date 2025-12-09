@@ -6,10 +6,10 @@ import { submitFeedbackSchema, type SubmitFeedbackResponse } from '@/types/feedb
 import { Octokit } from '@octokit/rest'
 import { enhanceIssueWithClaudeCode } from '@/lib/claude'
 import { createFeedback } from '@/services/feedback'
+import { getProjectConfig, DEFAULT_PROJECT_ID } from '@/lib/projects'
 
-// GitHub repo configuration
-const GITHUB_OWNER = 'PaultheAICoder'
-const GITHUB_REPO = 'SkuInventoryDatabase'
+// Get project config for this project
+const project = getProjectConfig(DEFAULT_PROJECT_ID)
 
 // Simple in-memory rate limiting (resets on server restart)
 const rateLimitMap = new Map<string, { count: number; resetAt: Date }>()
@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Add submitter information to the issue body
     const submitterInfo = `## Submitter Information
+**Project**: ${DEFAULT_PROJECT_ID}
 **Submitted by**: ${session.user.name || 'Unknown'} (${session.user.email || 'no email'})
 **Submitted at**: ${new Date().toISOString()}
 
@@ -99,8 +100,8 @@ export async function POST(request: NextRequest) {
     const octokit = new Octokit({ auth: githubToken })
 
     const { data: issue } = await octokit.issues.create({
-      owner: GITHUB_OWNER,
-      repo: GITHUB_REPO,
+      owner: project.owner,
+      repo: project.repo,
       title,
       body: issueBody,
       labels: [label],
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         githubIssueNumber: issueNumber,
         githubIssueUrl: issueUrl,
+        projectId: DEFAULT_PROJECT_ID,
       })
       console.log(`[Feedback] Created feedback record for issue #${issueNumber}`)
     } catch (feedbackError) {

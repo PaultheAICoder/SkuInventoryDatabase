@@ -56,6 +56,7 @@ const mockUser = { name: 'Test User', email: 'test@example.com' }
 const mockFeedbackDb = {
   id: 'feedback-123',
   userId: 'user-456',
+  projectId: 'SkuInventoryDatabase',
   githubIssueNumber: 100,
   githubIssueUrl: 'https://github.com/org/repo/issues/100',
   status: 'pending' as const,
@@ -91,6 +92,7 @@ describe('Feedback Service', () => {
           userId: 'user-456',
           githubIssueNumber: 100,
           githubIssueUrl: 'https://github.com/org/repo/issues/100',
+          projectId: 'SkuInventoryDatabase',
           status: 'pending',
         },
         include: {
@@ -117,6 +119,45 @@ describe('Feedback Service', () => {
 
       expect(result.createdAt).toBe('2025-12-09T12:00:00.000Z')
       expect(result.updatedAt).toBe('2025-12-09T12:00:00.000Z')
+    })
+
+    it('stores projectId when provided', async () => {
+      const feedbackWithProject = { ...mockFeedbackDb, projectId: 'NovusProjectDatabase' }
+      mockPrisma.feedback.create.mockResolvedValue(feedbackWithProject)
+
+      const result = await createFeedback({
+        userId: 'user-456',
+        githubIssueNumber: 100,
+        githubIssueUrl: 'https://github.com/org/repo/issues/100',
+        projectId: 'NovusProjectDatabase',
+      })
+
+      expect(mockPrisma.feedback.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            projectId: 'NovusProjectDatabase',
+          }),
+        })
+      )
+      expect(result.projectId).toBe('NovusProjectDatabase')
+    })
+
+    it('defaults projectId to SkuInventoryDatabase when not provided', async () => {
+      mockPrisma.feedback.create.mockResolvedValue(mockFeedbackDb)
+
+      await createFeedback({
+        userId: 'user-456',
+        githubIssueNumber: 100,
+        githubIssueUrl: 'https://github.com/org/repo/issues/100',
+      })
+
+      expect(mockPrisma.feedback.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            projectId: 'SkuInventoryDatabase',
+          }),
+        })
+      )
     })
   })
 

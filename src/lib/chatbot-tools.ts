@@ -13,10 +13,10 @@ import {
   getTransactionHistory,
 } from '@/services/chatbot-queries'
 import type { CreateIssueResult } from '@/types/chatbot'
+import { getProjectConfig, DEFAULT_PROJECT_ID } from '@/lib/projects'
 
-// GitHub configuration
-const GITHUB_OWNER = 'PaultheAICoder'
-const GITHUB_REPO = 'SkuInventoryDatabase'
+// Get project config for chatbot issue creation
+const project = getProjectConfig(DEFAULT_PROJECT_ID)
 
 /**
  * Tool definitions for Claude
@@ -242,8 +242,8 @@ Reported via chatbot assistant.
 *This issue was automatically created from a chatbot conversation.*`
 
   const { data: issue } = await octokit.issues.create({
-    owner: GITHUB_OWNER,
-    repo: GITHUB_REPO,
+    owner: project.owner,
+    repo: project.repo,
     title: params.title,
     body,
     labels: ['bug'],
@@ -282,8 +282,8 @@ Requested via chatbot assistant.
 *This issue was automatically created from a chatbot conversation.*`
 
   const { data: issue } = await octokit.issues.create({
-    owner: GITHUB_OWNER,
-    repo: GITHUB_REPO,
+    owner: project.owner,
+    repo: project.repo,
     title: params.title,
     body,
     labels: ['enhancement'],

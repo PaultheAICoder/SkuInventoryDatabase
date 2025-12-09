@@ -611,6 +611,7 @@ model Feedback {
   id                    String         @id @default(uuid())
   userId                String
   user                  User           @relation(fields: [userId], references: [id])
+  projectId             String         @default("SkuInventoryDatabase") @db.VarChar(100)
 
   // GitHub link
   githubIssueNumber     Int            @unique

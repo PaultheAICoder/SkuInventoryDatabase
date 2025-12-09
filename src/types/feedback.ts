@@ -72,6 +72,7 @@ export type FeedbackStatus = 'pending' | 'resolved' | 'verified' | 'changes_requ
 export interface FeedbackRecord {
   id: string
   userId: string
+  projectId: string
   userName?: string
   userEmail?: string
   githubIssueNumber: number
@@ -93,6 +94,7 @@ export interface CreateFeedbackInput {
   userId: string
   githubIssueNumber: number
   githubIssueUrl: string
+  projectId?: string
 }
 
 // Input type for updating feedback records

@@ -23,6 +23,7 @@ function toFeedbackRecord(
   feedback: {
     id: string
     userId: string
+    projectId: string
     githubIssueNumber: number
     githubIssueUrl: string
     status: string
@@ -41,6 +42,7 @@ function toFeedbackRecord(
   return {
     id: feedback.id,
     userId: feedback.userId,
+    projectId: feedback.projectId,
     userName: feedback.user?.name ?? undefined,
     userEmail: feedback.user?.email,
     githubIssueNumber: feedback.githubIssueNumber,
@@ -67,6 +69,7 @@ export async function createFeedback(input: CreateFeedbackInput): Promise<Feedba
       userId: input.userId,
       githubIssueNumber: input.githubIssueNumber,
       githubIssueUrl: input.githubIssueUrl,
+      projectId: input.projectId ?? 'SkuInventoryDatabase',
       status: 'pending',
     },
     include: {
