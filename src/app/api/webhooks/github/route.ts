@@ -12,6 +12,12 @@ import { NextRequest } from 'next/server'
 import crypto from 'crypto'
 import { Octokit } from '@octokit/rest'
 import { sendGraphEmail, isGraphEmailConfigured } from '@/lib/graph-email'
+import { prisma } from '@/lib/db'
+import {
+  getFeedbackByIssueNumber,
+  createFeedback,
+  updateFeedbackStatus,
+} from '@/services/feedback'
 
 const GITHUB_OWNER = 'PaultheAICoder'
 const GITHUB_REPO = 'SkuInventoryDatabase'
@@ -28,6 +34,17 @@ function extractSubmitterFromBody(body: string): { name: string; email: string }
     }
   }
   return null
+}
+
+/**
+ * Look up user by email address
+ */
+async function getUserByEmail(email: string): Promise<{ id: string; name: string | null; email: string } | null> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, name: true, email: true },
+  })
+  return user
 }
 
 /**
@@ -98,6 +115,33 @@ export async function POST(request: NextRequest) {
 
         console.log(`[Webhook] Found submitter: ${submitter.name} (${submitter.email})`)
 
+        // Look up user by email
+        const user = await getUserByEmail(submitter.email)
+        if (!user) {
+          console.log(`[Webhook] User not found for email ${submitter.email} - skipping feedback tracking`)
+          // Continue with email notification but skip feedback tracking
+        }
+
+        // Check if feedback record exists (may have been created by /api/feedback)
+        let feedback = await getFeedbackByIssueNumber(issueNumber)
+
+        if (!feedback && user) {
+          // Create feedback record if it doesn't exist
+          // (handles issues created outside the feedback dialog)
+          feedback = await createFeedback({
+            userId: user.id,
+            githubIssueNumber: issueNumber,
+            githubIssueUrl: issue.html_url,
+          })
+          console.log(`[Webhook] Created feedback record for issue #${issueNumber}`)
+        }
+
+        // Check if we should skip re-notification for already resolved/verified feedback
+        if (feedback && (feedback.status === 'resolved' || feedback.status === 'verified')) {
+          console.log(`[Webhook] Feedback #${feedback.id} already in ${feedback.status} state - skipping re-notification`)
+          return new Response('OK', { status: 200 })
+        }
+
         // Check if email is configured
         if (!isGraphEmailConfigured()) {
           console.log('[Webhook] Email not configured - skipping notification')
@@ -147,6 +191,16 @@ export async function POST(request: NextRequest) {
         if (success) {
           console.log(`[Webhook] Notification email sent to ${submitter.email}`)
 
+          // Update feedback record if it exists
+          if (feedback) {
+            await updateFeedbackStatus(feedback.id, {
+              status: 'resolved',
+              notificationSentAt: new Date(),
+              // Note: Graph API sendMail doesn't return Message-ID; would need to fetch sent item
+            })
+            console.log(`[Webhook] Updated feedback #${feedback.id} to resolved`)
+          }
+
           // Add comment to issue noting notification was sent
           const githubToken = process.env.GITHUB_API_TOKEN
           if (githubToken) {
@@ -156,7 +210,7 @@ export async function POST(request: NextRequest) {
                 owner: GITHUB_OWNER,
                 repo: GITHUB_REPO,
                 issue_number: issueNumber,
-                body: `📧 Notification sent to submitter (${submitter.email}) requesting verification.`,
+                body: `📧 Notification sent to submitter (${submitter.email}) requesting verification.${feedback ? `\nTracking: Feedback #${feedback.id.substring(0, 8)}` : ''}`,
               })
             } catch (commentError) {
               console.error('[Webhook] Failed to add comment:', commentError)

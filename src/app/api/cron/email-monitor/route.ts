@@ -7,7 +7,9 @@
  * This endpoint should be called by a cron job every 5 minutes.
  * Protected by CRON_SECRET header authentication.
  *
- * Architecture: Uses GitHub as source of truth - no database dependency.
+ * Architecture: Uses database-backed state for persistence.
+ * - lastCheckTime persisted in EmailMonitorState table
+ * - Feedback records updated on verification/changes_requested
  * - Issue number extracted from email subject
  * - Submitter email extracted from GitHub issue body
  * - Follow-up issues created and linked to original
@@ -17,12 +19,15 @@ import { NextRequest } from 'next/server'
 import { Octokit } from '@octokit/rest'
 import { fetchNewReplies, isGraphEmailConfigured } from '@/lib/graph-email'
 import { extractIssueNumber, parseReplyDecision } from '@/services/email-parsing'
+import {
+  getLastCheckTime,
+  updateLastCheckTime,
+  getFeedbackByIssueNumber,
+  updateFeedbackStatus,
+} from '@/services/feedback'
 
 const GITHUB_OWNER = 'PaultheAICoder'
 const GITHUB_REPO = 'SkuInventoryDatabase'
-
-// Cache for last check time (in production, use Redis or database)
-let lastCheckTime = new Date(Date.now() - 15 * 60 * 1000) // Default: 15 minutes ago
 
 /**
  * Extract submitter email from issue body
@@ -71,11 +76,12 @@ export async function GET(request: NextRequest) {
   const octokit = new Octokit({ auth: githubToken })
 
   try {
-    console.log(`[Email Monitor] Starting email check since ${lastCheckTime.toISOString()}`)
+    const previousCheckTime = await getLastCheckTime()
+    console.log(`[Email Monitor] Starting email check since ${previousCheckTime.toISOString()}`)
 
-    const emails = await fetchNewReplies(lastCheckTime)
-    const previousCheckTime = lastCheckTime
-    lastCheckTime = new Date()
+    const emails = await fetchNewReplies(previousCheckTime)
+    const newCheckTime = new Date()
+    await updateLastCheckTime(newCheckTime)
 
     const results = {
       processed: 0,
@@ -93,7 +99,7 @@ export async function GET(request: NextRequest) {
         timestamp: new Date().toISOString(),
         checkWindow: {
           from: previousCheckTime.toISOString(),
-          to: lastCheckTime.toISOString(),
+          to: newCheckTime.toISOString(),
         },
       })
     }
@@ -158,6 +164,18 @@ export async function GET(request: NextRequest) {
         results.processed++
 
         if (action === 'verified') {
+          // Update feedback record status
+          const feedback = await getFeedbackByIssueNumber(issueNumber)
+          if (feedback) {
+            await updateFeedbackStatus(feedback.id, {
+              status: 'verified',
+              responseReceivedAt: new Date(email.receivedAt),
+              responseEmailId: email.id,
+              responseContent: cleanedBody.substring(0, 1000), // Truncate long responses
+            })
+            console.log(`[Email Monitor] Updated feedback #${feedback.id} to verified`)
+          }
+
           // Add comment to issue confirming verification
           await octokit.issues.createComment({
             owner: GITHUB_OWNER,
@@ -203,6 +221,20 @@ This follow-up was automatically created when the user replied to the resolution
             labels: [issueType, 'follow-up'],
           })
 
+          // Update feedback record status
+          const feedback = await getFeedbackByIssueNumber(issueNumber)
+          if (feedback) {
+            await updateFeedbackStatus(feedback.id, {
+              status: 'changes_requested',
+              responseReceivedAt: new Date(email.receivedAt),
+              responseEmailId: email.id,
+              responseContent: cleanedBody.substring(0, 1000),
+              followUpIssueNumber: followUpIssue.number,
+              followUpIssueUrl: followUpIssue.html_url,
+            })
+            console.log(`[Email Monitor] Updated feedback #${feedback.id} to changes_requested`)
+          }
+
           // Add comment to original issue linking to follow-up
           await octokit.issues.createComment({
             owner: GITHUB_OWNER,
@@ -232,7 +264,7 @@ This follow-up was automatically created when the user replied to the resolution
       timestamp: new Date().toISOString(),
       checkWindow: {
         from: previousCheckTime.toISOString(),
-        to: lastCheckTime.toISOString(),
+        to: newCheckTime.toISOString(),
       },
     })
   } catch (error) {
@@ -270,8 +302,9 @@ export async function POST(request: NextRequest) {
 
     // Optional: override check time for testing
     if (body.since) {
-      lastCheckTime = new Date(body.since)
-      console.log(`[Email Monitor] Manual trigger with custom since: ${lastCheckTime.toISOString()}`)
+      const customSince = new Date(body.since)
+      await updateLastCheckTime(customSince)
+      console.log(`[Email Monitor] Manual trigger with custom since: ${customSince.toISOString()}`)
     }
 
     // Redirect to GET handler

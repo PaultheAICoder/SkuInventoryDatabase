@@ -5,6 +5,7 @@ import { success, unauthorized, serverError, error, parseBody } from '@/lib/api-
 import { submitFeedbackSchema, type SubmitFeedbackResponse } from '@/types/feedback'
 import { Octokit } from '@octokit/rest'
 import { enhanceIssueWithClaudeCode } from '@/lib/claude'
+import { createFeedback } from '@/services/feedback'
 
 // GitHub repo configuration
 const GITHUB_OWNER = 'PaultheAICoder'
@@ -109,6 +110,19 @@ export async function POST(request: NextRequest) {
     const issueNumber = issue.number
 
     console.log(`[Feedback] Created GitHub issue #${issueNumber} for ${session.user.email}`)
+
+    // Create feedback record to track this submission
+    try {
+      await createFeedback({
+        userId: session.user.id,
+        githubIssueNumber: issueNumber,
+        githubIssueUrl: issueUrl,
+      })
+      console.log(`[Feedback] Created feedback record for issue #${issueNumber}`)
+    } catch (feedbackError) {
+      // Log but don't fail - the GitHub issue was created successfully
+      console.error(`[Feedback] Failed to create feedback record:`, feedbackError)
+    }
 
     const response: SubmitFeedbackResponse = {
       issueUrl,

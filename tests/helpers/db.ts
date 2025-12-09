@@ -43,6 +43,9 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   await prisma.component.deleteMany({})
   await prisma.location.deleteMany({})
   await prisma.securityEvent.deleteMany({})
+  // Clean up feedback system data
+  await prisma.feedback.deleteMany({})
+  await prisma.emailMonitorState.deleteMany({})
   // Don't delete users/brands/companies as they may be needed for auth
 }
 
