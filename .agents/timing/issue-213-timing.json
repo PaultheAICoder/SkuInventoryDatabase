@@ -1,5 +1,14 @@
 {
   "issue": "213",
   "workflow": "3-agent",
-  "workflow_start": "2025-12-08T21:29:58.000Z"
+  "workflow_start": "2025-12-08T21:29:58.000Z",
+  "workflow_end": "2025-12-08T21:48:11.000Z",
+  "scout_plan_start": "2025-12-08T21:30:20.000Z",
+  "scout_plan_end": "2025-12-08T21:32:27.000Z",
+  "build_start": "2025-12-08T21:32:42.000Z",
+  "build_end": "2025-12-08T21:37:51.000Z",
+  "test_cleanup_start": "2025-12-08T21:38:05.000Z",
+  "test_cleanup_end": "2025-12-08T21:48:11.000Z",
+  "outcome": "completed",
+  "commit": "f4a8196"
 }

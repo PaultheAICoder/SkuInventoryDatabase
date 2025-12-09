@@ -7,31 +7,36 @@
  * This endpoint should be called by a cron job every 5 minutes.
  * Protected by CRON_SECRET header authentication.
  *
- * IMPORTANT: Email monitoring is STUBBED until Azure AD is configured.
- * The endpoint will return a "skipped" status when email is not configured.
+ * Architecture: Uses GitHub as source of truth - no database dependency.
+ * - Issue number extracted from email subject
+ * - Submitter email extracted from GitHub issue body
+ * - Follow-up issues created and linked to original
  */
 
 import { NextRequest } from 'next/server'
+import { Octokit } from '@octokit/rest'
 import { fetchNewReplies, isGraphEmailConfigured } from '@/lib/graph-email'
-import { getFeedbackByIssueNumber, processEmailReply } from '@/services/feedback'
-import { extractIssueNumber } from '@/services/email-parsing'
+import { extractIssueNumber, parseReplyDecision } from '@/services/email-parsing'
+
+const GITHUB_OWNER = 'PaultheAICoder'
+const GITHUB_REPO = 'SkuInventoryDatabase'
 
 // Cache for last check time (in production, use Redis or database)
 let lastCheckTime = new Date(Date.now() - 15 * 60 * 1000) // Default: 15 minutes ago
+
+/**
+ * Extract submitter email from issue body
+ */
+function extractSubmitterEmail(body: string): string | null {
+  const match = body.match(/\*\*Submitted by\*\*:\s*[^(]+\s*\(([^)]+)\)/)
+  return match ? match[1].trim() : null
+}
 
 /**
  * GET /api/cron/email-monitor - Poll for email replies
  *
  * Should be called by a cron job every 5 minutes.
  * Protected by CRON_SECRET.
- *
- * Response:
- * - status: 'success' | 'skipped' | 'error'
- * - emailsChecked: number of emails found
- * - processed: number of emails successfully processed
- * - verified: number of feedback items marked as verified
- * - changesRequested: number of follow-up issues created
- * - errors: array of error messages
  */
 export async function GET(request: NextRequest) {
   // Verify cron secret
@@ -52,6 +57,18 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     })
   }
+
+  const githubToken = process.env.GITHUB_API_TOKEN
+  if (!githubToken) {
+    console.error('[Email Monitor] GITHUB_API_TOKEN not configured')
+    return Response.json({
+      status: 'error',
+      message: 'GITHUB_API_TOKEN not configured',
+      timestamp: new Date().toISOString(),
+    }, { status: 500 })
+  }
+
+  const octokit = new Octokit({ auth: githubToken })
 
   try {
     console.log(`[Email Monitor] Starting email check since ${lastCheckTime.toISOString()}`)
@@ -85,48 +102,117 @@ export async function GET(request: NextRequest) {
 
     for (const email of emails) {
       try {
-        // Extract issue number from subject (format: "Re: [Resolved] Your Bug Report #123")
+        // Extract issue number from subject (format: "Re: Your bug report - Issue #123")
         const issueNumber = extractIssueNumber(email.subject)
         if (!issueNumber) {
           console.log(`[Email Monitor] Could not extract issue number from subject: ${email.subject}`)
           continue
         }
 
-        const feedback = await getFeedbackByIssueNumber(issueNumber)
-
-        if (!feedback) {
-          console.log(`[Email Monitor] No feedback found for issue #${issueNumber}`)
+        // Fetch the original issue from GitHub
+        let issue
+        try {
+          const response = await octokit.issues.get({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            issue_number: issueNumber,
+          })
+          issue = response.data
+        } catch {
+          console.log(`[Email Monitor] Issue #${issueNumber} not found on GitHub`)
           continue
         }
 
-        // Only process resolved feedback awaiting verification
-        if (feedback.status !== 'resolved') {
-          console.log(`[Email Monitor] Feedback for issue #${issueNumber} is not in resolved status (current: ${feedback.status})`)
+        // Only process closed issues (we only notify on close)
+        if (issue.state !== 'closed') {
+          console.log(`[Email Monitor] Issue #${issueNumber} is not closed (state: ${issue.state})`)
+          continue
+        }
+
+        // Extract submitter email from issue body
+        const submitterEmail = issue.body ? extractSubmitterEmail(issue.body) : null
+        if (!submitterEmail) {
+          console.log(`[Email Monitor] No submitter email in issue #${issueNumber} body`)
           continue
         }
 
         // Verify sender matches the original submitter
-        if (feedback.userEmail?.toLowerCase() !== email.from.toLowerCase()) {
+        if (submitterEmail.toLowerCase() !== email.from.toLowerCase()) {
           console.warn(
-            `[Email Monitor] Email from ${email.from} doesn't match feedback submitter ${feedback.userEmail}`
+            `[Email Monitor] Email from ${email.from} doesn't match submitter ${submitterEmail}`
           )
           continue
         }
 
-        console.log(`[Email Monitor] Processing reply for issue #${issueNumber}`)
+        console.log(`[Email Monitor] Processing reply for issue #${issueNumber} from ${email.from}`)
 
-        const result = await processEmailReply(feedback, email.body, email.id)
+        // Parse the reply to determine user intent
+        const { action, cleanedBody, confidence } = parseReplyDecision(email.body)
+        console.log(`[Email Monitor] Parsed action: ${action}, confidence: ${confidence}`)
+
+        if (!action) {
+          console.log(`[Email Monitor] Could not determine action from reply`)
+          continue
+        }
+
         results.processed++
 
-        if (result.action === 'verified') {
+        if (action === 'verified') {
+          // Add comment to issue confirming verification
+          await octokit.issues.createComment({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            issue_number: issueNumber,
+            body: `✅ **User Verified**: The submitter confirmed the fix works.\n\n> ${cleanedBody.substring(0, 200)}${cleanedBody.length > 200 ? '...' : ''}`,
+          })
           results.verified++
-          console.log(`[Email Monitor] Issue #${issueNumber} marked as verified`)
+          console.log(`[Email Monitor] Issue #${issueNumber} verified by user`)
         }
-        if (result.action === 'changes_requested') {
+
+        if (action === 'changes_requested') {
+          // Create a new follow-up issue linked to the original
+          const issueType = (issue.labels as Array<{ name: string }>).some(l => l.name === 'bug') ? 'bug' : 'enhancement'
+
+          const { data: followUpIssue } = await octokit.issues.create({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            title: `[Follow-up] Re: #${issueNumber} - ${issue.title}`,
+            body: `## Submitter Information
+**Submitted by**: ${submitterEmail.split('@')[0]} (${submitterEmail})
+**Submitted at**: ${new Date().toISOString()}
+
+---
+
+## Follow-up to Issue #${issueNumber}
+
+**Original Issue**: ${issue.html_url}
+**Original Title**: ${issue.title}
+
+### User Feedback
+The submitter reports the fix did not fully resolve their issue:
+
+> ${cleanedBody}
+
+### Context
+This follow-up was automatically created when the user replied to the resolution notification indicating additional changes are needed.
+
+## Next Steps
+- Review user feedback above
+- Investigate what was missed in the original fix
+- Implement additional changes as needed`,
+            labels: [issueType, 'follow-up'],
+          })
+
+          // Add comment to original issue linking to follow-up
+          await octokit.issues.createComment({
+            owner: GITHUB_OWNER,
+            repo: GITHUB_REPO,
+            issue_number: issueNumber,
+            body: `🔄 **Changes Requested**: The submitter reported the fix didn't fully resolve their issue.\n\nFollow-up issue created: #${followUpIssue.number}\n\n> ${cleanedBody.substring(0, 200)}${cleanedBody.length > 200 ? '...' : ''}`,
+          })
+
           results.changesRequested++
-          console.log(
-            `[Email Monitor] Issue #${issueNumber} - follow-up created: #${result.followUpIssue?.number}`
-          )
+          console.log(`[Email Monitor] Created follow-up issue #${followUpIssue.number} for issue #${issueNumber}`)
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'

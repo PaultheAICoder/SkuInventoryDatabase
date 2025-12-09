@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         updatedAt: true,
         _count: {
           select: {
-            users: true,
+            userCompanies: true,
             brands: true,
           },
         },
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       data: companies.map((company) => ({
         id: company.id,
         name: company.name,
-        userCount: company._count.users,
+        userCount: company._count.userCompanies,
         brandCount: company._count.brands,
         createdAt: company.createdAt.toISOString(),
         updatedAt: company.updatedAt.toISOString(),

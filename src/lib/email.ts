@@ -1,9 +1,9 @@
 /**
  * Email client for low-stock alerts
- * Uses Resend API for email delivery
+ * Uses Microsoft Graph API for email delivery via ai-coder@vital-enterprises.com
  */
 
-import { Resend } from 'resend'
+import { sendGraphEmail, isGraphEmailConfigured } from '@/lib/graph-email'
 
 // Types
 export interface EmailMessage {
@@ -37,10 +37,10 @@ export class EmailDeliveryError extends Error {
 }
 
 /**
- * Check if email is configured (Resend API key present)
+ * Check if email is configured (Microsoft Graph credentials present)
  */
 export function isEmailConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY
+  return isGraphEmailConfigured()
 }
 
 /**
@@ -51,32 +51,17 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Get the "from" email address
- */
-function getFromAddress(): string {
-  return process.env.EMAIL_FROM || 'Trevor Inventory <alerts@example.com>'
-}
-
-/**
- * Send email via Resend
+ * Send email via Microsoft Graph API
  */
 export async function sendEmail(message: EmailMessage): Promise<void> {
-  if (!process.env.RESEND_API_KEY) {
-    throw new EmailDeliveryError('Email provider not configured. Set RESEND_API_KEY environment variable.')
+  if (!isGraphEmailConfigured()) {
+    throw new EmailDeliveryError('Email provider not configured. Set Azure AD environment variables.')
   }
 
-  const resend = new Resend(process.env.RESEND_API_KEY)
+  const success = await sendGraphEmail(message.to, message.subject, message.html)
 
-  const { error } = await resend.emails.send({
-    from: getFromAddress(),
-    to: message.to,
-    subject: message.subject,
-    html: message.html,
-    text: message.text,
-  })
-
-  if (error) {
-    throw new EmailDeliveryError(`Resend error: ${error.message}`, error)
+  if (!success) {
+    throw new EmailDeliveryError('Failed to send email via Microsoft Graph')
   }
 }
 
@@ -289,98 +274,6 @@ Sent by Trevor Inventory`
     html,
     text,
   }
-}
-
-// ============================================
-// Feedback Resolution Email
-// ============================================
-
-/**
- * Feedback resolution email data
- */
-export interface FeedbackResolutionEmailData {
-  to: string
-  userName: string
-  feedbackType: 'bug' | 'feature'
-  issueNumber: number
-  issueUrl: string
-  description: string
-}
-
-/**
- * Send feedback resolution notification email
- */
-export async function sendFeedbackResolutionEmail(data: FeedbackResolutionEmailData): Promise<void> {
-  const typeLabel = data.feedbackType === 'bug' ? 'Bug Report' : 'Feature Request'
-
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f5;">
-  <div style="max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    <div style="background-color: #10b981; color: white; padding: 20px; text-align: center;">
-      <h1 style="margin: 0; font-size: 24px;">Your ${typeLabel} Has Been Resolved!</h1>
-    </div>
-    <div style="padding: 24px;">
-      <p style="margin: 0 0 16px; color: #374151;">Hi ${data.userName},</p>
-      <p style="margin: 0 0 16px; color: #374151;">
-        Great news! Your ${typeLabel.toLowerCase()} has been addressed and the issue has been closed.
-      </p>
-
-      <div style="background-color: #f9fafb; border-radius: 6px; padding: 16px; margin: 16px 0;">
-        <p style="margin: 0 0 8px; font-weight: 600; color: #374151;">Issue #${data.issueNumber}</p>
-        <p style="margin: 0; color: #6b7280; font-size: 14px;">${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}</p>
-      </div>
-
-      <p style="margin: 16px 0; color: #374151;">
-        <strong>Please verify the fix works for your use case.</strong> You can reply to this email with:
-      </p>
-
-      <ul style="margin: 16px 0; padding-left: 20px; color: #374151;">
-        <li><strong>"Verified"</strong> or <strong>"Looks good"</strong> - if the fix works</li>
-        <li><strong>"Changes needed"</strong> or describe the issue - if further work is required</li>
-      </ul>
-
-      <div style="text-align: center; margin-top: 24px;">
-        <a href="${data.issueUrl}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">View Issue on GitHub</a>
-      </div>
-    </div>
-    <div style="background-color: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #6b7280;">
-      <p style="margin: 0;">Sent by Trevor Inventory Feedback System</p>
-    </div>
-  </div>
-</body>
-</html>`
-
-  const text = `Your ${typeLabel} Has Been Resolved!
-
-Hi ${data.userName},
-
-Great news! Your ${typeLabel.toLowerCase()} has been addressed and the issue has been closed.
-
-Issue #${data.issueNumber}
-${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}
-
-Please verify the fix works for your use case. Reply to this email with:
-- "Verified" or "Looks good" - if the fix works
-- "Changes needed" or describe the issue - if further work is required
-
-View Issue: ${data.issueUrl}
-
-Sent by Trevor Inventory Feedback System`
-
-  const message: EmailMessage = {
-    to: [data.to],
-    subject: `[Resolved] Your ${typeLabel} #${data.issueNumber}`,
-    html,
-    text,
-  }
-
-  await sendEmail(message)
 }
 
 /**

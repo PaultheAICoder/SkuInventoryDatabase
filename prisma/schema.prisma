@@ -128,9 +128,6 @@ model User {
 
   // Multi-company assignment (SINGLE SOURCE OF TRUTH)
   userCompanies UserCompany[]
-
-  // Feedback relations
-  feedbacks Feedback[]
 }
 
 model UserCompany {
@@ -596,50 +593,6 @@ model SkuChannelMapping {
   @@index([skuId])
 }
 
-// ============================================
-// Feedback Tracking
-// ============================================
-
-enum FeedbackStatus {
-  pending // Issue created, awaiting resolution
-  in_progress // Developer working on it
-  resolved // Issue closed, awaiting user verification
-  verified // User confirmed fix works
-  reopened // User requested changes, follow-up created
-}
-
-model Feedback {
-  id                String         @id @default(uuid())
-  userId            String
-  user              User           @relation(fields: [userId], references: [id])
-  type              String         @db.VarChar(20) // 'bug' | 'feature'
-  description       String         @db.Text
-  githubIssueNumber Int
-  githubIssueUrl    String         @db.VarChar(500)
-  status            FeedbackStatus @default(pending)
-  emailMessageId    String?        @db.VarChar(255) // For tracking notification emails
-  resolvedAt        DateTime?
-  verifiedAt        DateTime?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-
-  replies FeedbackReply[]
-
-  @@index([userId])
-  @@index([githubIssueNumber])
-  @@index([status])
-}
-
-model FeedbackReply {
-  id                  String   @id @default(uuid())
-  feedbackId          String
-  feedback            Feedback @relation(fields: [feedbackId], references: [id], onDelete: Cascade)
-  emailMessageId      String?  @db.VarChar(255) // Email message ID for tracking
-  content             String   @db.Text
-  action              String   @db.VarChar(20) // 'verified' | 'changes_requested'
-  followUpIssueNumber Int? // If changes requested, the new issue number
-  followUpIssueUrl    String?  @db.VarChar(500)
-  createdAt           DateTime @default(now())
-
-  @@index([feedbackId])
-}
+// Note: Feedback tracking is now done via GitHub issues only.
+// Submitter info is stored in the issue body (## Submitter Information section).
+// This eliminates the need for separate Feedback/FeedbackReply tables.

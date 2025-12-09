@@ -1,0 +1,10 @@
+{
+  "issue": "202",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-08T21:24:32.000Z",
+  "workflow_end": "2025-12-08T21:29:42.000Z",
+  "scout_plan_start": "2025-12-08T21:24:53.000Z",
+  "scout_plan_end": "2025-12-08T21:29:12.000Z",
+  "outcome": "deferred_to_v2",
+  "reason": "91 files affected, current implementation works, high risk"
+}

@@ -163,6 +163,50 @@ export async function testGraphConnection(): Promise<boolean> {
 }
 
 /**
+ * Send an email via Microsoft Graph API
+ *
+ * @param to - Recipient email address(es)
+ * @param subject - Email subject
+ * @param body - HTML body content
+ * @returns true if sent successfully, false otherwise
+ */
+export async function sendGraphEmail(
+  to: string | string[],
+  subject: string,
+  body: string
+): Promise<boolean> {
+  const client = getGraphClient()
+  if (!client) {
+    console.error('[Graph Email] Service not configured, cannot send email')
+    return false
+  }
+
+  const recipients = Array.isArray(to) ? to : [to]
+
+  try {
+    await client.api(`/users/${FEEDBACK_EMAIL}/sendMail`).post({
+      message: {
+        subject,
+        body: {
+          contentType: 'HTML',
+          content: body,
+        },
+        toRecipients: recipients.map((email) => ({
+          emailAddress: { address: email },
+        })),
+      },
+      saveToSentItems: true,
+    })
+
+    console.log(`[Graph Email] Email sent to ${recipients.join(', ')}`)
+    return true
+  } catch (error) {
+    console.error('[Graph Email] Failed to send email:', error)
+    return false
+  }
+}
+
+/**
  * Get configuration status for debugging
  */
 export function getGraphEmailStatus(): {

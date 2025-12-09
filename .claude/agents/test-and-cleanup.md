@@ -296,6 +296,8 @@ gh issue comment <number> --body "## 3-Agent Workflow Complete
 gh issue close <number> --comment "Issue resolved."
 ```
 
+**Note**: When issues are closed, a GitHub webhook automatically notifies the submitter (if submitter info exists in the issue body). No manual notification step needed.
+
 ## B6. Create Completion Report
 
 Write to `/home/pbrown/SkuInventory/completion-docs/YYYY-MM-DD-issue-XXX-description.md`:
