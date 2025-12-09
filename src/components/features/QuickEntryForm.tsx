@@ -293,7 +293,7 @@ export function QuickEntryForm() {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        throw new Error(data?.error || data?.message || 'Failed to record transaction')
+        throw new Error(data?.message || data?.error || 'Failed to record transaction')
       }
 
       // Success
