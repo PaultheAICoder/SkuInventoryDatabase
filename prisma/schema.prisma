@@ -128,6 +128,9 @@ model User {
 
   // Multi-company assignment (SINGLE SOURCE OF TRUTH)
   userCompanies UserCompany[]
+
+  // Feedback relation
+  feedbacks         Feedback[]
 }
 
 model UserCompany {
@@ -593,6 +596,50 @@ model SkuChannelMapping {
   @@index([skuId])
 }
 
-// Note: Feedback tracking is now done via GitHub issues only.
-// Submitter info is stored in the issue body (## Submitter Information section).
-// This eliminates the need for separate Feedback/FeedbackReply tables.
+// ============================================
+// Feedback Tracking Entities
+// ============================================
+
+enum FeedbackStatus {
+  pending           // Issue created
+  resolved          // Issue closed, notification sent
+  verified          // User confirmed fix
+  changes_requested // User needs more work
+}
+
+model Feedback {
+  id                    String         @id @default(uuid())
+  userId                String
+  user                  User           @relation(fields: [userId], references: [id])
+
+  // GitHub link
+  githubIssueNumber     Int            @unique
+  githubIssueUrl        String         @db.VarChar(500)
+
+  // Status tracking
+  status                FeedbackStatus @default(pending)
+
+  // Notification tracking
+  notificationSentAt    DateTime?
+  notificationMessageId String?        @db.VarChar(255)
+
+  // Response tracking
+  responseReceivedAt    DateTime?
+  responseEmailId       String?        @db.VarChar(255)
+  responseContent       String?        @db.Text
+  followUpIssueNumber   Int?
+  followUpIssueUrl      String?        @db.VarChar(500)
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@index([status])
+  @@index([githubIssueNumber])
+  @@index([userId])
+}
+
+model EmailMonitorState {
+  id            String   @id @default("singleton")
+  lastCheckTime DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
