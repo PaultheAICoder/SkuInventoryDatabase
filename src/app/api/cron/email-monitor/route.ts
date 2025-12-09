@@ -81,21 +81,26 @@ export async function GET(request: NextRequest) {
 
     const emails = await fetchNewReplies(previousCheckTime)
     const newCheckTime = new Date()
-    await updateLastCheckTime(newCheckTime)
+    // Note: lastCheckTime is updated at the end only if processing succeeds
 
     const results = {
       processed: 0,
       verified: 0,
       changesRequested: 0,
+      skipped: 0,
+      skippedReasons: [] as string[],
       errors: [] as string[],
     }
 
     if (emails.length === 0) {
       console.log('[Email Monitor] No new reply emails found')
+      // Update lastCheckTime even when no emails - successful check with nothing to process
+      await updateLastCheckTime(newCheckTime)
       return Response.json({
         status: 'success',
         emailsChecked: 0,
         ...results,
+        lastCheckTimeUpdated: true,
         timestamp: new Date().toISOString(),
         checkWindow: {
           from: previousCheckTime.toISOString(),
@@ -152,29 +157,57 @@ export async function GET(request: NextRequest) {
 
         console.log(`[Email Monitor] Processing reply for issue #${issueNumber} from ${email.from}`)
 
+        // Fetch feedback record for idempotency and status checks
+        const feedback = await getFeedbackByIssueNumber(issueNumber)
+        if (!feedback) {
+          const skipReason = `No feedback record for issue #${issueNumber}`
+          console.log(`[Email Monitor] ${skipReason}, skipping`)
+          results.skipped++
+          results.skippedReasons.push(skipReason)
+          continue
+        }
+
+        // Check if this email was already processed (idempotency)
+        if (feedback.responseEmailId === email.id) {
+          const skipReason = `Email ${email.id} already processed for issue #${issueNumber}`
+          console.log(`[Email Monitor] ${skipReason}, skipping`)
+          results.skipped++
+          results.skippedReasons.push(skipReason)
+          continue
+        }
+
+        // Only process replies for feedback in 'resolved' status
+        if (feedback.status !== 'resolved') {
+          const skipReason = `Feedback for issue #${issueNumber} not in resolved status (${feedback.status})`
+          console.log(`[Email Monitor] ${skipReason}, skipping`)
+          results.skipped++
+          results.skippedReasons.push(skipReason)
+          continue
+        }
+
         // Parse the reply to determine user intent
         const { action, cleanedBody, confidence } = parseReplyDecision(email.body)
         console.log(`[Email Monitor] Parsed action: ${action}, confidence: ${confidence}`)
 
         if (!action) {
-          console.log(`[Email Monitor] Could not determine action from reply`)
+          const skipReason = `Could not determine action from reply for issue #${issueNumber}`
+          console.log(`[Email Monitor] ${skipReason}`)
+          results.skipped++
+          results.skippedReasons.push(skipReason)
           continue
         }
 
         results.processed++
 
         if (action === 'verified') {
-          // Update feedback record status
-          const feedback = await getFeedbackByIssueNumber(issueNumber)
-          if (feedback) {
-            await updateFeedbackStatus(feedback.id, {
-              status: 'verified',
-              responseReceivedAt: new Date(email.receivedAt),
-              responseEmailId: email.id,
-              responseContent: cleanedBody.substring(0, 1000), // Truncate long responses
-            })
-            console.log(`[Email Monitor] Updated feedback #${feedback.id} to verified`)
-          }
+          // Update feedback record status (feedback already fetched and validated above)
+          await updateFeedbackStatus(feedback.id, {
+            status: 'verified',
+            responseReceivedAt: new Date(email.receivedAt),
+            responseEmailId: email.id,
+            responseContent: cleanedBody.substring(0, 1000), // Truncate long responses
+          })
+          console.log(`[Email Monitor] Updated feedback #${feedback.id} to verified`)
 
           // Add comment to issue confirming verification
           await octokit.issues.createComment({
@@ -221,19 +254,16 @@ This follow-up was automatically created when the user replied to the resolution
             labels: [issueType, 'follow-up'],
           })
 
-          // Update feedback record status
-          const feedback = await getFeedbackByIssueNumber(issueNumber)
-          if (feedback) {
-            await updateFeedbackStatus(feedback.id, {
-              status: 'changes_requested',
-              responseReceivedAt: new Date(email.receivedAt),
-              responseEmailId: email.id,
-              responseContent: cleanedBody.substring(0, 1000),
-              followUpIssueNumber: followUpIssue.number,
-              followUpIssueUrl: followUpIssue.html_url,
-            })
-            console.log(`[Email Monitor] Updated feedback #${feedback.id} to changes_requested`)
-          }
+          // Update feedback record status (feedback already fetched above)
+          await updateFeedbackStatus(feedback.id, {
+            status: 'changes_requested',
+            responseReceivedAt: new Date(email.receivedAt),
+            responseEmailId: email.id,
+            responseContent: cleanedBody.substring(0, 1000),
+            followUpIssueNumber: followUpIssue.number,
+            followUpIssueUrl: followUpIssue.html_url,
+          })
+          console.log(`[Email Monitor] Updated feedback #${feedback.id} to changes_requested`)
 
           // Add comment to original issue linking to follow-up
           await octokit.issues.createComment({
@@ -254,13 +284,24 @@ This follow-up was automatically created when the user replied to the resolution
     }
 
     console.log(
-      `[Email Monitor] Complete: ${results.processed} processed, ${results.verified} verified, ${results.changesRequested} changes requested`
+      `[Email Monitor] Complete: ${results.processed} processed, ${results.verified} verified, ${results.changesRequested} changes requested, ${results.skipped} skipped`
     )
+
+    // Only update lastCheckTime if processing was successful
+    // This prevents losing emails if all processing fails
+    let lastCheckTimeUpdated = false
+    if (results.errors.length === 0 || results.processed > 0) {
+      await updateLastCheckTime(newCheckTime)
+      lastCheckTimeUpdated = true
+    } else if (results.errors.length > 0) {
+      console.warn('[Email Monitor] All emails failed to process, not updating lastCheckTime')
+    }
 
     return Response.json({
       status: 'success',
       emailsChecked: emails.length,
       ...results,
+      lastCheckTimeUpdated,
       timestamp: new Date().toISOString(),
       checkWindow: {
         from: previousCheckTime.toISOString(),

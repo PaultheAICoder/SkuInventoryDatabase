@@ -1,0 +1,13 @@
+{
+  "issue": "238",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-09T21:19:44.000Z",
+  "cleanup_start": "2025-12-09T21:35:00.000Z",
+  "cleanup_end": "2025-12-09T21:42:00.000Z",
+  "validation_duration_minutes": 7,
+  "tests_run": 599,
+  "tests_passed": 599,
+  "tests_skipped": 5,
+  "warnings_fixed": 0,
+  "blockers_resolved": 0
+}
