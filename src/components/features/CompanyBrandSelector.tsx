@@ -151,13 +151,14 @@ export function CompanyBrandSelector() {
   const currentDisplay = `${session.user.selectedCompanyName} / ${session.user.selectedBrandName || 'No Brand'}`
 
   return (
-    <div className="px-4 py-2 border-b">
+    <div className="px-4 py-2 border-b" data-testid="company-brand-selector-container">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
             className="w-full justify-between"
             disabled={isLoading}
+            data-testid="company-brand-selector-trigger"
           >
             <span className="flex items-center gap-2 truncate">
               {isLoading ? (
