@@ -1,0 +1,10 @@
+{
+  "issue": "223",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-09T03:38:10.000Z",
+  "plan_complete": "2025-12-09T04:28:00.000Z",
+  "build_complete": "2025-12-09T04:52:00.000Z",
+  "cleanup_complete": "2025-12-09T05:15:00.000Z",
+  "total_duration_minutes": 97,
+  "status": "complete"
+}

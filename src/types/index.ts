@@ -89,7 +89,7 @@ export interface SessionUser {
   email: string
   name: string
   role: UserRole
-  companyId: string  // Selected company ID (for backward compatibility)
+  companyId: string  // Synced with selectedCompanyId (will be removed in Phase 3)
   companyName: string  // Selected company name
   companies: SessionCompany[]  // All accessible companies
   selectedCompanyId: string  // Currently selected company

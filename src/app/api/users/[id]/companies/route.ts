@@ -164,7 +164,8 @@ export async function PUT(
         data: userCompanyRecords,
       })
 
-      // Keep User.companyId in sync (backward compatibility)
+      // Keep User.companyId in sync with isPrimary UserCompany
+      // TODO: Remove in Phase 3 when User.companyId column is dropped
       await tx.user.update({
         where: { id },
         data: { companyId: newPrimaryCompanyId },

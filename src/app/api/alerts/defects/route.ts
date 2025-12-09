@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     // Check if requesting thresholds
     if (searchParams.get('thresholds') === 'true') {
-      const thresholds = await getDefectThresholds(session.user.companyId)
+      const thresholds = await getDefectThresholds(session.user.selectedCompanyId)
       return success({ thresholds })
     }
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const queryResult = parseQuery(searchParams, alertQuerySchema)
     if (queryResult.error) return queryResult.error
 
-    const alerts = await getDefectAlerts(session.user.companyId, queryResult.data)
+    const alerts = await getDefectAlerts(session.user.selectedCompanyId, queryResult.data)
     return success({ alerts })
   } catch (error) {
     console.error('Error fetching defect alerts:', error)
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (bodyResult.error) return bodyResult.error
 
     const threshold = await createThreshold(
-      session.user.companyId,
+      session.user.selectedCompanyId,
       bodyResult.data,
       session.user.id
     )

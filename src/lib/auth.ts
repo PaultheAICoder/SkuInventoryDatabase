@@ -38,10 +38,12 @@ export const authOptions: NextAuthOptions = {
           },
         })
 
+        // Find primary company from UserCompany
+        const primaryCompany = user?.userCompanies.find(uc => uc.isPrimary)
         // Fetch brands for the user's primary company
-        const brands = user ? await prisma.brand.findMany({
+        const brands = user && primaryCompany ? await prisma.brand.findMany({
           where: {
-            companyId: user.companyId,
+            companyId: primaryCompany.company.id,
             isActive: true,
           },
           select: { id: true, name: true },
@@ -49,11 +51,8 @@ export const authOptions: NextAuthOptions = {
         }) : []
 
         // Fetch brands for ALL user's accessible companies (for unified selector)
+        // UserCompany records are the single source of truth - no fallback needed
         const accessibleCompanyIds = user ? user.userCompanies.map(uc => uc.company.id) : []
-        // Ensure primary company is included
-        if (user && !accessibleCompanyIds.includes(user.companyId)) {
-          accessibleCompanyIds.push(user.companyId)
-        }
         const allBrands = user ? await prisma.brand.findMany({
           where: {
             companyId: { in: accessibleCompanyIds },
@@ -97,22 +96,17 @@ export const authOptions: NextAuthOptions = {
           }),
         ])
 
-        // Build companies list from userCompanies
-        const companiesFromJoin = user.userCompanies.map(uc => ({
+        // Build companies list from userCompanies (single source of truth)
+        const companies = user.userCompanies.map(uc => ({
           id: uc.company.id,
           name: uc.company.name,
           role: uc.role,
         }))
 
-        // Ensure primary company is included (for backward compatibility)
-        const primaryCompanyIncluded = companiesFromJoin.some(c => c.id === user.companyId)
-        const companies = primaryCompanyIncluded
-          ? companiesFromJoin
-          : [{ id: user.company.id, name: user.company.name, role: user.role }, ...companiesFromJoin]
-
-        // Selected company defaults to primary company
-        const selectedCompanyId = user.companyId
-        const selectedCompanyName = user.company.name
+        // Find primary company from UserCompany.isPrimary
+        const primaryUserCompany = user.userCompanies.find(uc => uc.isPrimary)
+        const selectedCompanyId = primaryUserCompany?.company.id ?? companies[0]?.id ?? ''
+        const selectedCompanyName = primaryUserCompany?.company.name ?? companies[0]?.name ?? ''
 
         // Build companiesWithBrands structure for unified selector
         const companiesWithBrands = companies.map(company => ({
@@ -187,12 +181,8 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Ensure selectedCompanyId has a fallback value for backward compatibility
-      // This handles tokens created before multi-company support was added
-      if (!token.selectedCompanyId && token.companyId) {
-        token.selectedCompanyId = token.companyId
-        token.selectedCompanyName = token.companyName
-      }
+      // Note: Old tokens without selectedCompanyId will need re-authentication
+      // This is acceptable as Phase 1 ensured all users have proper UserCompany records
 
       // Handle session update (for company switching)
       if (trigger === 'update' && session?.selectedCompanyId) {
@@ -203,7 +193,7 @@ export const authOptions: NextAuthOptions = {
         if (hasAccess) {
           token.selectedCompanyId = session.selectedCompanyId
           token.selectedCompanyName = session.selectedCompanyName
-          // Keep companyId in sync for backward compatibility
+          // Keep companyId synced with selectedCompanyId for session consistency
           token.companyId = session.selectedCompanyId
           token.companyName = session.selectedCompanyName
         }

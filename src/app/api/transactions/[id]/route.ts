@@ -19,7 +19,7 @@ export async function GET(
     const transaction = await prisma.transaction.findUnique({
       where: {
         id,
-        companyId: session.user.companyId,
+        companyId: session.user.selectedCompanyId,
       },
       include: {
         company: {

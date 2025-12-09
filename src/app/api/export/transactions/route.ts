@@ -25,14 +25,10 @@ export async function GET(request: NextRequest) {
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
 
-    // Get user's company
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { companyId: true },
-    })
-
-    if (!user) {
-      // Return empty CSV
+    // Get selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      // Return empty CSV if no company selected
       const csv = toCSV([], transactionExportColumns)
       return new NextResponse(csv, {
         headers: {
@@ -44,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: Prisma.TransactionWhereInput = {
-      companyId: user.companyId,
+      companyId: selectedCompanyId,
     }
 
     if (type) {

@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       const queryResult = parseQuery(searchParams, defectAnalyticsQuerySchema)
       if (queryResult.error) return queryResult.error
 
-      const csv = await generateDefectAnalyticsExport(session.user.companyId, queryResult.data)
+      const csv = await generateDefectAnalyticsExport(session.user.selectedCompanyId, queryResult.data)
       const filename = generateDefectAnalyticsFilename()
 
       return new Response(csv, {
@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
       const skuId = searchParams.get('skuId') || undefined
 
       const [skus, bomVersions] = await Promise.all([
-        getSKUsWithBuilds(session.user.companyId),
-        getBOMVersionsForFilter(session.user.companyId, skuId),
+        getSKUsWithBuilds(session.user.selectedCompanyId),
+        getBOMVersionsForFilter(session.user.selectedCompanyId, skuId),
       ])
 
       return success({
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     const queryResult = parseQuery(searchParams, defectAnalyticsQuerySchema)
     if (queryResult.error) return queryResult.error
 
-    const analytics = await getDefectAnalytics(session.user.companyId, queryResult.data)
+    const analytics = await getDefectAnalytics(session.user.selectedCompanyId, queryResult.data)
     return success(analytics)
   } catch (error) {
     console.error('Error fetching defect analytics:', error)
