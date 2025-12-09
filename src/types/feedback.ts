@@ -60,3 +60,49 @@ export interface EnhanceIssueRequest {
 // Note: Feedback tracking is now done via GitHub issues only.
 // Submitter info is stored in issue body, not in a database table.
 // This eliminates the need for a separate Feedback table.
+
+// ============================================
+// Database Types (for Phase 2 feedback service)
+// ============================================
+
+// Feedback status enum (matches Prisma FeedbackStatus)
+export type FeedbackStatus = 'pending' | 'resolved' | 'verified' | 'changes_requested'
+
+// Database record type (returned from service functions)
+export interface FeedbackRecord {
+  id: string
+  userId: string
+  userName?: string
+  userEmail?: string
+  githubIssueNumber: number
+  githubIssueUrl: string
+  status: FeedbackStatus
+  notificationSentAt: string | null
+  notificationMessageId: string | null
+  responseReceivedAt: string | null
+  responseEmailId: string | null
+  responseContent: string | null
+  followUpIssueNumber: number | null
+  followUpIssueUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+// Input type for creating feedback records
+export interface CreateFeedbackInput {
+  userId: string
+  githubIssueNumber: number
+  githubIssueUrl: string
+}
+
+// Input type for updating feedback records
+export interface UpdateFeedbackInput {
+  status?: FeedbackStatus
+  notificationSentAt?: Date
+  notificationMessageId?: string
+  responseReceivedAt?: Date
+  responseEmailId?: string
+  responseContent?: string
+  followUpIssueNumber?: number
+  followUpIssueUrl?: string
+}
