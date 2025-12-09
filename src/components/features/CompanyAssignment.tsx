@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +25,7 @@ export function CompanyAssignment({
   onAssignmentChange,
   disabled,
 }: CompanyAssignmentProps) {
+  const { update: updateSession } = useSession()
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,6 +44,21 @@ export function CompanyAssignment({
     setIsUpdating(companyId)
     try {
       await onAssignmentChange(newIds)
+
+      // Refresh the current user's session if they modified their own companies
+      try {
+        const refreshRes = await fetch('/api/session/refresh', { method: 'POST' })
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json()
+          await updateSession({
+            companies: refreshData.data.companies,
+            companiesWithBrands: refreshData.data.companiesWithBrands,
+          })
+        }
+      } catch (refreshError) {
+        // Silent fail - user may need to re-login for changes to take effect
+        console.warn('Failed to refresh session:', refreshError)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update assignment')
     } finally {

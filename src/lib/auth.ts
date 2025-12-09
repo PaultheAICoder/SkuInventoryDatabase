@@ -221,6 +221,32 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      // Handle companies/companiesWithBrands refresh (after user assignment changes or brand creation)
+      if (trigger === 'update' && session?.companiesWithBrands !== undefined) {
+        // Update companies and companiesWithBrands in token
+        token.companies = session.companies
+        token.companiesWithBrands = session.companiesWithBrands
+
+        // If current selected company is no longer in the list, reset to first company
+        const hasAccessToCurrentCompany = (session.companies as Array<{ id: string }>)?.some(
+          c => c.id === token.selectedCompanyId
+        )
+        if (!hasAccessToCurrentCompany && session.companies?.length > 0) {
+          const firstCompany = session.companies[0]
+          token.selectedCompanyId = firstCompany.id
+          token.selectedCompanyName = firstCompany.name
+          token.companyId = firstCompany.id
+          token.companyName = firstCompany.name
+          // Also update brands for the new company
+          const firstCompanyWithBrands = (session.companiesWithBrands as Array<{ id: string; brands: Array<{ id: string; name: string }> }>)?.find(
+            c => c.id === firstCompany.id
+          )
+          token.brands = firstCompanyWithBrands?.brands ?? []
+          token.selectedBrandId = firstCompanyWithBrands?.brands?.[0]?.id ?? null
+          token.selectedBrandName = firstCompanyWithBrands?.brands?.[0]?.name ?? null
+        }
+      }
+
       return token
     },
     async session({ session, token }) {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +16,7 @@ interface BrandFormProps {
 
 export function BrandForm({ brand, onSuccess }: BrandFormProps) {
   const router = useRouter()
+  const { update: updateSession } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,6 +54,22 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'Failed to save brand')
+      }
+
+      // Refresh session after creating a new brand (so it appears in dropdown immediately)
+      if (!isEditing) {
+        try {
+          const refreshRes = await fetch('/api/session/refresh', { method: 'POST' })
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json()
+            await updateSession({
+              companies: refreshData.data.companies,
+              companiesWithBrands: refreshData.data.companiesWithBrands,
+            })
+          }
+        } catch (refreshError) {
+          console.warn('Failed to refresh session:', refreshError)
+        }
       }
 
       if (onSuccess) {
