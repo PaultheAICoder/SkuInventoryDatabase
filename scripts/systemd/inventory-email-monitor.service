@@ -1,0 +1,21 @@
+[Unit]
+Description=Inventory Email Monitor - Poll for email replies
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment="CRON_SECRET=tHhCDDrFWf+5WREIQsSYp75++qjjd0V26qetRtcQvp8="
+ExecStart=/usr/bin/curl -s -X GET "http://172.16.20.50:4545/api/cron/email-monitor" \
+    -H "Authorization: Bearer ${CRON_SECRET}" \
+    -H "Content-Type: application/json" \
+    -o /var/log/inventory/email-monitor-last.json \
+    -w "\nHTTP_CODE:%{http_code}\n"
+TimeoutSec=120
+
+StandardOutput=append:/var/log/inventory/email-monitor.log
+StandardError=append:/var/log/inventory/email-monitor.log
+
+[Install]
+WantedBy=multi-user.target
