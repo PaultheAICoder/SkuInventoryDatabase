@@ -211,7 +211,11 @@ export async function POST(request: NextRequest) {
       throw error
     }
   } catch (error) {
-    console.error('Error creating build transaction:', error)
+    console.error('Error creating build transaction:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return serverError()
   }
 }

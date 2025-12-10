@@ -263,6 +263,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
       setLotAvailability([])
       setShowLotDetails(false)
     } catch (err) {
+      console.error('BuildDialog submission error:', err)
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)

@@ -1,0 +1,15 @@
+{
+  "issue": "250",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-10T16:49:15.000Z",
+  "cleanup_start": "2025-12-10T17:10:00.000Z",
+  "cleanup_end": "2025-12-10T17:25:00.000Z",
+  "phases": {
+    "pre_flight": "2m",
+    "unit_tests": "19s",
+    "e2e_tests": "2.2m",
+    "issue_fixes": "3m",
+    "documentation": "5m"
+  },
+  "total_cleanup_duration": "15m"
+}

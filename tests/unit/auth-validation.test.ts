@@ -8,7 +8,7 @@
  * To run: set TEST_DATABASE_URL=postgresql://... or run via docker-compose.test.yml
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { getTestPrisma, disconnectTestDb } from '../helpers/db'
+import type { PrismaClient } from '@prisma/client'
 
 // Check if test database is configured
 const hasTestDatabase = !!process.env.TEST_DATABASE_URL
@@ -18,21 +18,40 @@ const hasTestDatabase = !!process.env.TEST_DATABASE_URL
 const describeWithDb = hasTestDatabase ? describe : describe.skip
 
 // Only mock database if we have a test database to use
-if (hasTestDatabase) {
-  vi.mock('@/lib/db', () => {
-    const testPrisma = getTestPrisma()
+// Note: vi.mock is hoisted, but we check inside the factory to avoid throws at module load time
+vi.mock('@/lib/db', () => {
+  // Only initialize prisma if TEST_DATABASE_URL is set
+  // Otherwise return a dummy that won't be used (tests are skipped)
+  if (!process.env.TEST_DATABASE_URL) {
     return {
-      prisma: testPrisma,
-      default: testPrisma,
+      prisma: null,
+      default: null,
     }
-  })
-}
+  }
+  const { getTestPrisma } = require('../helpers/db')
+  const testPrisma = getTestPrisma()
+  return {
+    prisma: testPrisma,
+    default: testPrisma,
+  }
+})
 
 // Import after mocking
 import { validateUserExists } from '@/lib/auth'
 
+// Helper to get prisma and disconnectTestDb only when needed
+const getDbHelpers = () => {
+  // Only require if we have a test database (tests would be skipped otherwise)
+  if (!hasTestDatabase) {
+    return { prisma: null as unknown as PrismaClient, disconnectTestDb: async () => {} }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dbHelpers = require('../helpers/db')
+  return { prisma: dbHelpers.getTestPrisma(), disconnectTestDb: dbHelpers.disconnectTestDb }
+}
+
 describeWithDb('validateUserExists', () => {
-  const prisma = getTestPrisma()
+  const { prisma, disconnectTestDb } = getDbHelpers()
   let activeUserId: string
   let inactiveUserId: string
 

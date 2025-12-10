@@ -29,7 +29,7 @@ export default function SKUDetailPage() {
   const router = useRouter()
   const params = useParams()
   const skuId = params.id as string
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [sku, setSku] = useState<SKUDetailResponse | null>(null)
   const [bomVersions, setBomVersions] = useState<BOMVersionResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -42,6 +42,8 @@ export default function SKUDetailPage() {
 
   const fetchData = useCallback(async () => {
     if (!skuId) return
+    // Don't fetch while session is loading
+    if (status === 'loading') return
 
     try {
       const [skuRes, bomRes] = await Promise.all([
@@ -65,7 +67,7 @@ export default function SKUDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [skuId])
+  }, [skuId, status])
 
   useEffect(() => {
     fetchData()
@@ -75,7 +77,7 @@ export default function SKUDetailPage() {
     fetchData()
   }
 
-  if (isLoading) {
+  if (isLoading || status === 'loading') {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">

@@ -14,8 +14,14 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Application error:', error)
+    // Log the error to an error reporting service with more context
+    console.error('Application error:', {
+      message: error.message,
+      digest: error.digest,
+      stack: error.stack,
+      name: error.name,
+      url: typeof window !== 'undefined' ? window.location.href : 'SSR',
+    })
   }, [error])
 
   return (
