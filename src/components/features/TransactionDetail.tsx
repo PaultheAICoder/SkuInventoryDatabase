@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -11,7 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
 
@@ -103,9 +115,36 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
   const config = transactionTypeConfig[transaction.type]
   const Icon = config.icon
   const { data: session } = useSession()
+  const router = useRouter()
 
   // Check if user can edit (not a viewer)
   const canEdit = session?.user?.role !== 'viewer'
+
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/transactions/${transaction.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Failed to delete transaction')
+      }
+
+      // Redirect to transactions list on success
+      router.push('/transactions')
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Failed to delete transaction')
+      setIsDeleting(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -125,12 +164,23 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
             </div>
             <div className="flex items-start gap-4">
               {canEdit && (
-                <Link href={`/transactions/${transaction.id}/edit`}>
-                  <Button variant="outline" size="sm">
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
+                <>
+                  <Link href={`/transactions/${transaction.id}/edit`}>
+                    <Button variant="outline" size="sm">
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
                   </Button>
-                </Link>
+                </>
               )}
               <div className="text-right text-sm text-muted-foreground">
                 <p suppressHydrationWarning>{new Date(transaction.date).toLocaleDateString()}</p>
@@ -293,6 +343,13 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 {new Date(transaction.createdAt).toLocaleString()}
               </p>
             </div>
+
+            {/* Delete Error Display */}
+            {deleteError && (
+              <div className="md:col-span-2 lg:col-span-3 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {deleteError}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -381,6 +438,38 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this {transaction.type} transaction from{' '}
+              <span suppressHydrationWarning>
+                {new Date(transaction.date).toLocaleDateString()}
+              </span>
+              ?
+              <span className="block mt-2 font-medium">
+                This will reverse all inventory changes made by this transaction.
+              </span>
+              <span className="block mt-2 text-destructive">
+                This action cannot be undone.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Transaction'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

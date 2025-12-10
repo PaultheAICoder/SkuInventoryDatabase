@@ -1,0 +1,27 @@
+{
+  "issue": "249",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-10T16:22:18.000Z",
+  "workflow_end": "2025-12-10T16:46:00.000Z",
+  "phases": {
+    "scout_plan": {
+      "duration_minutes": 13
+    },
+    "build": {
+      "duration_minutes": 45
+    },
+    "test_cleanup": {
+      "duration_minutes": 25
+    }
+  },
+  "total_duration_minutes": 83,
+  "tests": {
+    "unit_passed": 624,
+    "unit_failed": 1,
+    "e2e_passed": 213,
+    "e2e_skipped": 11,
+    "e2e_failed": 2
+  },
+  "files_modified": 6,
+  "files_created": 1
+}

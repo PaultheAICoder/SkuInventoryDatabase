@@ -11,6 +11,7 @@ import type {
   UpdateBuildInput,
   UpdateOutboundInput,
   TransactionUpdateResult,
+  TransactionDeleteResult,
 } from '@/types/transaction-edit'
 
 // =============================================================================
@@ -823,4 +824,73 @@ export async function updateTransaction(params: {
     default:
       throw new Error(`Unsupported transaction type: ${type}`)
   }
+}
+
+// =============================================================================
+// Delete Transaction
+// =============================================================================
+
+/**
+ * Delete an approved transaction and reverse all inventory effects
+ * This permanently removes the transaction and restores inventory to pre-transaction state
+ */
+export async function deleteTransaction(params: {
+  transactionId: string
+  companyId: string
+  userId: string
+}): Promise<TransactionDeleteResult> {
+  const { transactionId, companyId, userId: _userId } = params
+
+  return prisma.$transaction(async (tx) => {
+    // 1. Verify transaction exists and belongs to company
+    const existingTransaction = await tx.transaction.findFirst({
+      where: {
+        id: transactionId,
+        companyId,
+        status: 'approved', // Can only delete approved transactions
+      },
+      include: {
+        lines: true,
+        finishedGoodsLines: true,
+        defectAlerts: true,
+      },
+    })
+
+    if (!existingTransaction) {
+      throw new Error('Transaction not found or cannot be deleted')
+    }
+
+    // 2. Reverse lot balance changes for all transaction lines
+    for (const line of existingTransaction.lines) {
+      if (line.lotId) {
+        // Decrement reverses the original change
+        await tx.lotBalance.update({
+          where: { lotId: line.lotId },
+          data: {
+            quantity: {
+              decrement: line.quantityChange,
+            },
+          },
+        })
+      }
+    }
+
+    // 3. Delete any associated defect alerts
+    if (existingTransaction.defectAlerts.length > 0) {
+      await tx.defectAlert.deleteMany({
+        where: { transactionId },
+      })
+    }
+
+    // 4. Delete the transaction (cascade will delete lines and finished goods lines)
+    await tx.transaction.delete({
+      where: { id: transactionId },
+    })
+
+    return {
+      id: transactionId,
+      type: existingTransaction.type,
+      deleted: true,
+    }
+  })
 }

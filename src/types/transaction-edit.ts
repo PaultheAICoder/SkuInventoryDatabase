@@ -102,3 +102,12 @@ export interface TransactionUpdateResult {
   date: Date
   updatedAt: Date
 }
+
+/**
+ * Result type for transaction delete operations
+ */
+export interface TransactionDeleteResult {
+  id: string
+  type: string
+  deleted: boolean
+}

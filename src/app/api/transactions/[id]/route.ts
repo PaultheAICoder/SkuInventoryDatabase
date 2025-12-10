@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { updateTransaction } from '@/services/transaction-edit'
+import { updateTransaction, deleteTransaction } from '@/services/transaction-edit'
 import {
   updateReceiptSchema,
   updateAdjustmentSchema,
@@ -281,5 +281,47 @@ export async function PUT(
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     return NextResponse.json({ error: 'Failed to update transaction' }, { status: 500 })
+  }
+}
+
+// DELETE /api/transactions/[id] - Delete an approved transaction
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Mark request as used
+  void request
+
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check role - Viewer cannot delete transactions
+    if (session.user.role === 'viewer') {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete transactions' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+    const selectedCompanyId = session.user.selectedCompanyId
+
+    const result = await deleteTransaction({
+      transactionId: id,
+      companyId: selectedCompanyId,
+      userId: session.user.id,
+    })
+
+    return NextResponse.json({ data: result })
+  } catch (error) {
+    console.error('Error deleting transaction:', error)
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    return NextResponse.json({ error: 'Failed to delete transaction' }, { status: 500 })
   }
 }

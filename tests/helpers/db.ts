@@ -32,6 +32,7 @@ export function getTestPrisma(): PrismaClient {
  */
 export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   // Delete in correct order to respect foreign keys
+  await prisma.defectAlert.deleteMany({}) // Must delete before transactions (FK constraint)
   await prisma.finishedGoodsLine.deleteMany({})
   await prisma.transactionLine.deleteMany({})
   await prisma.transaction.deleteMany({})
