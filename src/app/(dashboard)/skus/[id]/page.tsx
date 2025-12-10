@@ -22,6 +22,7 @@ import { FinishedGoodsAdjustmentDialog } from '@/components/features/FinishedGoo
 import { FinishedGoodsReceiptDialog } from '@/components/features/FinishedGoodsReceiptDialog'
 import { BuildableUnitsDisplay } from '@/components/features/BuildableUnitsDisplay'
 import { InventoryByLocationTable } from '@/components/features/InventoryByLocationTable'
+import { formatDateString } from '@/lib/utils'
 import type { SKUDetailResponse } from '@/types/sku'
 import type { BOMVersionResponse } from '@/types/bom'
 
@@ -281,7 +282,7 @@ export default function SKUDetailPage() {
               <TableBody>
                 {sku.recentTransactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell suppressHydrationWarning>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                    <TableCell suppressHydrationWarning>{formatDateString(tx.date)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {tx.type}

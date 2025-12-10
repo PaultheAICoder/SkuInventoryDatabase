@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import type { DraftTransactionResponse } from '@/types/draft'
 import { DRAFT_STATUS_CONFIG } from '@/types/draft'
+import { formatDateString } from '@/lib/utils'
 
 interface DraftTransactionCardProps {
   draft: DraftTransactionResponse
@@ -90,7 +91,7 @@ export function DraftTransactionCard({
     : draft.lines[0]?.component?.name
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return formatDateString(dateStr, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

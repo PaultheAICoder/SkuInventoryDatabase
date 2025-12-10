@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLocalDate } from '@/lib/utils'
+import { parseLocalDate, formatDateString } from '@/lib/utils'
 
 describe('parseLocalDate', () => {
   it('should parse date-only string as local midnight, not UTC', () => {
@@ -81,5 +81,73 @@ describe('parseLocalDate', () => {
     expect(result.getDate()).toBe(1)
     expect(result.getMonth()).toBe(0) // January = 0
     expect(result.getFullYear()).toBe(2025)
+  })
+})
+
+describe('formatDateString', () => {
+  it('should format date-only string without timezone shift', () => {
+    // This is the key test - regardless of machine timezone,
+    // "2025-12-08" should format to show December 8
+    const result = formatDateString('2025-12-08')
+    expect(result).toContain('12')  // Month
+    expect(result).toContain('8')   // Day (not 7!)
+    expect(result).toContain('2025') // Year
+  })
+
+  it('should handle ISO timestamp correctly', () => {
+    const result = formatDateString('2025-12-08T14:30:00.000Z')
+    expect(result).toBeDefined()
+  })
+
+  it('should accept formatting options', () => {
+    const result = formatDateString('2025-12-08', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+    expect(result).toContain('Dec')
+    expect(result).toContain('8')
+    expect(result).toContain('2025')
+  })
+
+  it('should format date with different options', () => {
+    const result = formatDateString('2025-12-08', {
+      month: 'long',
+      day: 'numeric'
+    })
+    expect(result).toContain('December')
+    expect(result).toContain('8')
+  })
+
+  it('should handle month/day only format options', () => {
+    const result = formatDateString('2025-12-08', {
+      month: 'short',
+      day: 'numeric'
+    })
+    expect(result).toContain('Dec')
+    expect(result).toContain('8')
+  })
+
+  it('should handle date at end of year', () => {
+    const result = formatDateString('2025-12-31')
+    expect(result).toContain('12')
+    expect(result).toContain('31')
+    expect(result).toContain('2025')
+  })
+
+  it('should handle date at start of year', () => {
+    const result = formatDateString('2025-01-01')
+    expect(result).toContain('1')
+    expect(result).toContain('2025')
+  })
+
+  it('should demonstrate the display bug being fixed', () => {
+    // This test documents the bug we're fixing
+    // new Date("2025-12-08").toLocaleDateString() can show "12/7/2025" in Pacific Time
+    // formatDateString("2025-12-08") should always show "12/8/2025"
+    const result = formatDateString('2025-12-08')
+
+    // The formatted string should always show day 8 in local time
+    expect(result).toContain('8')
   })
 })

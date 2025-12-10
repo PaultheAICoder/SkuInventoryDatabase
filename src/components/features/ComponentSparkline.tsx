@@ -1,6 +1,7 @@
 'use client'
 
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts'
+import { formatDateString } from '@/lib/utils'
 
 interface TrendDataPoint {
   date: string
@@ -26,7 +27,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   return (
     <div className="rounded-lg border bg-background p-2 shadow-lg">
       <p className="text-xs text-muted-foreground" suppressHydrationWarning>
-        {new Date(data.date).toLocaleDateString()}
+        {formatDateString(data.date)}
       </p>
       <p className="text-sm font-medium" suppressHydrationWarning>
         {data.quantityOnHand.toLocaleString()} units

@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatDateString } from '@/lib/utils'
 import type { ReorderStatus } from '@/types'
 
 interface DashboardData {
@@ -196,7 +197,7 @@ export default function DashboardPage() {
                   {data.recentTransactions.slice(0, 5).map((tx) => (
                     <TableRow key={tx.id}>
                       <TableCell className="font-mono text-sm" suppressHydrationWarning>
-                        {new Date(tx.date).toLocaleDateString()}
+                        {formatDateString(tx.date)}
                       </TableCell>
                       <TableCell className="capitalize">{tx.type}</TableCell>
                       <TableCell>

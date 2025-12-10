@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { formatDateString } from '@/lib/utils'
 import type { LotResponse } from '@/types/lot'
 
 interface LotTableProps {
@@ -255,7 +256,7 @@ export function LotTable({ lots, total, page, pageSize }: LotTableProps) {
                     </div>
                   </TableCell>
                   <TableCell suppressHydrationWarning>
-                    {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString() : '-'}
+                    {lot.expiryDate ? formatDateString(lot.expiryDate) : '-'}
                   </TableCell>
                   <TableCell className="text-right font-mono" suppressHydrationWarning>
                     {parseFloat(lot.balance).toLocaleString()}

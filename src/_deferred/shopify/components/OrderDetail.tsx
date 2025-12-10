@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ShoppingCart, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { LineMappingDialog } from './LineMappingDialog'
 import { ORDER_STATUS_CONFIG, type OrderStatusKey } from '@/types/order-review'
+import { formatDateString } from '@/lib/utils'
 import type { OrderResponse, OrderLineResponse } from '@/types/shopify-sync'
 
 interface OrderDetailProps {
@@ -157,7 +158,7 @@ export function OrderDetail({ order, onRefresh }: OrderDetailProps) {
             <div>
               <p className="text-sm text-muted-foreground">Order Date</p>
               <p className="font-medium" suppressHydrationWarning>
-                {new Date(order.orderDate).toLocaleDateString()}
+                {formatDateString(order.orderDate)}
               </p>
             </div>
             <div>

@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ForecastStatusBadge } from './ForecastStatusBadge'
+import { formatDateString } from '@/lib/utils'
 import type { ComponentForecastResponse } from '@/types/forecast'
 
 interface ForecastTableProps {
@@ -63,7 +64,7 @@ export function ForecastTable({ forecasts, total, page, pageSize }: ForecastTabl
 
   const formatDate = (dateString: string | null): string => {
     if (!dateString) return '-'
-    return new Date(dateString).toLocaleDateString()
+    return formatDateString(dateString)
   }
 
   return (

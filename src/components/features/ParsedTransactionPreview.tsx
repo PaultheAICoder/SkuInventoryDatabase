@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import type { ConfidenceLevel, ParseTransactionResponse } from '@/types/parser'
+import { formatDateString } from '@/lib/utils'
 
 interface ParsedTransactionPreviewProps {
   result: ParseTransactionResponse
@@ -58,8 +59,8 @@ export function ParsedTransactionPreview({
   const { parsed, suggestions } = result
 
   const formatDate = (date: Date | string) => {
-    const d = typeof date === 'string' ? new Date(date) : date
-    return d.toLocaleDateString('en-US', {
+    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0]
+    return formatDateString(dateStr, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',

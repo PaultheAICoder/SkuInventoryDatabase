@@ -26,6 +26,27 @@ export function parseLocalDate(value: string | Date): Date {
 }
 
 /**
+ * Format a date string for display, ensuring correct timezone interpretation.
+ *
+ * IMPORTANT: JavaScript's new Date("YYYY-MM-DD") parses as UTC midnight,
+ * which can shift the date by -1 day for users west of UTC when displayed.
+ * By appending "T00:00:00", we force local timezone interpretation.
+ *
+ * @param dateStr - Date string (YYYY-MM-DD or ISO timestamp)
+ * @param options - Intl.DateTimeFormatOptions for formatting
+ * @returns Formatted date string in user's locale
+ */
+export function formatDateString(
+  dateStr: string,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  // If no time component, append T00:00:00 to force local timezone
+  const dateString = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', options)
+}
+
+/**
  * Parse a fraction string (e.g., "1/45") or decimal number to a numeric value.
  * Returns null if the input is invalid.
  */

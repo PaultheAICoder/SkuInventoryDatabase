@@ -22,6 +22,7 @@ import { ComponentSparkline } from '@/components/features/ComponentSparkline'
 import { SparklineTimeFilter } from '@/components/features/SparklineTimeFilter'
 import { InventoryByLocationTable } from '@/components/features/InventoryByLocationTable'
 import { ArrowLeft, Edit, Package, Plus, Minus, ArrowLeftRight } from 'lucide-react'
+import { formatDateString } from '@/lib/utils'
 import type { ComponentDetailResponse } from '@/types/component'
 
 export default function ComponentDetailPage() {
@@ -353,7 +354,7 @@ export default function ComponentDetailPage() {
               <TableBody>
                 {component.recentTransactions.map((tx) => (
                   <TableRow key={tx.id}>
-                    <TableCell suppressHydrationWarning>{new Date(tx.date).toLocaleDateString()}</TableCell>
+                    <TableCell suppressHydrationWarning>{formatDateString(tx.date)}</TableCell>
                     <TableCell className="capitalize">{tx.type}</TableCell>
                     <TableCell
                       className={`text-right font-mono ${

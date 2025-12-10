@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ArrowLeft, Package2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { formatDateString } from '@/lib/utils'
 import type { LotDetailResponse, LotTraceResponse, LotTransactionResponse, AffectedSkuResponse } from '@/types/lot'
 
 export default function LotDetailPage() {
@@ -208,7 +209,7 @@ export default function LotDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Expiry Date</p>
                 <p className="text-lg font-medium" suppressHydrationWarning>
-                  {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString() : '-'}
+                  {lot.expiryDate ? formatDateString(lot.expiryDate) : '-'}
                 </p>
               </div>
               {lot.supplier && (
@@ -259,7 +260,7 @@ export default function LotDetailPage() {
                 {trace.transactions.map((tx: LotTransactionResponse) => (
                   <TableRow key={tx.id}>
                     <TableCell suppressHydrationWarning>
-                      {new Date(tx.date).toLocaleDateString()}
+                      {formatDateString(tx.date)}
                     </TableCell>
                     <TableCell className="capitalize">{tx.type}</TableCell>
                     <TableCell

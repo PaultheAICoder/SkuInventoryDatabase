@@ -26,6 +26,7 @@ import {
 import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
+import { formatDateString } from '@/lib/utils'
 
 interface TransactionLine {
   id: string
@@ -183,7 +184,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
                 </>
               )}
               <div className="text-right text-sm text-muted-foreground">
-                <p suppressHydrationWarning>{new Date(transaction.date).toLocaleDateString()}</p>
+                <p suppressHydrationWarning>{formatDateString(transaction.date)}</p>
                 <p className="font-mono text-xs">{transaction.id.slice(0, 8)}...</p>
               </div>
             </div>
@@ -447,7 +448,7 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
             <AlertDialogDescription>
               Are you sure you want to delete this {transaction.type} transaction from{' '}
               <span suppressHydrationWarning>
-                {new Date(transaction.date).toLocaleDateString()}
+                {formatDateString(transaction.date)}
               </span>
               ?
               <span className="block mt-2 font-medium">

@@ -34,6 +34,7 @@ import {
 import type { DraftTransactionResponse } from '@/types/draft'
 import { DRAFT_STATUS_CONFIG } from '@/types/draft'
 import { toast } from 'sonner'
+import { formatDateString } from '@/lib/utils'
 
 interface DraftTransactionListProps {
   initialDrafts?: DraftTransactionResponse[]
@@ -178,7 +179,7 @@ export function DraftTransactionList({ initialDrafts, onRefresh }: DraftTransact
   }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return formatDateString(dateStr, {
       month: 'short',
       day: 'numeric',
     })

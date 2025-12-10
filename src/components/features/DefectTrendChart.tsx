@@ -11,6 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
+import { formatDateString } from '@/lib/utils'
 import type { DefectRateTrendPoint } from '@/types/analytics'
 
 interface DefectTrendChartProps {
@@ -20,14 +21,13 @@ interface DefectTrendChartProps {
 
 export function DefectTrendChart({ data, groupBy }: DefectTrendChartProps) {
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
     switch (groupBy) {
       case 'day':
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        return formatDateString(dateStr, { month: 'short', day: 'numeric' })
       case 'week':
-        return `Week of ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        return `Week of ${formatDateString(dateStr, { month: 'short', day: 'numeric' })}`
       case 'month':
-        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+        return formatDateString(dateStr, { month: 'short', year: 'numeric' })
     }
   }
 

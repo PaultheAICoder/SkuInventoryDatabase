@@ -26,6 +26,7 @@ import { ChevronLeft, ChevronRight, Filter, Plus, FileCheck } from 'lucide-react
 import { ExportButton } from '@/components/features/ExportButton'
 import Link from 'next/link'
 import { LocationFilter } from '@/components/features/LocationFilter'
+import { formatDateString } from '@/lib/utils'
 import type { TransactionResponse } from '@/types/transaction'
 import { salesChannels } from '@/types'
 
@@ -356,7 +357,7 @@ function TransactionLogContent() {
                       onClick={() => router.push(`/transactions/${tx.id}`)}
                     >
                       <TableCell className="font-mono text-sm" suppressHydrationWarning>
-                        {new Date(tx.date).toLocaleDateString()}
+                        {formatDateString(tx.date)}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getTypeBadgeVariant(tx.type)}>{tx.type}</Badge>

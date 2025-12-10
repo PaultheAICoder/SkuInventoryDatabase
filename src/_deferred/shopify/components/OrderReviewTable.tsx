@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Search, ChevronLeft, ChevronRight, Eye, AlertCircle } from 'lucide-react'
 import { ORDER_STATUS_CONFIG, type OrderStatusKey } from '@/types/order-review'
+import { formatDateString } from '@/lib/utils'
 import type { OrderResponse } from '@/types/shopify-sync'
 
 interface OrderReviewTableProps {
@@ -176,7 +177,7 @@ export function OrderReviewTable({ orders, total, page, pageSize }: OrderReviewT
                       </div>
                     </TableCell>
                     <TableCell suppressHydrationWarning>
-                      {new Date(order.orderDate).toLocaleDateString()}
+                      {formatDateString(order.orderDate)}
                     </TableCell>
                     <TableCell className="text-right">{order.lines.length}</TableCell>
                     <TableCell>{getStatusBadge(order.status)}</TableCell>
