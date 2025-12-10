@@ -27,7 +27,7 @@ import type { ComponentDetailResponse } from '@/types/component'
 export default function ComponentDetailPage() {
   const params = useParams()
   const id = params.id as string
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [component, setComponent] = useState<ComponentDetailResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +37,9 @@ export default function ComponentDetailPage() {
   const [sparklineDays, setSparklineDays] = useState(30)
 
   const fetchComponent = useCallback(async () => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
     try {
       const res = await fetch(`/api/components/${id}?trendDays=${sparklineDays}`)
       if (!res.ok) {
@@ -52,7 +55,7 @@ export default function ComponentDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [id, sparklineDays])
+  }, [id, sparklineDays, status])
 
   useEffect(() => {
     fetchComponent()
@@ -73,7 +76,7 @@ export default function ComponentDetailPage() {
 
   const canEdit = session?.user?.role !== 'viewer'
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="space-y-6">
         <div className="h-8 w-48 animate-pulse rounded bg-muted" />

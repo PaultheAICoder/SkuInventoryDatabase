@@ -51,10 +51,21 @@ const navigation = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
+
+  // Show minimal layout while session is loading
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="flex items-center justify-center h-screen">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const filteredNavigation = navigation.filter(
     (item) => !item.adminOnly || session?.user?.role === 'admin'

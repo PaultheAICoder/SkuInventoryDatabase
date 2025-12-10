@@ -73,7 +73,7 @@ interface ExpiryData {
 }
 
 export default function DashboardPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -113,12 +113,16 @@ export default function DashboardPage() {
         setIsLoading(false)
       }
     }
+
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
     if (session?.user?.selectedCompanyId) {
       fetchDashboard()
     }
-  }, [timeFilter, locationId, session?.user?.selectedCompanyId, session?.user?.selectedBrandId])
+  }, [status, timeFilter, locationId, session?.user?.selectedCompanyId, session?.user?.selectedBrandId])
 
-  if (isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
       <div className="space-y-6">
         <div>

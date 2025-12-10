@@ -39,7 +39,7 @@ const TRANSACTION_TYPES = [
 ]
 
 function TransactionLogContent() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -124,9 +124,12 @@ function TransactionLogContent() {
 
   // Refetch when company changes or fetchTransactions changes
   useEffect(() => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
     fetchTransactions()
     fetchDraftCount()
-  }, [fetchTransactions, fetchDraftCount, session?.user?.selectedCompanyId])
+  }, [fetchTransactions, fetchDraftCount, session?.user?.selectedCompanyId, status])
 
   const handleApplyFilters = () => {
     updateFilters(filters)
@@ -317,14 +320,14 @@ function TransactionLogContent() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {(status === 'loading' || isLoading) && (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">Loading...</CardContent>
         </Card>
       )}
 
       {/* Transaction Table */}
-      {!isLoading && !error && (
+      {!isLoading && status !== 'loading' && !error && (
         <>
           <div className="rounded-md border">
             <Table>

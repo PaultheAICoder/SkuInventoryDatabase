@@ -10,7 +10,7 @@ import { Building2, Search } from 'lucide-react'
 import type { CompanyResponse } from '@/types/company'
 
 export default function CompaniesPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [companies, setCompanies] = useState<CompanyResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,8 +38,11 @@ export default function CompaniesPage() {
   }, [search])
 
   useEffect(() => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
     fetchCompanies()
-  }, [fetchCompanies])
+  }, [fetchCompanies, status])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -86,12 +89,12 @@ export default function CompaniesPage() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {(status === 'loading' || isLoading) && (
         <div className="py-10 text-center text-muted-foreground">Loading companies...</div>
       )}
 
       {/* Company Table */}
-      {!isLoading && !error && session?.user && (
+      {!isLoading && status !== 'loading' && !error && session?.user && (
         <CompanyTable
           companies={companies}
           currentCompanyId={session.user.selectedCompanyId}

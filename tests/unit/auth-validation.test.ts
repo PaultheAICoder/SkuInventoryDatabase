@@ -19,7 +19,7 @@ const describeWithDb = hasTestDatabase ? describe : describe.skip
 
 // Only mock database if we have a test database to use
 // Note: vi.mock is hoisted, but we check inside the factory to avoid throws at module load time
-vi.mock('@/lib/db', () => {
+vi.mock('@/lib/db', async () => {
   // Only initialize prisma if TEST_DATABASE_URL is set
   // Otherwise return a dummy that won't be used (tests are skipped)
   if (!process.env.TEST_DATABASE_URL) {
@@ -28,8 +28,8 @@ vi.mock('@/lib/db', () => {
       default: null,
     }
   }
-  const { getTestPrisma } = require('../helpers/db')
-  const testPrisma = getTestPrisma()
+  const dbHelpers = await import('../helpers/db')
+  const testPrisma = dbHelpers.getTestPrisma()
   return {
     prisma: testPrisma,
     default: testPrisma,
@@ -39,23 +39,19 @@ vi.mock('@/lib/db', () => {
 // Import after mocking
 import { validateUserExists } from '@/lib/auth'
 
-// Helper to get prisma and disconnectTestDb only when needed
-const getDbHelpers = () => {
-  // Only require if we have a test database (tests would be skipped otherwise)
-  if (!hasTestDatabase) {
-    return { prisma: null as unknown as PrismaClient, disconnectTestDb: async () => {} }
-  }
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const dbHelpers = require('../helpers/db')
-  return { prisma: dbHelpers.getTestPrisma(), disconnectTestDb: dbHelpers.disconnectTestDb }
-}
-
 describeWithDb('validateUserExists', () => {
-  const { prisma, disconnectTestDb } = getDbHelpers()
+  // Module-level variables initialized in beforeAll
+  let prisma: PrismaClient
+  let disconnectTestDb: () => Promise<void>
   let activeUserId: string
   let inactiveUserId: string
 
   beforeAll(async () => {
+    // Dynamically import db helpers
+    const dbHelpers = await import('../helpers/db')
+    prisma = dbHelpers.getTestPrisma()
+    disconnectTestDb = dbHelpers.disconnectTestDb
+
     // Find an active user from seed data
     const activeUser = await prisma.user.findFirst({
       where: { isActive: true },

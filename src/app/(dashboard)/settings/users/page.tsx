@@ -17,7 +17,7 @@ import { UserPlus, Search } from 'lucide-react'
 import type { UserResponse } from '@/types/user'
 
 export default function UsersPage() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [users, setUsers] = useState<UserResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,8 +49,11 @@ export default function UsersPage() {
   }, [search, roleFilter, activeFilter])
 
   useEffect(() => {
+    // Don't fetch while session is loading
+    if (status === 'loading') return
+
     fetchUsers()
-  }, [fetchUsers])
+  }, [fetchUsers, status])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -120,12 +123,12 @@ export default function UsersPage() {
       )}
 
       {/* Loading State */}
-      {isLoading && (
+      {(status === 'loading' || isLoading) && (
         <div className="py-10 text-center text-muted-foreground">Loading users...</div>
       )}
 
       {/* User Table */}
-      {!isLoading && !error && session?.user && (
+      {!isLoading && status !== 'loading' && !error && session?.user && (
         <UserTable users={users} currentUserId={session.user.id} onRefresh={fetchUsers} />
       )}
     </div>
