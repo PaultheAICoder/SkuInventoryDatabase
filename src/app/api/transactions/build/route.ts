@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company and try again.', 400)
+    }
 
     // Verify SKU exists and belongs to user's selected company
     const sku = await prisma.sKU.findFirst({
@@ -196,7 +199,7 @@ export async function POST(request: NextRequest) {
         // Return 400 with insufficient items so frontend can show warning
         const insufficientItems = await checkInsufficientInventory({
           bomVersionId: selectedBomVersionId,
-          companyId: selectedCompanyId!,
+          companyId: selectedCompanyId,
           unitsToBuild: data.unitsToBuild,
         })
 

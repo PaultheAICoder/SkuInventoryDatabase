@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -36,7 +35,6 @@ export function FinishedGoodsReceiptDialog({
   skuName,
   currentQuantity,
 }: FinishedGoodsReceiptDialogProps) {
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
@@ -96,8 +94,9 @@ export function FinishedGoodsReceiptDialog({
         throw new Error(data?.message || 'Failed to record receipt')
       }
 
+      // Just close the dialog - parent component handles refresh via onOpenChange callback
       onOpenChange(false)
-      router.refresh()
+      // Note: Do NOT call router.refresh() here - parent handles data refresh to avoid race condition
 
       // Reset form
       setFormData({

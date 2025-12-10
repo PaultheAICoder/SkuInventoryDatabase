@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   Dialog,
   DialogContent,
@@ -54,7 +53,6 @@ interface BuildDialogProps {
 }
 
 export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialogProps) {
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingSkus, setIsLoadingSkus] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -237,8 +235,9 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         // Still close and refresh, but could show a toast
       }
 
+      // Just close the dialog - parent component handles refresh via onOpenChange callback
       onOpenChange(false)
-      router.refresh()
+      // Note: Do NOT call router.refresh() here - parent handles data refresh to avoid race condition
 
       // Reset form
       setFormData({
@@ -263,8 +262,30 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
       setLotAvailability([])
       setShowLotDetails(false)
     } catch (err) {
-      console.error('BuildDialog submission error:', err)
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      const errorContext = {
+        error: err,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        formData: {
+          skuId: formData.skuId,
+          date: formData.date,
+          unitsToBuild: formData.unitsToBuild,
+        },
+        timestamp: new Date().toISOString(),
+      }
+      console.error('BuildDialog submission error:', errorContext)
+
+      // Provide more helpful error message
+      let userMessage = 'An error occurred'
+      if (err instanceof Error) {
+        if (err.message.includes('company')) {
+          userMessage = 'Please select a company from the sidebar and try again'
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          userMessage = 'Network error. Please check your connection and try again'
+        } else {
+          userMessage = err.message
+        }
+      }
+      setError(userMessage)
     } finally {
       setIsLoading(false)
     }

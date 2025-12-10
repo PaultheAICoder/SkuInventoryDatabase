@@ -312,7 +312,11 @@ export default function SKUDetailPage() {
           open={buildDialogOpen}
           onOpenChange={(open) => {
             setBuildDialogOpen(open)
-            if (!open) handleRefresh()
+            if (!open) {
+              // Use slight delay to ensure dialog animation completes
+              // and state is stable before fetching
+              setTimeout(() => handleRefresh(), 100)
+            }
           }}
           preselectedSkuId={skuId}
         />
@@ -325,7 +329,11 @@ export default function SKUDetailPage() {
             open={fgAdjustmentDialogOpen}
             onOpenChange={(open) => {
               setFgAdjustmentDialogOpen(open)
-              if (!open) handleRefresh()
+              if (!open) {
+                // Use slight delay to ensure dialog animation completes
+                // and state is stable before fetching
+                setTimeout(() => handleRefresh(), 100)
+              }
             }}
             skuId={skuId}
             skuName={sku.name}
@@ -335,7 +343,11 @@ export default function SKUDetailPage() {
             open={fgReceiptDialogOpen}
             onOpenChange={(open) => {
               setFgReceiptDialogOpen(open)
-              if (!open) handleRefresh()
+              if (!open) {
+                // Use slight delay to ensure dialog animation completes
+                // and state is stable before fetching
+                setTimeout(() => handleRefresh(), 100)
+              }
             }}
             skuId={skuId}
             skuName={sku.name}

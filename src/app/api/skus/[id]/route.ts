@@ -10,6 +10,7 @@ import {
   conflict,
   serverError,
   parseBody,
+  error,
 } from '@/lib/api-response'
 import { updateSKUSchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnits } from '@/services/bom'
@@ -33,6 +34,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Get selected brand (may be null for "all brands")
     const selectedBrandId = session.user.selectedBrandId
@@ -73,13 +77,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Calculate costs for all BOM versions
     const bomVersionIds = sku.bomVersions.map((v) => v.id)
-    const bomCosts = await calculateBOMUnitCosts(bomVersionIds, selectedCompanyId!)
+    const bomCosts = await calculateBOMUnitCosts(bomVersionIds, selectedCompanyId)
 
     // Calculate max buildable units (filtered by location if specified)
-    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!, locationId)
+    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId, locationId)
 
     // Get finished goods inventory
-    const finishedGoodsInventory = await getSkuInventorySummary(id, selectedCompanyId!)
+    const finishedGoodsInventory = await getSkuInventorySummary(id, selectedCompanyId)
 
     // Find active BOM
     const activeBom = sku.bomVersions.find((v) => v.isActive)
@@ -147,6 +151,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Check SKU exists and belongs to user's selected company
     const existing = await prisma.sKU.findFirst({
@@ -199,11 +206,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const activeBom = sku.bomVersions[0]
     let activeBomCost: number | null = null
     if (activeBom) {
-      const costs = await calculateBOMUnitCosts([activeBom.id], selectedCompanyId!)
+      const costs = await calculateBOMUnitCosts([activeBom.id], selectedCompanyId)
       activeBomCost = costs.get(activeBom.id) ?? 0
     }
 
-    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId!)
+    const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId)
 
     return success({
       id: sku.id,
@@ -243,6 +250,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Check SKU exists and belongs to user's selected company
     const existing = await prisma.sKU.findFirst({
