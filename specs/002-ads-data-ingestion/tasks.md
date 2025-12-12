@@ -200,24 +200,24 @@
 
 ### Notification System
 
-- [ ] T062 Create notification service in src/services/notifications.ts with createNotification(), markRead(), getUnreadForUser()
-- [ ] T063 Create GET /api/notifications/route.ts to list user notifications
-- [ ] T064 Create PATCH /api/notifications/[id]/route.ts to mark notification read/dismissed
-- [ ] T065 Add notification creation to sync failure handling in Amazon Ads sync service
-- [ ] T066 Create notification banner component for dashboard header showing unread sync failure alerts
+- [x] T062 Create notification service in src/services/notifications.ts with createNotification(), markRead(), getUnreadForUser()
+- [x] T063 Create GET /api/notifications/route.ts to list user notifications
+- [x] T064 Create PATCH /api/notifications/[id]/route.ts to mark notification read/dismissed
+- [x] T065 Add notification creation to sync failure handling in Amazon Ads sync service
+- [ ] T066 Create notification banner component for dashboard header showing unread sync failure alerts → **GH Issue #268**
 
 ### Data Retention
 
-- [ ] T067 Create POST /api/cron/retention-cleanup/route.ts to delete KeywordMetric and SalesDaily records older than 12 months
-- [ ] T068 Add retention cleanup to SyncLog for audit trail
-- [ ] T069 Document external scheduler configuration (cron job or pg_cron) to call /api/cron/ads-sync daily at 3AM and /api/cron/retention-cleanup daily at 4AM
+- [ ] T067 Create POST /api/cron/retention-cleanup/route.ts to delete KeywordMetric and SalesDaily records older than 12 months → **GH Issue #266**
+- [ ] T068 Add retention cleanup to SyncLog for audit trail → **GH Issue #266**
+- [ ] T069 Document external scheduler configuration (cron job or pg_cron) to call /api/cron/ads-sync daily at 3AM and /api/cron/retention-cleanup daily at 4AM → **GH Issue #266**
 
 ### Final Integration
 
-- [ ] T070 Add integrations link to main navigation/sidebar
-- [ ] T071 Verify all API routes have proper auth checks (admin for connect/disconnect, admin/ops for sync/upload)
-- [ ] T072 Run npm run build to verify no TypeScript errors
-- [ ] T073 Run npm run lint to verify no linting errors
+- [ ] T070 Add integrations link to main navigation/sidebar → **GH Issue #267**
+- [ ] T071 Verify all API routes have proper auth checks (admin for connect/disconnect, admin/ops for sync/upload) → **GH Issue #267**
+- [x] T072 Run npm run build to verify no TypeScript errors
+- [x] T073 Run npm run lint to verify no linting errors
 
 ---
 
