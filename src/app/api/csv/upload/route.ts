@@ -29,13 +29,21 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         isPrimary: true,
       },
-      select: { companyId: true },
+      select: { companyId: true, role: true },
     })
 
     if (!userCompany?.companyId) {
       return NextResponse.json(
         { error: 'User must belong to a company' },
         { status: 400 }
+      )
+    }
+
+    // Admin or Ops only for file uploads
+    if (userCompany.role !== 'admin' && userCompany.role !== 'ops') {
+      return NextResponse.json(
+        { error: 'Admin or Ops permission required' },
+        { status: 403 }
       )
     }
 
@@ -214,6 +222,23 @@ export async function GET() {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      )
+    }
+
+    // Get user's primary company for role check
+    const userCompany = await prisma.userCompany.findFirst({
+      where: {
+        userId: session.user.id,
+        isPrimary: true,
+      },
+      select: { role: true },
+    })
+
+    // Admin or Ops only for file upload info
+    if (!userCompany || (userCompany.role !== 'admin' && userCompany.role !== 'ops')) {
+      return NextResponse.json(
+        { error: 'Admin or Ops permission required' },
+        { status: 403 }
       )
     }
 

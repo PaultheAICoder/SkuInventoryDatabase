@@ -37,6 +37,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Admin or Ops only (sync can be triggered by ops team)
+    if (userCompany.role !== 'admin' && userCompany.role !== 'ops') {
+      return NextResponse.json(
+        { error: 'Admin or Ops permission required' },
+        { status: 403 }
+      )
+    }
+
     // Get connection
     const connection = await prisma.shopifyConnection.findFirst({
       where: {

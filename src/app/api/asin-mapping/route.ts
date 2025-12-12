@@ -217,11 +217,19 @@ export async function POST(request: NextRequest) {
     // Get user's company
     const userCompany = await prisma.userCompany.findFirst({
       where: { userId: session.user.id, isPrimary: true },
-      select: { companyId: true },
+      select: { companyId: true, role: true },
     })
 
     if (!userCompany) {
       return NextResponse.json({ error: 'User must belong to a company' }, { status: 400 })
+    }
+
+    // Only admin can create ASIN mappings
+    if (userCompany.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only admins can create ASIN mappings' },
+        { status: 403 }
+      )
     }
 
     // Verify brand belongs to user's company

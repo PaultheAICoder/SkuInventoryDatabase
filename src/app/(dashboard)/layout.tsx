@@ -24,6 +24,7 @@ import {
   TrendingDown,
   Tag,
   FolderTree,
+  Plug,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -41,6 +42,7 @@ const navigation = [
   { name: 'Import', href: '/import', icon: Upload },
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Forecasts', href: '/forecasts', icon: TrendingDown },
+  { name: 'Integrations', href: '/integrations', icon: Plug, adminOnly: true },
   { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
   { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
   { name: 'Brands', href: '/settings/brands', icon: Tag, adminOnly: true },

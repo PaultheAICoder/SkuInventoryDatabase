@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Admin or Ops only for viewing sync logs
+    if (session.user.role !== 'admin' && session.user.role !== 'ops') {
+      return NextResponse.json(
+        { error: 'Admin or Ops permission required' },
+        { status: 403 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const credentialId = searchParams.get('credentialId')
     const syncType = searchParams.get('syncType')
