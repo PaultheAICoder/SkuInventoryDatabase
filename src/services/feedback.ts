@@ -34,6 +34,11 @@ function toFeedbackRecord(
     responseContent: string | null
     followUpIssueNumber: number | null
     followUpIssueUrl: string | null
+    clarificationSentAt: Date | null
+    clarificationMessageId: string | null
+    clarificationQuestions: string | null
+    clarificationAnswers: string | null
+    clarificationContext: string | null
     createdAt: Date
     updatedAt: Date
     user?: { name: string | null; email: string }
@@ -55,6 +60,11 @@ function toFeedbackRecord(
     responseContent: feedback.responseContent,
     followUpIssueNumber: feedback.followUpIssueNumber,
     followUpIssueUrl: feedback.followUpIssueUrl,
+    clarificationSentAt: feedback.clarificationSentAt?.toISOString() ?? null,
+    clarificationMessageId: feedback.clarificationMessageId,
+    clarificationQuestions: feedback.clarificationQuestions,
+    clarificationAnswers: feedback.clarificationAnswers,
+    clarificationContext: feedback.clarificationContext,
     createdAt: feedback.createdAt.toISOString(),
     updatedAt: feedback.updatedAt.toISOString(),
   }
@@ -136,6 +146,12 @@ export async function updateFeedbackStatus(
       ...(input.responseContent !== undefined && { responseContent: input.responseContent }),
       ...(input.followUpIssueNumber && { followUpIssueNumber: input.followUpIssueNumber }),
       ...(input.followUpIssueUrl && { followUpIssueUrl: input.followUpIssueUrl }),
+      // Clarification fields
+      ...(input.clarificationSentAt && { clarificationSentAt: input.clarificationSentAt }),
+      ...(input.clarificationMessageId && { clarificationMessageId: input.clarificationMessageId }),
+      ...(input.clarificationQuestions !== undefined && { clarificationQuestions: input.clarificationQuestions }),
+      ...(input.clarificationAnswers !== undefined && { clarificationAnswers: input.clarificationAnswers }),
+      ...(input.clarificationContext !== undefined && { clarificationContext: input.clarificationContext }),
     },
     include: {
       user: {
@@ -221,4 +237,151 @@ export async function updateLastCheckTime(time: Date): Promise<void> {
       lastCheckTime: time,
     },
   })
+}
+
+// ============================================
+// Clarification Flow Management
+// ============================================
+
+/**
+ * Get all feedback in 'clarification_requested' status
+ * Used by email monitor to process clarification responses
+ */
+export async function getClarificationRequestedFeedback(): Promise<FeedbackRecord[]> {
+  const feedbacks = await prisma.feedback.findMany({
+    where: { status: 'clarification_requested' },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+    orderBy: { clarificationSentAt: 'asc' },
+  })
+
+  return feedbacks.map(toFeedbackRecord)
+}
+
+/**
+ * Get feedback records that have timed out waiting for clarification
+ * Used to create follow-up issues after timeout period
+ *
+ * @param timeoutHours - Number of hours after which to consider clarification timed out (default: 48)
+ * @returns Array of feedback records that have exceeded the timeout
+ */
+export async function getTimedOutClarifications(
+  timeoutHours: number = 48
+): Promise<FeedbackRecord[]> {
+  const timeoutDate = new Date(Date.now() - timeoutHours * 60 * 60 * 1000)
+
+  const feedbacks = await prisma.feedback.findMany({
+    where: {
+      status: 'clarification_requested',
+      clarificationSentAt: {
+        lt: timeoutDate,
+      },
+    },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+    orderBy: { clarificationSentAt: 'asc' },
+  })
+
+  return feedbacks.map(toFeedbackRecord)
+}
+
+/**
+ * Update feedback to clarification_requested state
+ * Called when initial rejection detected and clarification email sent
+ */
+export async function updateFeedbackClarification(
+  id: string,
+  input: {
+    clarificationSentAt: Date
+    clarificationMessageId?: string
+    clarificationQuestions: string  // JSON array of questions
+    clarificationContext?: string   // JSON object
+  }
+): Promise<FeedbackRecord> {
+  const feedback = await prisma.feedback.update({
+    where: { id },
+    data: {
+      status: 'clarification_requested',
+      clarificationSentAt: input.clarificationSentAt,
+      clarificationMessageId: input.clarificationMessageId,
+      clarificationQuestions: input.clarificationQuestions,
+      clarificationContext: input.clarificationContext,
+    },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+  })
+
+  return toFeedbackRecord(feedback)
+}
+
+/**
+ * Complete clarification by recording answers and transitioning to changes_requested
+ * Called when user responds to clarification questions
+ */
+export async function completeClarification(
+  id: string,
+  input: {
+    clarificationAnswers: string
+    responseReceivedAt: Date
+    responseEmailId: string
+    followUpIssueNumber?: number
+    followUpIssueUrl?: string
+  }
+): Promise<FeedbackRecord> {
+  const feedback = await prisma.feedback.update({
+    where: { id },
+    data: {
+      status: 'changes_requested',
+      clarificationAnswers: input.clarificationAnswers,
+      responseReceivedAt: input.responseReceivedAt,
+      responseEmailId: input.responseEmailId,
+      followUpIssueNumber: input.followUpIssueNumber,
+      followUpIssueUrl: input.followUpIssueUrl,
+    },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+  })
+
+  return toFeedbackRecord(feedback)
+}
+
+/**
+ * Mark clarification as timed out
+ * Used when no response received within timeout period
+ */
+export async function timeoutClarification(
+  id: string,
+  input: {
+    followUpIssueNumber: number
+    followUpIssueUrl: string
+  }
+): Promise<FeedbackRecord> {
+  const feedback = await prisma.feedback.update({
+    where: { id },
+    data: {
+      status: 'changes_requested',
+      clarificationAnswers: '[TIMEOUT - No response received within 48 hours]',
+      followUpIssueNumber: input.followUpIssueNumber,
+      followUpIssueUrl: input.followUpIssueUrl,
+    },
+    include: {
+      user: {
+        select: { name: true, email: true },
+      },
+    },
+  })
+
+  return toFeedbackRecord(feedback)
 }

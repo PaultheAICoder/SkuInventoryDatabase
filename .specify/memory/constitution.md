@@ -1,27 +1,17 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 0.0.0 → 1.0.0 (MAJOR - initial ratification)
+Version change: 1.0.0 → 2.0.0 (MAJOR - V2 scope expansion)
 
-Modified principles: N/A (initial version)
+Modified sections:
+- Additional Constraints > Technology & Integration: Updated for V2 external integrations
+- Additional Constraints > Out of Scope: Updated to reflect V2 scope
+- Added V2 Scope section documenting new capabilities
 
-Added sections:
-- Core Principles (5 principles)
-  - I. Data Integrity & Auditability
-  - II. Simplicity First
-  - III. Extensibility by Design
-  - IV. Security & Authorization
-  - V. User-Centric Design
-- Additional Constraints
-- Development Workflow
-- Governance
+Rationale: V1 core inventory system is complete. V2 adds external integrations
+(Amazon Ads, Shopify) as documented in PRD-sales-ads-seo.md.
 
-Removed sections: None
-
-Templates requiring updates:
-- .specify/templates/plan-template.md ✅ (no changes needed - Constitution Check section compatible)
-- .specify/templates/spec-template.md ✅ (no changes needed - structure aligns with principles)
-- .specify/templates/tasks-template.md ✅ (no changes needed - phase structure compatible)
+Templates requiring updates: None (existing templates compatible)
 
 Follow-up TODOs: None
 ==================
@@ -115,10 +105,11 @@ prioritize the daily workflow of ops staff over administrative convenience.
 
 ### Technology & Integration
 
-- V1 has NO external integrations (Shopify, Amazon, etc.) - all data entry is manual
 - Tech stack is implementer's choice but MUST support web frontend + API backend
-- Performance targets: UI operations feel instant for V1 scale (tens of thousands of
+- Performance targets: UI operations feel instant for current scale (tens of thousands of
   transactions)
+- External integrations MUST use OAuth2 where available
+- API credentials MUST be encrypted at rest
 
 ### Data Model Boundaries
 
@@ -127,15 +118,26 @@ prioritize the daily workflow of ops staff over administrative convenience.
 - Pooled inventory (no lot/expiry tracking)
 - One active BOM version per SKU at any time
 
-### Out of Scope (V1)
+### V2 Scope (Current)
 
-These are explicitly prohibited in V1 implementation:
+These capabilities are now in scope as of V2:
+- Amazon Ads API integration (read-only, US marketplace)
+- Shopify integration (read-only order/product sync)
+- CSV upload for keyword data (Amazon, ZonGuru, Helium10)
+- In-app notifications for sync failures
+- ASIN-to-SKU mapping for cross-system data correlation
+- Daily sales breakdown with organic/ad attribution
+
+### Out of Scope (V2)
+
+These remain prohibited in V2 implementation:
 - Multi-location inventory tracking
 - Finished goods / WIP bin tracking
 - Lot numbers and expiry dates
-- Automated notifications (email/Slack)
-- Demand forecasting or ROAS analytics
-- External marketplace integrations
+- Email/Slack notifications (in-app only for now)
+- Demand forecasting
+- Write-back to external platforms (read-only integrations only)
+- Google Ads or other advertising platforms beyond Amazon
 
 ## Development Workflow
 
@@ -182,4 +184,4 @@ decisions.
 - MINOR: New principle added or significant guidance expansion
 - PATCH: Clarifications, wording improvements, typo fixes
 
-**Version**: 1.0.0 | **Ratified**: 2025-12-01 | **Last Amended**: 2025-12-01
+**Version**: 2.0.0 | **Ratified**: 2025-12-01 | **Last Amended**: 2025-12-12

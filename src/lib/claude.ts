@@ -417,3 +417,288 @@ ${description}
 - [ ] All tests passing
 - [ ] Build completes successfully`
 }
+
+// ============================================================================
+// Follow-Up Clarification Questions (for failed fix reports)
+// ============================================================================
+
+import type {
+  FollowUpClarificationParams,
+  FollowUpClarificationResult,
+  GenerateEnrichedFollowUpParams,
+  EnrichedFollowUpResult,
+} from '@/types/feedback'
+
+/**
+ * Fallback questions when no context is available or API fails
+ */
+const FALLBACK_CLARIFICATION_QUESTIONS = [
+  'What specifically is not working after the fix?',
+  'Is the issue exactly the same as before, or is it a different problem now?',
+  'Can you describe the steps that show the problem still exists?',
+]
+
+/**
+ * Generate 3 context-specific clarification questions for a failed fix report.
+ *
+ * Uses the implementation context (files modified, root cause, etc.) to generate
+ * questions specific to what was attempted, rather than generic questions.
+ */
+export async function generateFollowUpClarificationQuestions(
+  params: FollowUpClarificationParams
+): Promise<FollowUpClarificationResult> {
+  const { originalIssue, implementationContext, userFeedback } = params
+
+  const anthropic = getClient()
+
+  // Build context summary for the response
+  let contextSummary = ''
+  if (implementationContext.fixDescription) {
+    contextSummary = implementationContext.fixDescription
+  } else if (implementationContext.filesModified.length > 0) {
+    contextSummary = `Modified ${implementationContext.filesModified.length} file(s): ${implementationContext.filesModified.map((f) => f.path.split('/').pop()).join(', ')}`
+  }
+
+  // If no API client or minimal context, return fallback questions
+  if (!anthropic || implementationContext.filesModified.length === 0) {
+    return {
+      questions: FALLBACK_CLARIFICATION_QUESTIONS,
+      contextSummary: contextSummary || 'Unable to retrieve implementation details',
+    }
+  }
+
+  try {
+    // Build file list for prompt
+    const filesList = implementationContext.filesModified
+      .slice(0, 8)
+      .map((f) => `- ${f.path}${f.description ? ` (${f.description})` : ''}`)
+      .join('\n')
+
+    const systemPrompt = `You are helping gather information about why a software fix didn't work for a user.
+
+Based on the context below, generate exactly 3 specific, targeted clarification questions that will help developers understand what specifically failed.
+
+CONTEXT:
+- Original Issue Title: ${originalIssue.title}
+- Issue Type: ${originalIssue.type}
+- Root Cause Identified: ${implementationContext.rootCauseIdentified || 'Not specified'}
+- Fix Description: ${implementationContext.fixDescription || 'Not specified'}
+- Files Modified:
+${filesList}
+${implementationContext.testsAdded?.length ? `- Tests Added: ${implementationContext.testsAdded.join(', ')}` : ''}
+
+USER'S INITIAL FEEDBACK: "${userFeedback}"
+
+Generate 3 questions that:
+1. Ask if the issue is in the specific area that was modified (reference actual file names or features)
+2. Determine if the root cause was correctly identified or if it's something different
+3. Clarify whether the fix is partially working, completely broken, or causing a new issue
+
+Each question should be:
+- Specific to this implementation (not generic)
+- Under 120 characters
+- Actionable (the answer will help debug the issue)
+
+Return ONLY the 3 questions, one per line, without numbering or bullets.`
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 400,
+      messages: [
+        {
+          role: 'user',
+          content: `Generate clarification questions for this failed fix report.`,
+        },
+      ],
+      system: systemPrompt,
+    })
+
+    // Extract text from response
+    const textContent = message.content.find((block) => block.type === 'text')
+    if (!textContent || textContent.type !== 'text') {
+      return {
+        questions: FALLBACK_CLARIFICATION_QUESTIONS,
+        contextSummary,
+      }
+    }
+
+    // Parse questions from response (one per line)
+    const questions = textContent.text
+      .split('\n')
+      .map((q) => q.trim())
+      .filter((q) => q.length > 0 && q.length < 150 && !q.startsWith('#'))
+      .slice(0, 3)
+
+    // Ensure we have exactly 3 questions
+    if (questions.length < 3) {
+      return {
+        questions: FALLBACK_CLARIFICATION_QUESTIONS,
+        contextSummary,
+      }
+    }
+
+    return { questions, contextSummary }
+  } catch (error) {
+    console.error('[Claude] Error generating clarification questions:', error)
+    return {
+      questions: FALLBACK_CLARIFICATION_QUESTIONS,
+      contextSummary,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }
+  }
+}
+
+/**
+ * Generate an enriched follow-up GitHub issue using all available context.
+ *
+ * This creates a detailed issue that includes:
+ * - What was originally reported
+ * - What fix was attempted (files changed, approach taken)
+ * - Why user says it didn't work
+ * - AI analysis of likely remaining issue
+ */
+export async function generateEnrichedFollowUpIssue(
+  params: GenerateEnrichedFollowUpParams
+): Promise<EnrichedFollowUpResult> {
+  const {
+    originalIssue,
+    implementationContext,
+    initialUserFeedback,
+    clarificationQuestions,
+    clarificationAnswers,
+  } = params
+
+  const anthropic = getClient()
+
+  // Build file list for the issue body
+  const filesList = implementationContext.filesModified
+    .map((f) => `- \`${f.path}\`${f.description ? ` - ${f.description}` : ''}`)
+    .join('\n')
+
+  // Default analysis if Claude unavailable
+  const defaultAnalysis = {
+    likelyRemainingIssue: 'Unable to determine - manual investigation required',
+    areasToInvestigate: implementationContext.filesModified.map((f) => f.path),
+    isRegressionLikely: false,
+  }
+
+  // Try to get AI analysis
+  let analysis = defaultAnalysis
+  if (anthropic) {
+    try {
+      const analysisPrompt = `Analyze this failed fix report and provide a brief analysis.
+
+ORIGINAL ISSUE: ${originalIssue.title}
+TYPE: ${originalIssue.type}
+
+FIX THAT WAS ATTEMPTED:
+- Root Cause Identified: ${implementationContext.rootCauseIdentified || 'Not specified'}
+- Fix Description: ${implementationContext.fixDescription || 'Not specified'}
+- Files Modified: ${implementationContext.filesModified.map((f) => f.path).join(', ')}
+
+USER'S INITIAL FEEDBACK: "${initialUserFeedback}"
+
+CLARIFICATION QUESTIONS ASKED:
+${clarificationQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+USER'S CLARIFICATION RESPONSE:
+"${clarificationAnswers}"
+
+Provide a JSON response with:
+1. likelyRemainingIssue: A 1-2 sentence description of what's likely still wrong
+2. areasToInvestigate: Array of 2-4 specific file paths or component areas to check
+3. isRegressionLikely: Boolean - does this seem like a new issue caused by the fix?
+
+Respond with ONLY valid JSON, no markdown.`
+
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        messages: [{ role: 'user', content: analysisPrompt }],
+      })
+
+      const textContent = message.content.find((block) => block.type === 'text')
+      if (textContent?.type === 'text') {
+        try {
+          const parsed = JSON.parse(textContent.text)
+          if (parsed.likelyRemainingIssue && parsed.areasToInvestigate) {
+            analysis = {
+              likelyRemainingIssue: parsed.likelyRemainingIssue,
+              areasToInvestigate: parsed.areasToInvestigate,
+              isRegressionLikely: Boolean(parsed.isRegressionLikely),
+            }
+          }
+        } catch {
+          // JSON parse failed, use default analysis
+        }
+      }
+    } catch (error) {
+      console.error('[Claude] Error generating analysis:', error)
+    }
+  }
+
+  // Generate the issue title
+  const title = `[Follow-up] Re: #${originalIssue.number} - ${originalIssue.title}`.substring(0, 100)
+
+  // Generate the issue body
+  const body = `## Follow-up to Issue #${originalIssue.number}
+
+**Original Issue**: ${originalIssue.url}
+**Original Title**: ${originalIssue.title}
+
+---
+
+### What Was Originally Reported
+${originalIssue.body.substring(0, 500)}${originalIssue.body.length > 500 ? '...' : ''}
+
+---
+
+### Fix That Was Attempted
+
+**Root Cause Identified**: ${implementationContext.rootCauseIdentified || 'Not explicitly documented'}
+
+**Files Modified**:
+${filesList || '- No file changes documented'}
+
+${implementationContext.fixDescription ? `**Fix Description**: ${implementationContext.fixDescription}` : ''}
+
+${implementationContext.testsAdded?.length ? `**Tests Added**: ${implementationContext.testsAdded.join(', ')}` : ''}
+
+---
+
+### Why User Says It Didn't Work
+
+**Initial Feedback**:
+> ${initialUserFeedback}
+
+**Clarification Questions Asked**:
+${clarificationQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+**User's Clarification Response**:
+> ${clarificationAnswers}
+
+---
+
+### Analysis
+
+**Likely Remaining Issue**: ${analysis.likelyRemainingIssue}
+
+**Areas to Investigate**:
+${analysis.areasToInvestigate.map((a) => `- ${a}`).join('\n')}
+
+**Is This Possibly a Regression?**: ${analysis.isRegressionLikely ? 'Yes - the fix may have introduced a new issue' : 'No - appears to be incomplete fix of original issue'}
+
+---
+
+### Next Steps
+- Review the analysis above
+- Check the specific areas identified
+- Verify the original tests still pass
+- Investigate if the fix inadvertently affected related functionality`
+
+  return {
+    title,
+    body,
+    analysis,
+  }
+}

@@ -1,0 +1,20 @@
+[Unit]
+Description=Inventory Smee Webhook Forwarder - Forward GitHub webhooks to local server
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=pbrown
+Environment="SMEE_URL=https://smee.io/PSeXlK7Wg5bQrX"
+Environment="TARGET_URL=http://172.16.20.50:4545/api/webhooks/github"
+ExecStart=/usr/bin/npx smee -u ${SMEE_URL} --target ${TARGET_URL}
+Restart=always
+RestartSec=10
+
+StandardOutput=append:/var/log/inventory/smee-webhook.log
+StandardError=append:/var/log/inventory/smee-webhook.log
+
+[Install]
+WantedBy=multi-user.target

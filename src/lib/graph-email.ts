@@ -224,3 +224,164 @@ export function getGraphEmailStatus(): {
     feedbackEmail: FEEDBACK_EMAIL || null,
   }
 }
+
+/**
+ * Parameters for sending a reply email (threaded)
+ */
+export interface ReplyEmailParams {
+  to: string
+  subject: string
+  body: string
+  conversationId?: string  // Graph conversation ID for threading
+  inReplyTo?: string       // Message-ID of the email being replied to (for email threading headers)
+}
+
+/**
+ * Result from sending a reply email
+ */
+export interface ReplyEmailResult {
+  success: boolean
+  messageId?: string  // The sent message's ID for tracking
+  error?: string
+}
+
+/**
+ * Send an email as a reply to maintain email thread
+ *
+ * Uses Microsoft Graph API to send a reply email that will be threaded
+ * with the original conversation in the recipient's email client.
+ *
+ * @param params - Reply email parameters
+ * @returns Result with success status and message ID
+ */
+export async function sendGraphReplyEmail(params: ReplyEmailParams): Promise<ReplyEmailResult> {
+  const { to, subject, body, conversationId, inReplyTo } = params
+
+  const client = getGraphClient()
+  if (!client) {
+    console.error('[Graph Email] Service not configured, cannot send reply email')
+    return { success: false, error: 'Graph email service not configured' }
+  }
+
+  try {
+    // Build the message object
+    const message: {
+      subject: string
+      body: { contentType: string; content: string }
+      toRecipients: Array<{ emailAddress: { address: string } }>
+      conversationId?: string
+      internetMessageHeaders?: Array<{ name: string; value: string }>
+    } = {
+      subject,
+      body: {
+        contentType: 'HTML',
+        content: body,
+      },
+      toRecipients: [{ emailAddress: { address: to } }],
+    }
+
+    // Add conversation ID if provided (helps Graph maintain thread)
+    if (conversationId) {
+      message.conversationId = conversationId
+    }
+
+    // Add In-Reply-To header if provided (helps email clients thread)
+    if (inReplyTo) {
+      message.internetMessageHeaders = [
+        { name: 'In-Reply-To', value: inReplyTo },
+      ]
+    }
+
+    // Create the message as a draft first, then send it
+    // This allows us to get the message ID back
+    const draftResponse = await client
+      .api(`/users/${FEEDBACK_EMAIL}/messages`)
+      .post(message)
+
+    const messageId = draftResponse.id
+
+    // Send the draft
+    await client
+      .api(`/users/${FEEDBACK_EMAIL}/messages/${messageId}/send`)
+      .post({})
+
+    console.log(`[Graph Email] Reply email sent to ${to}, messageId: ${messageId}`)
+
+    return {
+      success: true,
+      messageId,
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Graph Email] Failed to send reply email:', errorMessage)
+    return {
+      success: false,
+      error: errorMessage,
+    }
+  }
+}
+
+/**
+ * Format a clarification email for a failed fix report
+ *
+ * @param recipientName - Name of the recipient
+ * @param issueNumber - Original issue number
+ * @param issueTitle - Original issue title
+ * @param contextSummary - Summary of what was fixed
+ * @param questions - Array of 3 clarification questions
+ * @returns Formatted HTML email body
+ */
+export function formatClarificationEmail(
+  recipientName: string,
+  issueNumber: number,
+  issueTitle: string,
+  contextSummary: string,
+  questions: string[]
+): string {
+  const questionsHtml = questions
+    .map((q, i) => `<p><strong>${i + 1}.</strong> ${q}</p>`)
+    .join('\n')
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { border-bottom: 2px solid #0066cc; padding-bottom: 10px; margin-bottom: 20px; }
+    .context { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    .questions { background: #fff8e6; padding: 15px; border-radius: 5px; border-left: 4px solid #ffcc00; margin: 15px 0; }
+    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Re: Issue #${issueNumber} - Need More Information</h2>
+    </div>
+
+    <p>Hi ${recipientName},</p>
+
+    <p>Thank you for letting us know the fix for <strong>"${issueTitle}"</strong> didn't fully resolve your issue.</p>
+
+    <div class="context">
+      <strong>What We Changed:</strong><br>
+      ${contextSummary.replace(/\n/g, '<br>')}
+    </div>
+
+    <p>To help us understand what's still not working, could you please answer these questions:</p>
+
+    <div class="questions">
+      ${questionsHtml}
+    </div>
+
+    <p>Just reply to this email with your answers, and we'll create a follow-up to address the remaining issue.</p>
+
+    <div class="footer">
+      <p>Thanks,<br>AI Coder</p>
+      <p><em>This is an automated message from the feedback tracking system.</em></p>
+    </div>
+  </div>
+</body>
+</html>`
+}

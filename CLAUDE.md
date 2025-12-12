@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-12-01
 
 ## Active Technologies
+- TypeScript 5.x (existing stack) + Next.js 14 (App Router), Prisma ORM, existing auth system (002-ads-data-ingestion)
+- PostgreSQL (existing, port 4546) (002-ads-data-ingestion)
 
 - TypeScript 5.x (full-stack) + Next.js 14 (App Router), Prisma ORM, TailwindCSS, shadcn/ui (001-inventory-bom-tracker)
 
@@ -22,6 +24,7 @@ npm test && npm run lint
 TypeScript 5.x (full-stack): Follow standard conventions
 
 ## Recent Changes
+- 002-ads-data-ingestion: Added TypeScript 5.x (existing stack) + Next.js 14 (App Router), Prisma ORM, existing auth system
 
 - 001-inventory-bom-tracker: Added TypeScript 5.x (full-stack) + Next.js 14 (App Router), Prisma ORM, TailwindCSS, shadcn/ui
 

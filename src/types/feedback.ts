@@ -66,7 +66,7 @@ export interface EnhanceIssueRequest {
 // ============================================
 
 // Feedback status enum (matches Prisma FeedbackStatus)
-export type FeedbackStatus = 'pending' | 'resolved' | 'verified' | 'changes_requested'
+export type FeedbackStatus = 'pending' | 'resolved' | 'clarification_requested' | 'verified' | 'changes_requested'
 
 // Database record type (returned from service functions)
 export interface FeedbackRecord {
@@ -85,6 +85,12 @@ export interface FeedbackRecord {
   responseContent: string | null
   followUpIssueNumber: number | null
   followUpIssueUrl: string | null
+  // Clarification tracking fields
+  clarificationSentAt: string | null
+  clarificationMessageId: string | null
+  clarificationQuestions: string | null  // JSON array of questions
+  clarificationAnswers: string | null    // User's response text
+  clarificationContext: string | null    // JSON: completion report summary, files changed
   createdAt: string
   updatedAt: string
 }
@@ -107,4 +113,75 @@ export interface UpdateFeedbackInput {
   responseContent?: string
   followUpIssueNumber?: number
   followUpIssueUrl?: string
+  // Clarification tracking fields
+  clarificationSentAt?: Date
+  clarificationMessageId?: string
+  clarificationQuestions?: string  // JSON array of questions
+  clarificationAnswers?: string
+  clarificationContext?: string    // JSON object
+}
+
+// ============================================
+// Clarification Context Types
+// ============================================
+
+// Context extracted from completion reports and agent outputs
+export interface ClarificationContext {
+  originalIssueNumber: number
+  originalTitle: string
+  completionReportPath?: string
+  filesModified: Array<{
+    path: string
+    changeType: 'created' | 'modified'
+    description?: string
+  }>
+  rootCauseIdentified?: string
+  fixDescription?: string
+  testsAdded?: string[]
+  whatWasAccomplished?: string[]
+}
+
+// Input for generating follow-up clarification questions
+export interface FollowUpClarificationParams {
+  originalIssue: {
+    number: number
+    title: string
+    body: string
+    type: 'bug' | 'feature'
+  }
+  implementationContext: ClarificationContext
+  userFeedback: string  // Their initial "not working" response
+}
+
+// Result from clarification question generation
+export interface FollowUpClarificationResult {
+  questions: string[]
+  contextSummary: string  // Brief summary of what was attempted
+  error?: string
+}
+
+// Input for generating enriched follow-up issue
+export interface GenerateEnrichedFollowUpParams {
+  originalIssue: {
+    number: number
+    title: string
+    body: string
+    url: string
+    type: 'bug' | 'feature'
+  }
+  implementationContext: ClarificationContext
+  initialUserFeedback: string
+  clarificationQuestions: string[]
+  clarificationAnswers: string
+}
+
+// Result from enriched follow-up issue generation
+export interface EnrichedFollowUpResult {
+  title: string
+  body: string
+  analysis: {
+    likelyRemainingIssue: string
+    areasToInvestigate: string[]
+    isRegressionLikely: boolean
+  }
 }

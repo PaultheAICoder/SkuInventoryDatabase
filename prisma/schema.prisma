@@ -34,6 +34,10 @@ model Company {
   // [V2-DEFERRED] Shopify integration relations
   shopifyConnection  ShopifyConnection?
   skuChannelMappings SkuChannelMapping[]
+
+  // V2: Integration credentials and sync logs
+  integrationCredentials IntegrationCredential[]
+  syncLogs               SyncLog[]               @relation("CompanySyncLogs")
 }
 
 enum LocationType {
@@ -75,6 +79,11 @@ model Brand {
 
   components Component[]
   skus       SKU[]
+
+  // V2: Integration relations
+  integrationCredentials IntegrationCredential[]
+  salesDaily             SalesDaily[]
+  asinSkuMappings        AsinSkuMapping[]
 
   @@unique([companyId, name])
   @@index([companyId, isActive])
@@ -131,6 +140,11 @@ model User {
 
   // Feedback relation
   feedbacks         Feedback[]
+
+  // V2: Integration relations
+  asinMappingsCreated AsinSkuMapping[] @relation("AsinMappingCreatedBy")
+  syncLogsTriggered   SyncLog[]        @relation("SyncLogTriggeredBy")
+  notifications       Notification[]
 }
 
 model UserCompany {
@@ -373,6 +387,9 @@ model SKU {
   // Channel mapping relations
   channelMappings SkuChannelMapping[]
 
+  // V2: ASIN mapping relation
+  asinMappings AsinSkuMapping[]
+
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
   @@index([companyId, isActive])
@@ -601,10 +618,11 @@ model SkuChannelMapping {
 // ============================================
 
 enum FeedbackStatus {
-  pending           // Issue created
-  resolved          // Issue closed, notification sent
-  verified          // User confirmed fix
-  changes_requested // User needs more work
+  pending                  // Issue created
+  resolved                 // Issue closed, notification sent
+  clarification_requested  // Clarification questions sent to user
+  verified                 // User confirmed fix
+  changes_requested        // User needs more work
 }
 
 model Feedback {
@@ -631,6 +649,13 @@ model Feedback {
   followUpIssueNumber   Int?
   followUpIssueUrl      String?        @db.VarChar(500)
 
+  // Clarification tracking
+  clarificationSentAt      DateTime?
+  clarificationMessageId   String?        @db.VarChar(255)
+  clarificationQuestions   String?        @db.Text  // JSON array of questions
+  clarificationAnswers     String?        @db.Text  // User's response text
+  clarificationContext     String?        @db.Text  // JSON: completion report summary, files changed
+
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
 
@@ -643,4 +668,288 @@ model EmailMonitorState {
   id            String   @id @default("singleton")
   lastCheckTime DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+// ============================================
+// V2: Amazon Ads Integration Entities
+// ============================================
+
+model IntegrationCredential {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  brandId         String?
+  brand           Brand?   @relation(fields: [brandId], references: [id])
+  integrationType String   @db.VarChar(50) // "amazon_ads", "shopify", etc.
+
+  // Encrypted credentials (format: iv:encrypted:authTag)
+  encryptedAccessToken  String  @db.Text
+  encryptedRefreshToken String? @db.Text
+
+  // OAuth metadata
+  scopes    String[] // PostgreSQL array
+  expiresAt DateTime?
+
+  // Connection status
+  status      String    @default("active") @db.VarChar(20) // "active", "expired", "revoked", "error"
+  lastUsedAt  DateTime?
+  lastErrorAt DateTime?
+  lastError   String?   @db.Text
+
+  // External account info
+  externalAccountId   String? @db.VarChar(100)
+  externalAccountName String? @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  adPortfolios AdPortfolio[]
+  syncLogs     SyncLog[]
+
+  @@unique([companyId, brandId, integrationType])
+  @@index([companyId, integrationType])
+  @@index([status])
+}
+
+model AdPortfolio {
+  id           String                @id @default(uuid())
+  credentialId String
+  credential   IntegrationCredential @relation(fields: [credentialId], references: [id])
+
+  externalId String @db.VarChar(100) // Amazon portfolio ID
+  name       String @db.VarChar(200)
+  state      String @default("enabled") @db.VarChar(20) // "enabled", "paused", "archived"
+
+  // Budget info (optional)
+  budgetAmount       Decimal? @db.Decimal(10, 2)
+  budgetCurrencyCode String?  @db.VarChar(3) // "USD"
+  budgetPolicy       String?  @db.VarChar(20) // "dateRange", "monthlyRecurring"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  campaigns      AdCampaign[]
+  keywordMetrics KeywordMetric[]
+
+  @@unique([credentialId, externalId])
+  @@index([credentialId])
+}
+
+model AdCampaign {
+  id           String       @id @default(uuid())
+  portfolioId  String?
+  portfolio    AdPortfolio? @relation(fields: [portfolioId], references: [id])
+  credentialId String       // Denormalized for queries without portfolio
+
+  externalId    String  @db.VarChar(100) // Amazon campaign ID
+  name          String  @db.VarChar(200)
+  campaignType  String  @db.VarChar(50) // "sponsoredProducts", "sponsoredBrands", "sponsoredDisplay"
+  targetingType String? @db.VarChar(50) // "manual", "auto"
+  state         String  @default("enabled") @db.VarChar(20)
+
+  // Budget
+  dailyBudget Decimal? @db.Decimal(10, 2)
+
+  // Dates
+  startDate DateTime? @db.Date
+  endDate   DateTime? @db.Date
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  adGroups       AdGroup[]
+  keywordMetrics KeywordMetric[]
+
+  @@unique([credentialId, externalId])
+  @@index([portfolioId])
+  @@index([credentialId])
+}
+
+model AdGroup {
+  id         String     @id @default(uuid())
+  campaignId String
+  campaign   AdCampaign @relation(fields: [campaignId], references: [id])
+
+  externalId String   @db.VarChar(100) // Amazon ad group ID
+  name       String   @db.VarChar(200)
+  state      String   @default("enabled") @db.VarChar(20)
+  defaultBid Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  keywordMetrics KeywordMetric[]
+
+  @@unique([campaignId, externalId])
+  @@index([campaignId])
+}
+
+model KeywordMetric {
+  id String @id @default(uuid())
+
+  // Hierarchy (nullable for CSV imports without full context)
+  portfolioId String?
+  portfolio   AdPortfolio? @relation(fields: [portfolioId], references: [id])
+  campaignId  String?
+  campaign    AdCampaign?  @relation(fields: [campaignId], references: [id])
+  adGroupId   String?
+  adGroup     AdGroup?     @relation(fields: [adGroupId], references: [id])
+
+  // Keyword identification
+  keyword   String @db.VarChar(500)
+  matchType String @db.VarChar(20) // "exact", "phrase", "broad", "auto"
+
+  // Time dimension
+  date DateTime @db.Date
+
+  // Performance metrics
+  impressions    Int      @default(0)
+  clicks         Int      @default(0)
+  ctr            Decimal? @db.Decimal(8, 4) // Click-through rate
+  spend          Decimal  @default(0) @db.Decimal(10, 2)
+  cpc            Decimal? @db.Decimal(10, 2) // Cost per click
+  orders         Int      @default(0)
+  sales          Decimal  @default(0) @db.Decimal(10, 2)
+  roas           Decimal? @db.Decimal(10, 2) // Return on ad spend
+  conversionRate Decimal? @db.Decimal(8, 4)
+  acos           Decimal? @db.Decimal(8, 4) // Advertising cost of sales
+
+  // Source tracking
+  source         String  @db.VarChar(50) // "api", "csv_amazon", "csv_zonguru", "csv_helium10"
+  sourceFileName String? @db.VarChar(255)
+
+  // Extra data from CSV (for columns we don't have dedicated fields for)
+  metadata Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([portfolioId, campaignId, adGroupId, keyword, matchType, date, source])
+  @@index([portfolioId, date])
+  @@index([campaignId, date])
+  @@index([keyword])
+  @@index([date])
+}
+
+model SalesDaily {
+  id      String @id @default(uuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  // Product identification
+  asin  String? @db.VarChar(20) // Amazon ASIN
+  skuId String? // FK to internal SKU (via AsinSkuMapping)
+
+  // Time dimension
+  date DateTime @db.Date
+
+  // Sales breakdown
+  totalSales        Decimal @db.Decimal(10, 2)
+  adAttributedSales Decimal @db.Decimal(10, 2)
+  organicSales      Decimal @db.Decimal(10, 2) // Calculated: total - adAttributed
+
+  // Source channel
+  channel String @db.VarChar(50) // "amazon", "shopify"
+
+  // Metadata
+  unitsTotal        Int?
+  unitsAdAttributed Int?
+  unitsOrganic      Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, asin, date, channel])
+  @@index([brandId, date])
+  @@index([asin])
+  @@index([date])
+}
+
+model AsinSkuMapping {
+  id      String @id @default(uuid())
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id])
+
+  asin  String @db.VarChar(20)
+  skuId String
+  sku   SKU    @relation(fields: [skuId], references: [id])
+
+  // Optional metadata
+  productName String? @db.VarChar(500) // Amazon product name for reference
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("AsinMappingCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([brandId, asin])
+  @@index([brandId])
+  @@index([skuId])
+}
+
+model SyncLog {
+  id           String                 @id @default(uuid())
+  credentialId String?
+  credential   IntegrationCredential? @relation(fields: [credentialId], references: [id])
+  companyId    String?
+  company      Company?               @relation("CompanySyncLogs", fields: [companyId], references: [id])
+
+  integrationType String @db.VarChar(50) // "amazon_ads", "shopify", "csv_amazon", "csv_zonguru", "csv_helium10"
+  syncType        String @db.VarChar(50) // "full", "incremental", "manual"
+  status          String @db.VarChar(20) // "running", "completed", "failed", "partial"
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  initiatedBy String?   // userId who triggered the sync
+
+  // Metrics
+  recordsProcessed Int @default(0)
+  recordsCreated   Int @default(0)
+  recordsUpdated   Int @default(0)
+  recordsDeleted   Int @default(0)
+  recordsFailed    Int @default(0)
+
+  // Error details
+  errorMessage String? @db.Text
+  errorDetails Json    @default("{}")
+
+  // For file uploads (CSV/XLSX)
+  fileName String? @db.VarChar(255)
+  fileSize Int?    // bytes
+  metadata Json    @default("{}") // Additional context (dateRange, brandId, etc.)
+
+  triggeredById String?
+  triggeredBy   User?   @relation("SyncLogTriggeredBy", fields: [triggeredById], references: [id])
+
+  @@index([credentialId, startedAt(sort: Desc)])
+  @@index([companyId, startedAt(sort: Desc)])
+  @@index([integrationType, status])
+  @@index([syncType, status])
+  @@index([startedAt(sort: Desc)])
+}
+
+model Notification {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type    String @db.VarChar(50) // "sync_failure", "credential_expired", "info"
+  title   String @db.VarChar(200)
+  message String @db.Text
+
+  // Link to related entity
+  relatedType String? @db.VarChar(50) // "sync_log", "credential"
+  relatedId   String?
+
+  read        Boolean   @default(false)
+  readAt      DateTime?
+  dismissedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt(sort: Desc)])
 }

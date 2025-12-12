@@ -222,3 +222,37 @@ export function isReplyEmail(subject: string): boolean {
   const subjectLower = subject.toLowerCase().trim()
   return subjectLower.startsWith('re:') || subjectLower.startsWith('re: ')
 }
+
+// ============================================
+// Clarification Response Parsing
+// ============================================
+
+/**
+ * Result of parsing a clarification response
+ */
+export interface ClarificationResponseResult {
+  fullResponse: string
+  hasSubstantiveContent: boolean
+}
+
+/**
+ * Parse a clarification response email body
+ *
+ * This extracts the user's response to clarification questions,
+ * cleaning out signatures, quoted text, and email headers.
+ *
+ * @param emailBody - Raw email body (may contain HTML)
+ * @returns Cleaned response and whether it has substantive content
+ */
+export function parseClarificationResponse(emailBody: string): ClarificationResponseResult {
+  const cleanedBody = cleanEmailBody(emailBody)
+
+  // Check if response has substantive content
+  // (more than just "ok" or single word responses)
+  const hasSubstantiveContent = cleanedBody.length > 20 && cleanedBody.split(' ').length > 3
+
+  return {
+    fullResponse: cleanedBody,
+    hasSubstantiveContent,
+  }
+}
