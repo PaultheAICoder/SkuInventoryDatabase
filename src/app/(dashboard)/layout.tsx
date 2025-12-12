@@ -32,6 +32,7 @@ import { FeedbackDialog } from '@/components/features/FeedbackDialog'
 import { ChatbotButton } from '@/components/features/ChatbotButton'
 import { ChatbotPanel } from '@/components/features/ChatbotPanel'
 import { CompanyBrandSelector } from '@/components/features/CompanyBrandSelector'
+import { NotificationBanner } from '@/components/notifications/notification-banner'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -155,6 +156,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="font-semibold lg:hidden">Inventory Tracker</span>
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBanner />
             <ChatbotButton onClick={() => setChatbotOpen(true)} />
             <FeedbackButton onClick={() => setFeedbackOpen(true)} />
           </div>
