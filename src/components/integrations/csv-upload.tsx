@@ -6,7 +6,7 @@
  * Drag-and-drop file upload for keyword/search term CSV and XLSX files.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -89,9 +89,9 @@ export function CsvUpload({ brands = [] }: CsvUploadProps) {
   }, [sources.length])
 
   // Fetch sources when component mounts
-  useState(() => {
+  useEffect(() => {
     fetchSources()
-  })
+  }, [fetchSources])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
