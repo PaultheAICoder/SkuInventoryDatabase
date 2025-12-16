@@ -1,0 +1,12 @@
+{
+  "issue": "285",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-16T23:14:17.000Z",
+  "scout_plan_start": "2025-12-16T23:14:35.000Z",
+  "scout_plan_end": "2025-12-16T23:18:40.000Z",
+  "build_start": "2025-12-16T23:18:53.000Z",
+  "build_end": "2025-12-16T23:27:45.000Z",
+  "cleanup_start": "2025-12-16T23:35:00.000Z",
+  "cleanup_end": "2025-12-16T23:45:00.000Z",
+  "workflow_end": "2025-12-16T23:45:00.000Z"
+}
