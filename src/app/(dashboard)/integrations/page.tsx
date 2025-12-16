@@ -38,7 +38,7 @@ export default function IntegrationsPage() {
         const res = await fetch('/api/brands')
         if (res.ok) {
           const data = await res.json()
-          setBrands(data.brands || data || [])
+          setBrands(data.data || [])
         }
       } catch {
         // Brands are optional for CSV upload
