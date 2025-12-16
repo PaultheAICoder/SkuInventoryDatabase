@@ -31,7 +31,11 @@ interface SKUOption {
   name: string
   internalCode: string
   maxBuildableUnits: number | null
-  hasActiveBom: boolean
+  activeBom: {
+    id: string
+    versionName: string
+    unitCost: string
+  } | null
 }
 
 interface LotAvailabilityItem {
@@ -129,12 +133,12 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         const data = await res.json()
         // Filter to only SKUs with active BOMs
         setSkus(
-          data.data.filter((sku: SKUOption) => sku.hasActiveBom).map((sku: SKUOption) => ({
+          data.data.filter((sku: SKUOption) => sku.activeBom !== null).map((sku: SKUOption) => ({
             id: sku.id,
             name: sku.name,
             internalCode: sku.internalCode,
             maxBuildableUnits: sku.maxBuildableUnits,
-            hasActiveBom: sku.hasActiveBom,
+            activeBom: sku.activeBom,
           }))
         )
       } else {
@@ -310,7 +314,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-5 py-4">
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
@@ -442,14 +446,18 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                     <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU'} />
                   </SelectTrigger>
                   <SelectContent>
+                    {skus.length === 0 && !isLoadingSkus && (
+                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                        No SKUs with active BOMs found.
+                        <br />
+                        Create a BOM for your SKUs first.
+                      </div>
+                    )}
                     {skus.map((sku) => (
                       <SelectItem key={sku.id} value={sku.id}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span>{sku.name}</span>
-                          <span className="text-xs text-muted-foreground" suppressHydrationWarning>
-                            ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
-                          </span>
-                        </div>
+                        <span suppressHydrationWarning>
+                          {sku.name} ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -514,6 +522,11 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 value={formData.notes}
                 onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
               />
+            </div>
+
+            {/* Location Settings */}
+            <div className="col-span-4 border-t pt-4 mt-2">
+              <p className="text-sm font-medium text-muted-foreground mb-4">Location Settings</p>
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
