@@ -305,7 +305,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[700px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Record Build</DialogTitle>
@@ -314,18 +314,18 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-5 py-4">
+          <div className="space-y-6 py-4">
             {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             {showWarning && insufficientItems.length > 0 && (
-              <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                  <div>
+              <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
                     <p className="font-medium text-yellow-800">Insufficient Inventory</p>
                     <p className="text-sm text-yellow-700 mt-1">
                       The following components have insufficient inventory:
@@ -339,7 +339,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-4 flex gap-2">
                       <Button
                         type="button"
                         size="sm"
@@ -364,10 +364,10 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             )}
 
             {showExpiredWarning && expiredLots.length > 0 && (
-              <div className="rounded-md bg-orange-50 border border-orange-200 p-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5" />
-                  <div>
+              <div className="rounded-md bg-orange-50 border border-orange-200 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
                     <p className="font-medium text-orange-800">Expired Lots Would Be Used</p>
                     <p className="text-sm text-orange-700 mt-1">
                       This build would consume inventory from expired lots:
@@ -380,7 +380,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-4 flex gap-2">
                       <Button
                         type="button"
                         size="sm"
@@ -418,234 +418,211 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
               </div>
             )}
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="date" className="text-right">
-                Date *
-              </Label>
-              <Input
-                id="date"
-                type="date"
-                className="col-span-3"
-                value={formData.date}
-                onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="skuId" className="text-right">
-                SKU *
-              </Label>
-              <div className="col-span-3">
-                <Select
-                  value={formData.skuId}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, skuId: value }))}
-                  disabled={isLoadingSkus}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {skus.length === 0 && !isLoadingSkus && (
-                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                        No SKUs with active BOMs found.
-                        <br />
-                        Create a BOM for your SKUs first.
-                      </div>
-                    )}
-                    {skus.map((sku) => (
-                      <SelectItem key={sku.id} value={sku.id}>
-                        <span suppressHydrationWarning>
-                          {sku.name} ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedSku && (
-                  <p className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
-                    Max buildable: {selectedSku.maxBuildableUnits?.toLocaleString() ?? '0'} units
-                  </p>
-                )}
+            {/* Build Details Section */}
+            <div className="space-y-4">
+              {/* Row 1: Date and SKU */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">Date *</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="skuId">SKU *</Label>
+                  <Select
+                    value={formData.skuId}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, skuId: value }))}
+                    disabled={isLoadingSkus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {skus.length === 0 && !isLoadingSkus && (
+                        <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                          No SKUs with active BOMs found.
+                          <br />
+                          Create a BOM for your SKUs first.
+                        </div>
+                      )}
+                      {skus.map((sku) => (
+                        <SelectItem key={sku.id} value={sku.id}>
+                          <span suppressHydrationWarning>
+                            {sku.name} ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedSku && (
+                    <p className="text-xs text-muted-foreground" suppressHydrationWarning>
+                      Max buildable: {selectedSku.maxBuildableUnits?.toLocaleString() ?? '0'} units
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="unitsToBuild" className="text-right">
-                Units *
-              </Label>
-              <div className="col-span-3">
-                <Input
-                  id="unitsToBuild"
-                  type="number"
-                  step="1"
-                  min="1"
-                  className={exceedsBuildable ? 'border-yellow-500' : ''}
-                  placeholder="e.g., 10"
-                  value={formData.unitsToBuild}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, unitsToBuild: e.target.value }))
-                  }
-                  required
-                />
-                {exceedsBuildable && (
-                  <p className="text-xs text-yellow-600 mt-1" suppressHydrationWarning>
-                    Exceeds max buildable units ({selectedSku?.maxBuildableUnits?.toLocaleString()})
-                  </p>
-                )}
+              {/* Row 2: Units and Sales Channel */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unitsToBuild">Units to Build *</Label>
+                  <Input
+                    id="unitsToBuild"
+                    type="number"
+                    step="1"
+                    min="1"
+                    className={exceedsBuildable ? 'border-yellow-500' : ''}
+                    placeholder="e.g., 10"
+                    value={formData.unitsToBuild}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, unitsToBuild: e.target.value }))
+                    }
+                    required
+                  />
+                  {exceedsBuildable && (
+                    <p className="text-xs text-yellow-600" suppressHydrationWarning>
+                      Exceeds max buildable ({selectedSku?.maxBuildableUnits?.toLocaleString()})
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="salesChannel">Sales Channel</Label>
+                  <Input
+                    id="salesChannel"
+                    placeholder="e.g., Amazon, Shopify"
+                    value={formData.salesChannel}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, salesChannel: e.target.value }))
+                    }
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="salesChannel" className="text-right">
-                Channel
-              </Label>
-              <Input
-                id="salesChannel"
-                className="col-span-3"
-                placeholder="e.g., Amazon, Shopify"
-                value={formData.salesChannel}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, salesChannel: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="notes" className="text-right">
-                Notes
-              </Label>
-              <Input
-                id="notes"
-                className="col-span-3"
-                placeholder="e.g., Order batch #123"
-                value={formData.notes}
-                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-              />
-            </div>
-
-            {/* Location Settings */}
-            <div className="col-span-4 border-t pt-4 mt-2">
-              <p className="text-sm font-medium text-muted-foreground mb-4">Location Settings</p>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">
-                Location
-              </Label>
-              <Select
-                value={formData.locationId}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
-                disabled={isLoadingLocations}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="outputLocation" className="text-right">
-                Output To
-              </Label>
-              <Select
-                value={formData.outputLocationId || EMPTY_VALUE}
-                onValueChange={(value) => setFormData((prev) => ({
-                  ...prev,
-                  outputLocationId: value === EMPTY_VALUE ? '' : value
-                }))}
-                disabled={isLoadingLocations}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Select finished goods location (optional)'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={EMPTY_VALUE}>No finished goods output</SelectItem>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {formData.outputLocationId && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="outputQuantity" className="text-right">
-                  Output Qty
-                </Label>
+              {/* Row 3: Notes (full width) */}
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
                 <Input
-                  id="outputQuantity"
-                  type="number"
-                  step="1"
-                  min="1"
-                  className="col-span-3"
-                  placeholder={`Defaults to ${formData.unitsToBuild || 'units built'}`}
-                  value={formData.outputQuantity}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, outputQuantity: e.target.value }))
-                  }
+                  id="notes"
+                  placeholder="e.g., Order batch #123"
+                  value={formData.notes}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                 />
               </div>
-            )}
+            </div>
+
+            {/* Location Settings Section */}
+            <div className="border-t pt-6 mt-2 space-y-4">
+              <p className="text-sm font-medium text-foreground">Location Settings</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location">Source Location</Label>
+                  <Select
+                    value={formData.locationId}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="outputLocation">Output Location</Label>
+                  <Select
+                    value={formData.outputLocationId || EMPTY_VALUE}
+                    onValueChange={(value) => setFormData((prev) => ({
+                      ...prev,
+                      outputLocationId: value === EMPTY_VALUE ? '' : value
+                    }))}
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'No finished goods output'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={EMPTY_VALUE}>No finished goods output</SelectItem>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {formData.outputLocationId && (
+                <div className="space-y-2">
+                  <Label htmlFor="outputQuantity">Output Quantity</Label>
+                  <Input
+                    id="outputQuantity"
+                    type="number"
+                    step="1"
+                    min="1"
+                    className="max-w-[200px]"
+                    placeholder={`Defaults to ${formData.unitsToBuild || 'units built'}`}
+                    value={formData.outputQuantity}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, outputQuantity: e.target.value }))
+                    }
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Defect Tracking (collapsible) */}
-            <details className="col-span-4">
-              <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+            <details className="border-t pt-6 mt-2">
+              <summary className="cursor-pointer text-sm font-medium text-foreground hover:text-foreground/80">
                 Defect Tracking (optional)
               </summary>
               <div className="mt-4 space-y-4 pl-4 border-l-2 border-muted">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="defectCount" className="text-right">
-                    Defects
-                  </Label>
-                  <Input
-                    id="defectCount"
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="col-span-3"
-                    placeholder="Number of defective units"
-                    value={formData.defectCount}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, defectCount: e.target.value }))
-                    }
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="defectCount">Defect Count</Label>
+                    <Input
+                      id="defectCount"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Number of defective units"
+                      value={formData.defectCount}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, defectCount: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="affectedUnits">Affected Units</Label>
+                    <Input
+                      id="affectedUnits"
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="Number of affected units"
+                      value={formData.affectedUnits}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, affectedUnits: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="affectedUnits" className="text-right">
-                    Affected
-                  </Label>
-                  <Input
-                    id="affectedUnits"
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="col-span-3"
-                    placeholder="Number of affected units"
-                    value={formData.affectedUnits}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, affectedUnits: e.target.value }))
-                    }
-                  />
-                </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="defectNotes" className="text-right">
-                    Notes
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="defectNotes">Defect Notes</Label>
                   <Input
                     id="defectNotes"
-                    className="col-span-3"
                     placeholder="Description of defects..."
                     value={formData.defectNotes}
                     onChange={(e) =>
@@ -658,9 +635,9 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
 
             {/* Lot Selection (collapsible) */}
             {lotAvailability.some((la) => la.hasLots) && (
-              <details className="col-span-4" open={showLotDetails}>
+              <details className="border-t pt-6 mt-2" open={showLotDetails}>
                 <summary
-                  className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-2"
+                  className="cursor-pointer text-sm font-medium text-foreground hover:text-foreground/80 flex items-center gap-2"
                   onClick={(e) => {
                     e.preventDefault()
                     setShowLotDetails(!showLotDetails)
@@ -689,8 +666,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                         </p>
                         <div className="text-xs space-y-1">
                           {comp.selectedLots.map((lot) => (
-                            <div key={lot.lotId} className="flex items-center gap-2 pl-2">
-                              <span className="font-mono bg-muted px-1 rounded">{lot.lotNumber}</span>
+                            <div key={lot.lotId} className="flex items-center gap-2 pl-3 py-1">
+                              <span className="font-mono bg-muted px-1.5 py-0.5 rounded">{lot.lotNumber}</span>
                               <span className="text-muted-foreground" suppressHydrationWarning>
                                 ({lot.quantity.toLocaleString()} units)
                               </span>
