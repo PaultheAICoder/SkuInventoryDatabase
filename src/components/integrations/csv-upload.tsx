@@ -21,6 +21,9 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Upload, FileText, CheckCircle, XCircle, Loader2, Info } from 'lucide-react'
 
+// Sentinel value for "no selection" in Select components
+const EMPTY_VALUE = '__none__'
+
 interface CsvSource {
   id: string
   name: string
@@ -276,12 +279,15 @@ export function CsvUpload({ brands = [] }: CsvUploadProps) {
           {brands.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="brand">Brand (Optional)</Label>
-              <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+              <Select
+                value={selectedBrand || EMPTY_VALUE}
+                onValueChange={(value) => setSelectedBrand(value === EMPTY_VALUE ? '' : value)}
+              >
                 <SelectTrigger id="brand">
                   <SelectValue placeholder="Select brand..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No brand</SelectItem>
+                  <SelectItem value={EMPTY_VALUE}>No brand</SelectItem>
                   {brands.map((brand) => (
                     <SelectItem key={brand.id} value={brand.id}>
                       {brand.name}

@@ -22,6 +22,10 @@ import {
 import { AlertTriangle, Package } from 'lucide-react'
 import type { InsufficientInventoryItem } from '@/types/transaction'
 
+// Sentinel value for "no selection" in Select components
+// Radix UI Select requires non-empty string values
+const EMPTY_VALUE = '__none__'
+
 interface SKUOption {
   id: string
   name: string
@@ -539,15 +543,18 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                 Output To
               </Label>
               <Select
-                value={formData.outputLocationId}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, outputLocationId: value }))}
+                value={formData.outputLocationId || EMPTY_VALUE}
+                onValueChange={(value) => setFormData((prev) => ({
+                  ...prev,
+                  outputLocationId: value === EMPTY_VALUE ? '' : value
+                }))}
                 disabled={isLoadingLocations}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Select finished goods location (optional)'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No finished goods output</SelectItem>
+                  <SelectItem value={EMPTY_VALUE}>No finished goods output</SelectItem>
                   {locations.map((loc) => (
                     <SelectItem key={loc.id} value={loc.id}>
                       {loc.name}

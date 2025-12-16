@@ -171,15 +171,21 @@ describe('calculateReorderRecommendation', () => {
   })
 
   it('calculates correct reorder date', () => {
-    const runoutDate = new Date('2025-12-20')
+    // Use a future date to avoid clamping to today
+    const runoutDate = new Date()
+    runoutDate.setDate(runoutDate.getDate() + 30) // 30 days from now
     const result = calculateReorderRecommendation({
       dailyConsumption: 10,
       leadTimeDays: 7,
       safetyDays: 3,
       runoutDate,
     })
-    // 2025-12-20 - 7 days = 2025-12-13
-    expect(result.recommendedReorderDate?.toISOString().split('T')[0]).toBe('2025-12-13')
+    // Reorder date should be runoutDate - leadTimeDays (7 days before runout)
+    const expectedReorderDate = new Date(runoutDate)
+    expectedReorderDate.setDate(expectedReorderDate.getDate() - 7)
+    expect(result.recommendedReorderDate?.toISOString().split('T')[0]).toBe(
+      expectedReorderDate.toISOString().split('T')[0]
+    )
   })
 
   it('handles null runout date', () => {
