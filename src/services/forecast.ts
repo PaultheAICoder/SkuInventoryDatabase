@@ -61,40 +61,93 @@ export async function upsertForecastConfig(
 /**
  * Calculate consumption rate (average daily usage) for a single component
  * Returns the average daily consumption based on transaction history
+ * Optionally filter by location - if locationId is omitted, calculates global consumption
+ *
+ * For location-aware consumption:
+ * - Non-transfer transactions: use transaction.locationId
+ * - Transfer transactions:
+ *   - negative line (outgoing) = fromLocationId
  */
 export async function calculateConsumptionRate(
   componentId: string,
   lookbackDays: number = 30,
-  excludedTypes: string[] = ['initial', 'adjustment']
+  excludedTypes: string[] = ['initial', 'adjustment'],
+  locationId?: string
 ): Promise<number> {
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - lookbackDays)
 
-  const result = await prisma.transactionLine.aggregate({
+  if (!locationId) {
+    // Global consumption - no location filtering needed
+    const result = await prisma.transactionLine.aggregate({
+      where: {
+        componentId,
+        quantityChange: { lt: 0 }, // Only consumption (negative)
+        transaction: {
+          status: 'approved',
+          type: { notIn: excludedTypes as TransactionType[] },
+          createdAt: { gte: startDate },
+        },
+      },
+      _sum: { quantityChange: true },
+    })
+
+    const totalConsumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
+    return totalConsumed / lookbackDays
+  }
+
+  // Location-specific consumption requires handling transfers specially
+  // Get regular (non-transfer) consumption at this location
+  const regularResult = await prisma.transactionLine.aggregate({
     where: {
       componentId,
-      quantityChange: { lt: 0 }, // Only consumption (negative)
+      quantityChange: { lt: 0 },
       transaction: {
         status: 'approved',
-        type: { notIn: excludedTypes as TransactionType[] },
+        type: { notIn: [...excludedTypes, 'transfer'] as TransactionType[] },
+        locationId,
         createdAt: { gte: startDate },
       },
     },
     _sum: { quantityChange: true },
   })
 
-  const totalConsumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
-  return totalConsumed / lookbackDays
+  // Get transfer consumption (outgoing from this location)
+  const transferResult = await prisma.transactionLine.aggregate({
+    where: {
+      componentId,
+      quantityChange: { lt: 0 },
+      transaction: {
+        status: 'approved',
+        type: 'transfer',
+        fromLocationId: locationId,
+        createdAt: { gte: startDate },
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  const regularConsumed = Math.abs(regularResult._sum.quantityChange?.toNumber() ?? 0)
+  const transferConsumed = Math.abs(transferResult._sum.quantityChange?.toNumber() ?? 0)
+  return (regularConsumed + transferConsumed) / lookbackDays
 }
 
 /**
  * Calculate consumption rates for multiple components at once (batch version)
  * Returns a Map of componentId -> average daily consumption
+ * Optionally filter by location - if locationId is omitted, calculates global consumption
+ *
+ * For location-aware consumption:
+ * - Non-transfer transactions: use transaction.locationId
+ * - Transfer transactions:
+ *   - negative line (outgoing) = fromLocationId
+ *   - positive line (incoming) = toLocationId
  */
 export async function calculateConsumptionRates(
   componentIds: string[],
   lookbackDays: number = 30,
-  excludedTypes: string[] = ['initial', 'adjustment']
+  excludedTypes: string[] = ['initial', 'adjustment'],
+  locationId?: string
 ): Promise<Map<string, number>> {
   if (componentIds.length === 0) {
     return new Map()
@@ -103,20 +156,6 @@ export async function calculateConsumptionRates(
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - lookbackDays)
 
-  const results = await prisma.transactionLine.groupBy({
-    by: ['componentId'],
-    where: {
-      componentId: { in: componentIds },
-      quantityChange: { lt: 0 },
-      transaction: {
-        status: 'approved',
-        type: { notIn: excludedTypes as TransactionType[] },
-        createdAt: { gte: startDate },
-      },
-    },
-    _sum: { quantityChange: true },
-  })
-
   const consumptionRates = new Map<string, number>()
 
   // Initialize all to 0
@@ -124,10 +163,80 @@ export async function calculateConsumptionRates(
     consumptionRates.set(id, 0)
   }
 
-  // Calculate daily rates
-  for (const result of results) {
-    const totalConsumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
-    consumptionRates.set(result.componentId, totalConsumed / lookbackDays)
+  if (!locationId) {
+    // Global consumption - no location filtering needed
+    const results = await prisma.transactionLine.groupBy({
+      by: ['componentId'],
+      where: {
+        componentId: { in: componentIds },
+        quantityChange: { lt: 0 },
+        transaction: {
+          status: 'approved',
+          type: { notIn: excludedTypes as TransactionType[] },
+          createdAt: { gte: startDate },
+        },
+      },
+      _sum: { quantityChange: true },
+    })
+
+    // Calculate daily rates
+    for (const result of results) {
+      const totalConsumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
+      consumptionRates.set(result.componentId, totalConsumed / lookbackDays)
+    }
+
+    return consumptionRates
+  }
+
+  // Location-specific consumption requires handling transfers specially
+  // For non-transfer transactions: use transaction.locationId
+  // For transfer transactions:
+  //   - negative line = fromLocationId (outgoing from this location)
+  //   - We count outgoing transfers as consumption from that location
+
+  // Get regular (non-transfer) consumption at this location
+  const regularResults = await prisma.transactionLine.groupBy({
+    by: ['componentId'],
+    where: {
+      componentId: { in: componentIds },
+      quantityChange: { lt: 0 },
+      transaction: {
+        status: 'approved',
+        type: { notIn: [...excludedTypes, 'transfer'] as TransactionType[] },
+        locationId,
+        createdAt: { gte: startDate },
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  for (const result of regularResults) {
+    const current = consumptionRates.get(result.componentId) ?? 0
+    const consumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
+    consumptionRates.set(result.componentId, current + consumed / lookbackDays)
+  }
+
+  // Get transfer consumption (outgoing from this location)
+  // For transfers, negative quantity means outgoing from fromLocationId
+  const transferResults = await prisma.transactionLine.groupBy({
+    by: ['componentId'],
+    where: {
+      componentId: { in: componentIds },
+      quantityChange: { lt: 0 },
+      transaction: {
+        status: 'approved',
+        type: 'transfer',
+        fromLocationId: locationId,
+        createdAt: { gte: startDate },
+      },
+    },
+    _sum: { quantityChange: true },
+  })
+
+  for (const result of transferResults) {
+    const current = consumptionRates.get(result.componentId) ?? 0
+    const consumed = Math.abs(result._sum.quantityChange?.toNumber() ?? 0)
+    consumptionRates.set(result.componentId, current + consumed / lookbackDays)
   }
 
   return consumptionRates
@@ -195,10 +304,12 @@ export function calculateReorderRecommendation(params: {
 
 /**
  * Get forecasts for all active components in a company
+ * Optionally filter by location and/or brand
  */
 export async function getComponentForecasts(
   companyId: string,
-  configOverride?: Partial<ForecastConfigInput>
+  configOverride?: Partial<ForecastConfigInput>,
+  filters?: { locationId?: string; brandId?: string }
 ): Promise<ComponentForecast[]> {
   // Get config (with overrides)
   const baseConfig = await getForecastConfig(companyId)
@@ -213,11 +324,13 @@ export async function getComponentForecasts(
     excludedTransactionTypes: config.excludedTransactionTypes,
   }
 
-  // Get all active components for company
+  // Get all active components for company, optionally filtered by brandId
   const components = await prisma.component.findMany({
     where: {
       companyId,
       isActive: true,
+      // Add brandId filter if provided
+      ...(filters?.brandId && { brandId: filters.brandId }),
     },
     select: {
       id: true,
@@ -233,10 +346,15 @@ export async function getComponentForecasts(
 
   const componentIds = components.map((c) => c.id)
 
-  // Batch fetch quantities and consumption rates
+  // Batch fetch quantities and consumption rates, passing locationId for location-aware calculations
   const [quantities, consumptionRates] = await Promise.all([
-    getComponentQuantities(componentIds, companyId),
-    calculateConsumptionRates(componentIds, config.lookbackDays, config.excludedTransactionTypes),
+    getComponentQuantities(componentIds, companyId, filters?.locationId),
+    calculateConsumptionRates(
+      componentIds,
+      config.lookbackDays,
+      config.excludedTransactionTypes,
+      filters?.locationId
+    ),
   ])
 
   // Build forecasts for each component
@@ -278,10 +396,12 @@ export async function getComponentForecasts(
 
 /**
  * Get forecast for a single component by ID
+ * Optionally filter by location for location-aware quantities and consumption
  */
 export async function getComponentForecastById(
   componentId: string,
-  configOverride?: Partial<ForecastConfigInput>
+  configOverride?: Partial<ForecastConfigInput>,
+  locationId?: string
 ): Promise<ComponentForecast | null> {
   // Get component with company info
   const component = await prisma.component.findUnique({
@@ -313,15 +433,16 @@ export async function getComponentForecastById(
     excludedTransactionTypes: config.excludedTransactionTypes,
   }
 
-  // Calculate consumption rate
+  // Calculate consumption rate (location-aware if locationId provided)
   const averageDailyConsumption = await calculateConsumptionRate(
     componentId,
     config.lookbackDays,
-    config.excludedTransactionTypes
+    config.excludedTransactionTypes,
+    locationId
   )
 
-  // Get quantity on hand
-  const quantities = await getComponentQuantities([componentId], component.companyId)
+  // Get quantity on hand (location-aware if locationId provided)
+  const quantities = await getComponentQuantities([componentId], component.companyId, locationId)
   const quantityOnHand = quantities.get(componentId) ?? 0
 
   // Calculate runout

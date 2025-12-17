@@ -63,6 +63,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { searchParams } = new URL(request.url)
     const lookbackDaysParam = searchParams.get('lookbackDays')
     const safetyDaysParam = searchParams.get('safetyDays')
+    const locationIdParam = searchParams.get('locationId')
 
     const configOverride: { lookbackDays?: number; safetyDays?: number } = {}
     if (lookbackDaysParam) {
@@ -78,10 +79,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Get forecast for component
+    // Get forecast for component with optional location filter
+    const locationId = locationIdParam ?? undefined
     const forecast = await getComponentForecastById(
       componentId,
-      Object.keys(configOverride).length > 0 ? configOverride : undefined
+      Object.keys(configOverride).length > 0 ? configOverride : undefined,
+      locationId
     )
 
     if (!forecast) {

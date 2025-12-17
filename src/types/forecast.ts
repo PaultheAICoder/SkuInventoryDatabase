@@ -93,6 +93,8 @@ export const forecastListQuerySchema = z.object({
   sortBy: z.enum(['runoutDate', 'consumption', 'name', 'reorderQty']).default('runoutDate'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
   showOnlyAtRisk: z.coerce.boolean().optional(),
+  locationId: z.string().uuid().optional(),
+  brandId: z.string().uuid().optional(),
 })
 
 export type ForecastListQuery = z.infer<typeof forecastListQuerySchema>

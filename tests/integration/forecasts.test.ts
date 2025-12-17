@@ -16,6 +16,7 @@ import {
   cleanupBeforeTest,
   createTestRequest,
   createTestComponentInDb,
+  createTestLocationInDb,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
 
@@ -133,6 +134,58 @@ describe('Forecast API', () => {
       expect(response.status).toBe(400)
       const json = await response.json()
       expect(json.message).toContain('No company selected')
+    })
+
+    it('accepts locationId filter parameter', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const location = await createTestLocationInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Forecast Test Location',
+      })
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const response = await getForecasts(
+        createTestRequest('/api/forecasts', {
+          searchParams: { locationId: location.id },
+        })
+      )
+      const json = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(json.data)).toBe(true)
+    })
+
+    it('accepts brandId filter parameter', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      // Get an existing brand ID from the session
+      const prisma = getIntegrationPrisma()
+      const brand = await prisma.brand.findFirst({
+        where: { companyId: TEST_SESSIONS.admin!.user.companyId, isActive: true },
+      })
+
+      const response = await getForecasts(
+        createTestRequest('/api/forecasts', {
+          searchParams: { brandId: brand!.id },
+        })
+      )
+      const json = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(Array.isArray(json.data)).toBe(true)
+    })
+
+    it('uses selectedBrandId from session when brandId not provided', async () => {
+      // Session already has selectedBrandId set
+      setTestSession(TEST_SESSIONS.admin!)
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const response = await getForecasts(createTestRequest('/api/forecasts'))
+      const json = await response.json()
+
+      expect(response.status).toBe(200)
+      // Should only return components for the selected brand
+      expect(Array.isArray(json.data)).toBe(true)
     })
   })
 
@@ -339,6 +392,42 @@ describe('Forecast API', () => {
       const json = await response.json()
       expect(json.message).toContain('No company selected')
     })
+
+    it('respects locationId filter in export', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const location = await createTestLocationInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Export Test Location',
+      })
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const response = await exportForecasts(
+        createTestRequest('/api/export/forecasts', {
+          searchParams: { locationId: location.id },
+        })
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('text/csv')
+    })
+
+    it('respects brandId filter in export', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const prisma = getIntegrationPrisma()
+      const brand = await prisma.brand.findFirst({
+        where: { companyId: TEST_SESSIONS.admin!.user.companyId, isActive: true },
+      })
+
+      const response = await exportForecasts(
+        createTestRequest('/api/export/forecasts', {
+          searchParams: { brandId: brand!.id },
+        })
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('text/csv')
+    })
   })
 
   describe('GET /api/forecasts/[componentId]', () => {
@@ -382,6 +471,25 @@ describe('Forecast API', () => {
       const response = await getComponentForecast(request, params)
 
       expect(response.status).toBe(401)
+    })
+
+    it('accepts locationId filter parameter', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+      const location = await createTestLocationInDb(TEST_SESSIONS.admin!.user.companyId, {
+        name: 'Single Component Test Location',
+      })
+
+      const request = createTestRequest(`/api/forecasts/${component.id}`, {
+        searchParams: { locationId: location.id },
+      })
+      const params = { params: Promise.resolve({ componentId: component.id }) }
+
+      const response = await getComponentForecast(request, params)
+      const json = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(json.data.componentId).toBe(component.id)
     })
   })
 })

@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const queryResult = parseQuery(searchParams, forecastListQuerySchema)
     if (queryResult.error) return queryResult.error
 
-    const { page, pageSize, lookbackDays, safetyDays, sortBy, sortOrder, showOnlyAtRisk } =
+    const { page, pageSize, lookbackDays, safetyDays, sortBy, sortOrder, showOnlyAtRisk, locationId, brandId } =
       queryResult.data
 
     // Use selected company for scoping
@@ -52,15 +52,19 @@ export async function GET(request: NextRequest) {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
+    // Use selected brand from session if not explicitly provided in query
+    const effectiveBrandId = brandId ?? session.user.selectedBrandId ?? undefined
+
     // Build config override if query params provided
     const configOverride: { lookbackDays?: number; safetyDays?: number } = {}
     if (lookbackDays !== undefined) configOverride.lookbackDays = lookbackDays
     if (safetyDays !== undefined) configOverride.safetyDays = safetyDays
 
-    // Get all forecasts for company
+    // Get all forecasts for company with optional filters
     const forecasts = await getComponentForecasts(
       selectedCompanyId,
-      Object.keys(configOverride).length > 0 ? configOverride : undefined
+      Object.keys(configOverride).length > 0 ? configOverride : undefined,
+      { locationId, brandId: effectiveBrandId }
     )
 
     // Apply showOnlyAtRisk filter if enabled

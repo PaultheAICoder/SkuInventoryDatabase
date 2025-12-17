@@ -319,6 +319,31 @@ describe('calculateConsumptionRates', () => {
     expect(result.get('comp-1')).toBe(10) // 300 / 30
     expect(result.get('comp-2')).toBe(2) // 60 / 30
   })
+
+  it('filters consumption by location when locationId provided', async () => {
+    // First call: regular (non-transfer) consumption at location
+    // Second call: transfer consumption from location
+    vi.mocked(prisma.transactionLine.groupBy)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(-150) } },
+      ] as never)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(-30) } },
+      ] as never)
+
+    const result = await calculateConsumptionRates(
+      ['comp-1'],
+      30,
+      ['initial', 'adjustment'],
+      'location-1'
+    )
+
+    // 150/30 + 30/30 = 5 + 1 = 6 per day
+    expect(result.get('comp-1')).toBe(6)
+
+    // Verify location filter was applied to both queries
+    expect(prisma.transactionLine.groupBy).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('getComponentForecasts', () => {
@@ -404,6 +429,83 @@ describe('getComponentForecasts', () => {
 
     expect(result[0].daysUntilRunout).toBe(10) // 100 / 10
     expect(result[0].recommendedReorderQty).toBe(140) // (7 lead + 7 safety) * 10
+  })
+
+  it('filters by brandId when provided', async () => {
+    vi.mocked(prisma.forecastConfig.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1', name: 'Brand Component', skuCode: 'BC-1', leadTimeDays: 7 },
+    ] as never)
+    vi.mocked(getComponentQuantities).mockResolvedValue(new Map([['comp-1', 50]]))
+    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
+
+    await getComponentForecasts('company-1', undefined, { brandId: 'brand-1' })
+
+    // Verify brandId filter was applied to component query
+    expect(prisma.component.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          brandId: 'brand-1',
+        }),
+      })
+    )
+  })
+
+  it('passes locationId to quantity and consumption calculations', async () => {
+    vi.mocked(prisma.forecastConfig.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1', name: 'Component 1', skuCode: 'SKU-1', leadTimeDays: 7 },
+    ] as never)
+    vi.mocked(getComponentQuantities).mockResolvedValue(new Map([['comp-1', 30]]))
+    // Mock location-aware consumption (regular + transfer queries)
+    vi.mocked(prisma.transactionLine.groupBy)
+      .mockResolvedValueOnce([
+        { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(-90) } },
+      ] as never)
+      .mockResolvedValueOnce([])
+
+    await getComponentForecasts('company-1', undefined, { locationId: 'loc-1' })
+
+    // Verify locationId was passed to getComponentQuantities
+    expect(getComponentQuantities).toHaveBeenCalledWith(
+      expect.any(Array),
+      'company-1',
+      'loc-1'
+    )
+  })
+
+  it('applies both brandId and locationId filters', async () => {
+    vi.mocked(prisma.forecastConfig.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1', name: 'Brand Location Component', skuCode: 'BLC-1', leadTimeDays: 7 },
+    ] as never)
+    vi.mocked(getComponentQuantities).mockResolvedValue(new Map([['comp-1', 25]]))
+    vi.mocked(prisma.transactionLine.groupBy)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+
+    const result = await getComponentForecasts('company-1', undefined, {
+      brandId: 'brand-1',
+      locationId: 'loc-1',
+    })
+
+    // Verify brandId filter was applied
+    expect(prisma.component.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          brandId: 'brand-1',
+        }),
+      })
+    )
+
+    // Verify locationId was passed to quantities
+    expect(getComponentQuantities).toHaveBeenCalledWith(
+      expect.any(Array),
+      'company-1',
+      'loc-1'
+    )
+
+    expect(result).toHaveLength(1)
   })
 })
 
@@ -506,5 +608,51 @@ describe('getComponentForecastById', () => {
     const result = await getComponentForecastById('comp-1', { safetyDays: 21 })
 
     expect(result?.assumptions.safetyDays).toBe(21)
+  })
+
+  it('passes locationId to quantity and consumption calculations', async () => {
+    vi.mocked(prisma.component.findUnique).mockResolvedValue({
+      id: 'comp-1',
+      name: 'Component 1',
+      skuCode: 'SKU-1',
+      leadTimeDays: 7,
+      companyId: 'company-1',
+      isActive: true,
+    } as never)
+
+    vi.mocked(prisma.forecastConfig.findUnique).mockResolvedValue(null)
+
+    // Mock location-aware consumption (regular + transfer queries)
+    vi.mocked(prisma.transactionLine.aggregate)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: new Prisma.Decimal(-60) },
+        _count: 2,
+        _avg: { quantityChange: null },
+        _min: { quantityChange: null },
+        _max: { quantityChange: null },
+      } as never)
+      .mockResolvedValueOnce({
+        _sum: { quantityChange: null },
+        _count: 0,
+        _avg: { quantityChange: null },
+        _min: { quantityChange: null },
+        _max: { quantityChange: null },
+      } as never)
+
+    vi.mocked(getComponentQuantities).mockResolvedValue(new Map([['comp-1', 40]]))
+
+    const result = await getComponentForecastById('comp-1', undefined, 'location-1')
+
+    // Verify locationId was passed to getComponentQuantities
+    expect(getComponentQuantities).toHaveBeenCalledWith(
+      ['comp-1'],
+      'company-1',
+      'location-1'
+    )
+
+    expect(result).not.toBeNull()
+    expect(result?.quantityOnHand).toBe(40)
+    // 60/30 = 2 per day consumption
+    expect(result?.averageDailyConsumption).toBe(2)
   })
 })

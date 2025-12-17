@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Parse optional query params for config override
+    // Parse optional query params for config override and filters
     const { searchParams } = new URL(request.url)
     const lookbackDays = searchParams.get('lookbackDays')
       ? parseInt(searchParams.get('lookbackDays')!, 10)
@@ -54,15 +54,22 @@ export async function GET(request: NextRequest) {
       ? parseInt(searchParams.get('safetyDays')!, 10)
       : undefined
 
+    // Parse location and brand filters
+    const locationId = searchParams.get('locationId') ?? undefined
+    const brandIdParam = searchParams.get('brandId') ?? undefined
+    // Use selected brand from session if not explicitly provided in query
+    const effectiveBrandId = brandIdParam ?? session.user.selectedBrandId ?? undefined
+
     // Build config override if query params provided
     const configOverride: { lookbackDays?: number; safetyDays?: number } = {}
     if (lookbackDays !== undefined) configOverride.lookbackDays = lookbackDays
     if (safetyDays !== undefined) configOverride.safetyDays = safetyDays
 
-    // Get forecasts with optional config override
+    // Get forecasts with optional config override and filters
     const forecasts = await getComponentForecasts(
       selectedCompanyId,
-      Object.keys(configOverride).length > 0 ? configOverride : undefined
+      Object.keys(configOverride).length > 0 ? configOverride : undefined,
+      { locationId, brandId: effectiveBrandId }
     )
 
     // Get component categories for export
