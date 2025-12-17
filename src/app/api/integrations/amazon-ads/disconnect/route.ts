@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { revokeAccess } from '@/services/amazon-ads/client'
 
@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Admin only
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return NextResponse.json(
         { error: 'Admin permission required' },
         { status: 403 }

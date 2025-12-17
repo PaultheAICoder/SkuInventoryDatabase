@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { unauthorized, notFound } from '@/lib/api-response'
 import {
@@ -89,7 +89,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 
   // Only ops and admin can access import templates
-  if (session.user.role === 'viewer') {
+  const companyRole = getSelectedCompanyRole(session)
+  if (companyRole === 'viewer') {
     return unauthorized('Viewers cannot access import templates')
   }
 

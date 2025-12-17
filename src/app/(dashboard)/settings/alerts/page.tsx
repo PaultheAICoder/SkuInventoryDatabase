@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { AlertConfigForm } from '@/components/features/AlertConfigForm'
+import { getClientCompanyRole } from '@/lib/utils'
 
 interface AlertConfig {
   id: string
@@ -56,7 +57,8 @@ export default function AlertSettingsPage() {
       return
     }
 
-    if (session.user.role !== 'admin') {
+    const companyRole = getClientCompanyRole(session.user)
+    if (companyRole !== 'admin') {
       router.push('/')
       return
     }

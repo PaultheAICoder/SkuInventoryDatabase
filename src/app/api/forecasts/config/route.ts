@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import {
   success,
   unauthorized,
@@ -71,7 +71,8 @@ export async function PUT(request: NextRequest) {
     }
 
     // Only admins can update config
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return forbidden()
     }
 

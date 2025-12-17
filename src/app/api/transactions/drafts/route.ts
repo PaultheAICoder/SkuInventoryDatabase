@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { parseQuery, unauthorized, forbidden, serverError, validationError, error } from '@/lib/api-response'
 import { createDraftSchema, draftListQuerySchema } from '@/types/draft'
 import { createDraftTransaction, getDraftTransactions } from '@/services/draft-transaction'
@@ -66,7 +66,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Only admin and ops can create drafts
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return forbidden()
     }
 

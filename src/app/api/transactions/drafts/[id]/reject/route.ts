@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { unauthorized, forbidden, serverError, error } from '@/lib/api-response'
 import { rejectDraftSchema } from '@/types/draft'
 import { rejectDraftTransaction } from '@/services/draft-transaction'
@@ -21,7 +21,8 @@ export async function POST(
     }
 
     // Only admin and ops can reject drafts
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return forbidden()
     }
 

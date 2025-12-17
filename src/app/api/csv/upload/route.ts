@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { error } from '@/lib/api-response'
 import { parseFile, validateFile, previewFile, detectFileType } from '@/services/csv/parser'
@@ -33,8 +33,9 @@ export async function POST(request: NextRequest) {
     // Use selected brand from session if available
     const selectedBrandId = session.user.selectedBrandId
 
-    // Admin or Ops only for file uploads (check via session role)
-    if (session.user.role !== 'admin' && session.user.role !== 'ops') {
+    // Admin or Ops only for file uploads (check via company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin' && companyRole !== 'ops') {
       return NextResponse.json(
         { error: 'Admin or Ops permission required' },
         { status: 403 }
@@ -226,8 +227,9 @@ export async function GET() {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Admin or Ops only for file upload info (check via session role)
-    if (session.user.role !== 'admin' && session.user.role !== 'ops') {
+    // Admin or Ops only for file upload info (check via company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin' && companyRole !== 'ops') {
       return NextResponse.json(
         { error: 'Admin or Ops permission required' },
         { status: 403 }

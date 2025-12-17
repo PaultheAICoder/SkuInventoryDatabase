@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import {
   success,
@@ -132,6 +132,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
+    }
+
+    // Non-viewer role required for create operations
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
+      return unauthorized('Insufficient permissions')
     }
 
     const { id: skuId } = await params

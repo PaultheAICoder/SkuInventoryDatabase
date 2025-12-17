@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import {
   success,
   unauthorized,
@@ -25,7 +25,8 @@ export async function GET() {
       return unauthorized()
     }
 
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return forbidden()
     }
 
@@ -60,7 +61,8 @@ export async function PATCH(request: NextRequest) {
       return unauthorized()
     }
 
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return forbidden()
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import {
   success,
   unauthorized,
@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return unauthorized()
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return unauthorized('Admin access required')
     }
 

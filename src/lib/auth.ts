@@ -398,3 +398,15 @@ export async function validateUserExists(userId: string): Promise<{ id: string; 
     return null
   }
 }
+
+/**
+ * Get the user's role for their currently selected company
+ * Returns the role from UserCompany (multi-tenant) not the legacy User.role
+ * This is the correct source for permission checks in multi-tenant context
+ */
+export function getSelectedCompanyRole(
+  session: { user: { companies: Array<{ id: string; role?: string }>; selectedCompanyId: string } }
+): 'admin' | 'ops' | 'viewer' | undefined {
+  const company = session.user.companies.find((c) => c.id === session.user.selectedCompanyId)
+  return company?.role as 'admin' | 'ops' | 'viewer' | undefined
+}

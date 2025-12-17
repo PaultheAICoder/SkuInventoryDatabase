@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import { ImportForm, type ImportResult } from '@/components/features/ImportForm'
 import { ImportResultDialog } from '@/components/features/ImportResultDialog'
+import { getClientCompanyRole } from '@/lib/utils'
 
 export default function ImportPage() {
   const { data: session, status } = useSession()
@@ -30,7 +31,8 @@ export default function ImportPage() {
     redirect('/login')
   }
 
-  if (session.user.role === 'viewer') {
+  const companyRole = getClientCompanyRole(session.user)
+  if (companyRole === 'viewer') {
     return (
       <div className="space-y-6">
         <div>

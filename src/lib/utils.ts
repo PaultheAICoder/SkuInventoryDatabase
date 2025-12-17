@@ -63,6 +63,22 @@ export function toLocalDateString(date: Date): string {
 }
 
 /**
+ * Get the user's role for their currently selected company (client-side version).
+ * Returns the role from the companies array based on selectedCompanyId.
+ * This is the correct source for permission checks in multi-tenant context.
+ *
+ * @param user - User object from useSession (must have companies and selectedCompanyId)
+ * @returns The role for the selected company, or undefined if not found
+ */
+export function getClientCompanyRole(
+  user: { companies: Array<{ id: string; role?: string }>; selectedCompanyId: string } | null | undefined
+): 'admin' | 'ops' | 'viewer' | undefined {
+  if (!user) return undefined
+  const company = user.companies.find((c) => c.id === user.selectedCompanyId)
+  return company?.role as 'admin' | 'ops' | 'viewer' | undefined
+}
+
+/**
  * Parse a fraction string (e.g., "1/45") or decimal number to a numeric value.
  * Returns null if the input is invalid.
  */
