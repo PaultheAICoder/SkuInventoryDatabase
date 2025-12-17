@@ -16,9 +16,13 @@ vi.mock('@/lib/db', () => ({
     transaction: {
       create: vi.fn(),
     },
-    transactionLine: {
-      aggregate: vi.fn(),
+    inventoryBalance: {
       groupBy: vi.fn(),
+      findMany: vi.fn(),
+      upsert: vi.fn(),
+    },
+    finishedGoodsBalance: {
+      upsert: vi.fn(),
     },
     location: {
       findFirst: vi.fn(),
@@ -116,16 +120,21 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       { id: 'component-1' },
     ] as never)
 
-    // Mock transactionLine for checkInsufficientInventory (returns sufficient inventory)
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
+    // Mock inventoryBalance for checkInsufficientInventory (returns sufficient inventory)
+    // Uses groupBy when no locationId, findMany when locationId is provided
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
       {
         componentId: 'component-1',
-        _sum: { quantityChange: new Prisma.Decimal(1000) }, // Plenty of inventory
+        _sum: { quantity: new Prisma.Decimal(1000) }, // Plenty of inventory
       },
     ] as never)
-    vi.mocked(prisma.transactionLine.aggregate).mockResolvedValue({
-      _sum: { quantityChange: new Prisma.Decimal(1000) },
-    } as never)
+    // Also mock findMany for location-specific queries (when locationId is provided)
+    vi.mocked(prisma.inventoryBalance.findMany).mockResolvedValue([
+      {
+        componentId: 'component-1',
+        quantity: new Prisma.Decimal(1000), // Plenty of inventory
+      },
+    ] as never)
   })
 
   // Helper to create transaction with lot info on lines
@@ -136,6 +145,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
   // Helper to create mock transaction client with lot support
   // Now includes bOMLine since it's fetched inside the transaction for atomicity (Issue #296)
+  // Also includes inventoryBalance and finishedGoodsBalance for balance updates
   function createMockTxClient(overrides: {
     locationResult?: { id: string; name: string } | null
     finishedGoodsCallback?: () => void
@@ -164,6 +174,12 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       },
       lotBalance: {
         update: vi.fn().mockResolvedValue({}),
+      },
+      inventoryBalance: {
+        upsert: vi.fn().mockResolvedValue({}),
+      },
+      finishedGoodsBalance: {
+        upsert: vi.fn().mockResolvedValue({}),
       },
     }
   }
@@ -265,6 +281,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
           },
           lot: { findMany: vi.fn().mockResolvedValue([]) },
           lotBalance: { update: vi.fn().mockResolvedValue({}) },
+          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
+          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -306,6 +324,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
           },
           lot: { findMany: vi.fn().mockResolvedValue([]) },
           lotBalance: { update: vi.fn().mockResolvedValue({}) },
+          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
+          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -349,6 +369,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
           },
           lot: { findMany: vi.fn().mockResolvedValue([]) },
           lotBalance: { update: vi.fn().mockResolvedValue({}) },
+          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
+          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -393,6 +415,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
           },
           lot: { findMany: vi.fn().mockResolvedValue([]) },
           lotBalance: { update: vi.fn().mockResolvedValue({}) },
+          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
+          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -435,6 +459,8 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
           },
           lot: { findMany: vi.fn().mockResolvedValue([]) },
           lotBalance: { update: vi.fn().mockResolvedValue({}) },
+          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
+          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })

@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db'
 import { Prisma, TransactionStatus } from '@prisma/client'
 import type { CreateDraftInput, DraftTransactionResponse, BatchApproveResult, BOMSnapshot, BOMLineSnapshot } from '@/types/draft'
-import { checkInsufficientInventory, getComponentQuantities } from './inventory'
+import { checkInsufficientInventory, getComponentQuantities, updateInventoryBalance } from './inventory'
+import { updateFinishedGoodsBalance } from './finished-goods'
 import { getDefaultLocationId } from './location'
 
 // =============================================================================
@@ -530,15 +531,29 @@ export async function approveDraftTransaction(params: {
 
           // Create finished goods output
           const defaultLocationId = await getDefaultLocationId(companyId)
+          const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
           await tx.finishedGoodsLine.create({
             data: {
               transactionId: id,
               skuId: draft.skuId,
-              locationId: draft.locationId ?? defaultLocationId ?? '',
+              locationId: fgLocationId,
               quantityChange: new Prisma.Decimal(draft.unitsBuild),
               costPerUnit: new Prisma.Decimal(unitBomCost),
             },
           })
+
+          // Update inventory balances for consumed components (legacy path)
+          if (draft.locationId) {
+            for (const bomLine of bomLines) {
+              const requiredQty = bomLine.quantityPerUnit.toNumber() * draft.unitsBuild
+              await updateInventoryBalance(tx, bomLine.componentId, draft.locationId, -requiredQty)
+            }
+          }
+
+          // Update finished goods balance
+          if (fgLocationId) {
+            await updateFinishedGoodsBalance(tx, draft.skuId, fgLocationId, draft.unitsBuild)
+          }
         } else {
           // Use snapshot data for consumption
           for (const line of bomSnapshot.lines) {
@@ -569,15 +584,29 @@ export async function approveDraftTransaction(params: {
 
           // Create finished goods output (using snapshot cost)
           const defaultLocationId = await getDefaultLocationId(companyId)
+          const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
           await tx.finishedGoodsLine.create({
             data: {
               transactionId: id,
               skuId: draft.skuId,
-              locationId: draft.locationId ?? defaultLocationId ?? '',
+              locationId: fgLocationId,
               quantityChange: new Prisma.Decimal(draft.unitsBuild),
               costPerUnit: new Prisma.Decimal(unitBomCost),
             },
           })
+
+          // Update inventory balances for consumed components (snapshot path)
+          if (draft.locationId) {
+            for (const line of bomSnapshot.lines) {
+              const requiredQty = parseFloat(line.quantityPerUnit) * draft.unitsBuild
+              await updateInventoryBalance(tx, line.componentId, draft.locationId, -requiredQty)
+            }
+          }
+
+          // Update finished goods balance
+          if (fgLocationId) {
+            await updateFinishedGoodsBalance(tx, draft.skuId, fgLocationId, draft.unitsBuild)
+          }
         }
       } else if (draft.type === 'transfer' && draft.lines.length > 0) {
         // For transfers, create both outgoing and incoming lines
@@ -608,8 +637,21 @@ export async function approveDraftTransaction(params: {
             costPerUnit: originalLine.costPerUnit,
           },
         })
+
+        // Update inventory balances for transfer
+        if (draft.fromLocationId && draft.toLocationId) {
+          await updateInventoryBalance(tx, originalLine.componentId, draft.fromLocationId, -quantity)
+          await updateInventoryBalance(tx, originalLine.componentId, draft.toLocationId, quantity)
+        }
+      } else if (draft.type === 'receipt' || draft.type === 'adjustment' || draft.type === 'initial') {
+        // For receipt, adjustment, initial - the lines are already correct from draft creation
+        // But we need to update the balance
+        if (draft.locationId && draft.lines.length > 0) {
+          for (const line of draft.lines) {
+            await updateInventoryBalance(tx, line.componentId, draft.locationId, line.quantityChange.toNumber())
+          }
+        }
       }
-      // For receipt, adjustment, initial - the lines are already correct from draft creation
 
       return approvedDraft
     })

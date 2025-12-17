@@ -12,6 +12,13 @@ vi.mock('@/lib/db', () => ({
       aggregate: vi.fn(),
       groupBy: vi.fn(),
     },
+    finishedGoodsBalance: {
+      aggregate: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      groupBy: vi.fn(),
+      upsert: vi.fn(),
+    },
     location: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -37,25 +44,6 @@ import {
 } from '@/services/finished-goods'
 import { prisma } from '@/lib/db'
 
-// Helper to create mock location data
-function mockLocation(overrides: Partial<{
-  id: string
-  name: string
-  type: 'warehouse' | 'threepl' | 'fba' | 'finished_goods'
-}> = {}) {
-  return {
-    id: overrides.id ?? 'loc-1',
-    companyId: 'company-1',
-    name: overrides.name ?? 'Test Location',
-    type: overrides.type ?? 'warehouse',
-    isDefault: false,
-    isActive: true,
-    notes: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-}
-
 describe('Finished Goods Service', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -64,8 +52,8 @@ describe('Finished Goods Service', () => {
   describe('getSkuQuantity', () => {
     it('returns global total when no locationId', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(150) },
+      vi.mocked(prisma.finishedGoodsBalance.aggregate).mockResolvedValue({
+        _sum: { quantity: new Prisma.Decimal(150) },
       } as never)
 
       const result = await getSkuQuantity('sku-1', 'company-1')
@@ -75,31 +63,31 @@ describe('Finished Goods Service', () => {
         where: { id: 'sku-1', companyId: 'company-1' },
         select: { id: true },
       })
-      expect(prisma.finishedGoodsLine.aggregate).toHaveBeenCalledWith({
+      expect(prisma.finishedGoodsBalance.aggregate).toHaveBeenCalledWith({
         where: { skuId: 'sku-1' },
-        _sum: { quantityChange: true },
+        _sum: { quantity: true },
       })
     })
 
     it('returns location-specific total when locationId provided', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(75) },
+      vi.mocked(prisma.finishedGoodsBalance.findUnique).mockResolvedValue({
+        quantity: new Prisma.Decimal(75),
       } as never)
 
       const result = await getSkuQuantity('sku-1', 'company-1', 'loc-1')
 
       expect(result).toBe(75)
-      expect(prisma.finishedGoodsLine.aggregate).toHaveBeenCalledWith({
-        where: { skuId: 'sku-1', locationId: 'loc-1' },
-        _sum: { quantityChange: true },
+      expect(prisma.finishedGoodsBalance.findUnique).toHaveBeenCalledWith({
+        where: { skuId_locationId: { skuId: 'sku-1', locationId: 'loc-1' } },
+        select: { quantity: true },
       })
     })
 
-    it('returns 0 when no finished goods lines exist', async () => {
+    it('returns 0 when no finished goods balance exists', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-new' } as never)
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: null },
+      vi.mocked(prisma.finishedGoodsBalance.aggregate).mockResolvedValue({
+        _sum: { quantity: null },
       } as never)
 
       const result = await getSkuQuantity('sku-new', 'company-1')
@@ -122,9 +110,9 @@ describe('Finished Goods Service', () => {
         { id: 'sku-1' },
         { id: 'sku-2' },
       ] as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { skuId: 'sku-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
-        { skuId: 'sku-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
+      vi.mocked(prisma.finishedGoodsBalance.groupBy).mockResolvedValue([
+        { skuId: 'sku-1', _sum: { quantity: new Prisma.Decimal(100) } },
+        { skuId: 'sku-2', _sum: { quantity: new Prisma.Decimal(50) } },
       ] as never)
 
       const result = await getSkuQuantities(['sku-1', 'sku-2', 'sku-3'], 'company-1')
@@ -147,26 +135,25 @@ describe('Finished Goods Service', () => {
         { id: 'sku-1' },
         { id: 'sku-2' },
       ] as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { skuId: 'sku-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
+      vi.mocked(prisma.finishedGoodsBalance.findMany).mockResolvedValue([
+        { skuId: 'sku-1', quantity: new Prisma.Decimal(50) },
       ] as never)
 
       await getSkuQuantities(['sku-1', 'sku-2'], 'company-1', 'loc-1')
 
-      expect(prisma.finishedGoodsLine.groupBy).toHaveBeenCalledWith({
-        by: ['skuId'],
+      expect(prisma.finishedGoodsBalance.findMany).toHaveBeenCalledWith({
         where: {
           skuId: { in: ['sku-1', 'sku-2'] },
           locationId: 'loc-1',
         },
-        _sum: { quantityChange: true },
+        select: { skuId: true, quantity: true },
       })
     })
 
     it('handles null quantity sums', async () => {
       vi.mocked(prisma.sKU.findMany).mockResolvedValue([{ id: 'sku-1' }] as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { skuId: 'sku-1', _sum: { quantityChange: null } },
+      vi.mocked(prisma.finishedGoodsBalance.groupBy).mockResolvedValue([
+        { skuId: 'sku-1', _sum: { quantity: null } },
       ] as never)
 
       const result = await getSkuQuantities(['sku-1'], 'company-1')
@@ -182,22 +169,17 @@ describe('Finished Goods Service', () => {
       expect(result.get('sku-1')).toBe(0)
       expect(result.get('sku-2')).toBe(0)
       // groupBy should not be called when no valid SKUs
-      expect(prisma.finishedGoodsLine.groupBy).not.toHaveBeenCalled()
+      expect(prisma.finishedGoodsBalance.groupBy).not.toHaveBeenCalled()
     })
   })
 
   describe('getSkuInventorySummary', () => {
     it('groups quantities by location', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
-        { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(50) } },
+      vi.mocked(prisma.finishedGoodsBalance.findMany).mockResolvedValue([
+        { location: { id: 'loc-1', name: 'Warehouse A', type: 'warehouse' }, quantity: new Prisma.Decimal(100) },
+        { location: { id: 'loc-2', name: 'FBA Center', type: 'fba' }, quantity: new Prisma.Decimal(50) },
       ] as never)
-
-      vi.mocked(prisma.location.findMany).mockResolvedValue([
-        mockLocation({ id: 'loc-1', name: 'Warehouse A', type: 'warehouse' }),
-        mockLocation({ id: 'loc-2', name: 'FBA Center', type: 'fba' }),
-      ])
 
       const result = await getSkuInventorySummary('sku-1', 'company-1')
 
@@ -207,13 +189,9 @@ describe('Finished Goods Service', () => {
 
     it('includes location details', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
+      vi.mocked(prisma.finishedGoodsBalance.findMany).mockResolvedValue([
+        { location: { id: 'loc-1', name: 'Main Warehouse', type: 'warehouse' }, quantity: new Prisma.Decimal(100) },
       ] as never)
-
-      vi.mocked(prisma.location.findMany).mockResolvedValue([
-        mockLocation({ id: 'loc-1', name: 'Main Warehouse', type: 'warehouse' }),
-      ])
 
       const result = await getSkuInventorySummary('sku-1', 'company-1')
 
@@ -225,37 +203,24 @@ describe('Finished Goods Service', () => {
       })
     })
 
-    it('excludes locations with zero quantity', async () => {
+    it('returns empty result when no balances exist (zero quantities filtered)', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
-        { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(0) } },
-      ] as never)
-
-      vi.mocked(prisma.location.findMany).mockResolvedValue([
-        mockLocation({ id: 'loc-1', name: 'Warehouse A', type: 'warehouse' }),
-        mockLocation({ id: 'loc-2', name: 'Empty Warehouse', type: 'warehouse' }),
-      ])
+      // The query already filters out zero quantities, so empty means no non-zero balances
+      vi.mocked(prisma.finishedGoodsBalance.findMany).mockResolvedValue([] as never)
 
       const result = await getSkuInventorySummary('sku-1', 'company-1')
 
-      expect(result.byLocation).toHaveLength(1)
-      expect(result.byLocation[0].locationId).toBe('loc-1')
+      expect(result.byLocation).toHaveLength(0)
+      expect(result.totalQuantity).toBe(0)
     })
 
     it('sorts by quantity descending', async () => {
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.groupBy).mockResolvedValue([
-        { locationId: 'loc-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
-        { locationId: 'loc-2', _sum: { quantityChange: new Prisma.Decimal(150) } },
-        { locationId: 'loc-3', _sum: { quantityChange: new Prisma.Decimal(100) } },
+      vi.mocked(prisma.finishedGoodsBalance.findMany).mockResolvedValue([
+        { location: { id: 'loc-1', name: 'Small', type: 'warehouse' }, quantity: new Prisma.Decimal(50) },
+        { location: { id: 'loc-2', name: 'Large', type: 'warehouse' }, quantity: new Prisma.Decimal(150) },
+        { location: { id: 'loc-3', name: 'Medium', type: 'warehouse' }, quantity: new Prisma.Decimal(100) },
       ] as never)
-
-      vi.mocked(prisma.location.findMany).mockResolvedValue([
-        mockLocation({ id: 'loc-1', name: 'Small', type: 'warehouse' }),
-        mockLocation({ id: 'loc-2', name: 'Large', type: 'warehouse' }),
-        mockLocation({ id: 'loc-3', name: 'Medium', type: 'warehouse' }),
-      ])
 
       const result = await getSkuInventorySummary('sku-1', 'company-1')
 
@@ -274,10 +239,32 @@ describe('Finished Goods Service', () => {
   })
 
   describe('adjustFinishedGoods', () => {
-    it('creates adjustment transaction with finished goods line', async () => {
-      vi.mocked(prisma.transaction.create).mockResolvedValue({
-        id: 'trans-1',
-      } as never)
+    it('creates adjustment transaction with finished goods line and updates balance', async () => {
+      const createdTransaction = { id: 'trans-1' }
+
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        const mockCreate = vi.fn().mockResolvedValue(createdTransaction)
+        const mockUpsert = vi.fn().mockResolvedValue({})
+        const tx = {
+          transaction: { create: mockCreate },
+          finishedGoodsBalance: { upsert: mockUpsert },
+        }
+        const result = await callback(tx as unknown as Prisma.TransactionClient)
+        // Verify transaction create was called
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              companyId: 'company-1',
+              type: 'adjustment',
+              skuId: 'sku-1',
+              reason: 'Physical count correction',
+            }),
+          })
+        )
+        // Verify balance update was called
+        expect(mockUpsert).toHaveBeenCalled()
+        return result
+      })
 
       const result = await adjustFinishedGoods({
         companyId: 'company-1',
@@ -291,30 +278,24 @@ describe('Finished Goods Service', () => {
       })
 
       expect(result.id).toBe('trans-1')
-      expect(prisma.transaction.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          companyId: 'company-1',
-          type: 'adjustment',
-          skuId: 'sku-1',
-          reason: 'Physical count correction',
-          notes: 'Adjustment note',
-          createdById: 'user-1',
-          finishedGoodsLines: {
-            create: expect.objectContaining({
-              skuId: 'sku-1',
-              locationId: 'loc-1',
-              quantityChange: new Prisma.Decimal(25),
-            }),
-          },
-        }),
-        select: { id: true },
-      })
     })
 
     it('allows positive and negative adjustments', async () => {
-      vi.mocked(prisma.transaction.create).mockResolvedValue({
-        id: 'trans-1',
-      } as never)
+      const createdTransaction = { id: 'trans-1' }
+      let quantityUsed: number | undefined
+
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        const mockCreate = vi.fn().mockResolvedValue(createdTransaction)
+        const mockUpsert = vi.fn().mockImplementation((args) => {
+          quantityUsed = args.create.quantity.toNumber()
+          return Promise.resolve({})
+        })
+        const tx = {
+          transaction: { create: mockCreate },
+          finishedGoodsBalance: { upsert: mockUpsert },
+        }
+        return callback(tx as unknown as Prisma.TransactionClient)
+      })
 
       // Positive adjustment
       await adjustFinishedGoods({
@@ -326,20 +307,7 @@ describe('Finished Goods Service', () => {
         date: new Date(),
         createdById: 'user-1',
       })
-
-      expect(prisma.transaction.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            finishedGoodsLines: {
-              create: expect.objectContaining({
-                quantityChange: new Prisma.Decimal(10),
-              }),
-            },
-          }),
-        })
-      )
-
-      vi.clearAllMocks()
+      expect(quantityUsed).toBe(10)
 
       // Negative adjustment
       await adjustFinishedGoods({
@@ -351,18 +319,7 @@ describe('Finished Goods Service', () => {
         date: new Date(),
         createdById: 'user-1',
       })
-
-      expect(prisma.transaction.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            finishedGoodsLines: {
-              create: expect.objectContaining({
-                quantityChange: new Prisma.Decimal(-5),
-              }),
-            },
-          }),
-        })
-      )
+      expect(quantityUsed).toBe(-5)
     })
   })
 
@@ -382,11 +339,11 @@ describe('Finished Goods Service', () => {
     })
 
     it('rejects when insufficient at source', async () => {
-      // Mock SKU verification for getSkuQuantity call
+      // Mock SKU verification for getSkuQuantity call (outside transaction)
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      // Mock getSkuQuantity to return insufficient amount
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(5) },
+      // Mock getSkuQuantity returning insufficient amount - now uses finishedGoodsBalance
+      vi.mocked(prisma.finishedGoodsBalance.findUnique).mockResolvedValue({
+        quantity: new Prisma.Decimal(5),
       } as never)
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -399,6 +356,7 @@ describe('Finished Goods Service', () => {
             }),
           },
           transaction: { create: vi.fn() },
+          finishedGoodsBalance: { upsert: vi.fn() },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -416,17 +374,19 @@ describe('Finished Goods Service', () => {
       ).rejects.toThrow('Insufficient finished goods at source location')
     })
 
-    it('creates two finished goods lines (negative and positive)', async () => {
-      // Mock SKU verification for getSkuQuantity call
+    it('creates two finished goods lines and updates balances', async () => {
+      // Mock SKU verification for getSkuQuantity call (outside transaction)
       vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(100) },
+      // Mock getSkuQuantity to return sufficient amount using balance table
+      vi.mocked(prisma.finishedGoodsBalance.findUnique).mockResolvedValue({
+        quantity: new Prisma.Decimal(100),
       } as never)
 
       const createdTransaction = { id: 'trans-1' }
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const mockCreate = vi.fn().mockResolvedValue(createdTransaction)
+        const mockUpsert = vi.fn().mockResolvedValue({})
         const tx = {
           location: {
             findFirst: vi.fn().mockResolvedValue({
@@ -437,6 +397,9 @@ describe('Finished Goods Service', () => {
           },
           transaction: {
             create: mockCreate,
+          },
+          finishedGoodsBalance: {
+            upsert: mockUpsert,
           },
         }
         const result = await callback(tx as unknown as Prisma.TransactionClient)
@@ -462,6 +425,8 @@ describe('Finished Goods Service', () => {
             }),
           })
         )
+        // Verify balance updates were called (from and to locations)
+        expect(mockUpsert).toHaveBeenCalledTimes(2)
         return result
       })
 
@@ -480,15 +445,50 @@ describe('Finished Goods Service', () => {
   })
 
   describe('receiveFinishedGoods', () => {
-    it('creates receipt transaction with finished goods line', async () => {
-      // Mock SKU verification for getSkuQuantity call
-      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.transaction.create).mockResolvedValue({
-        id: 'trans-1',
-      } as never)
+    it('creates receipt transaction with finished goods line and updates balance', async () => {
+      const createdTransaction = { id: 'trans-1' }
 
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(125) },
+      // Mock $transaction for the receive operation
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        const mockCreate = vi.fn().mockResolvedValue(createdTransaction)
+        const mockUpsert = vi.fn().mockResolvedValue({})
+        const tx = {
+          transaction: { create: mockCreate },
+          finishedGoodsBalance: { upsert: mockUpsert },
+        }
+        const result = await callback(tx as unknown as Prisma.TransactionClient)
+        // Verify transaction create was called with correct data
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              companyId: 'company-1',
+              type: 'receipt',
+              skuId: 'sku-1',
+              supplier: 'Customer Return',
+              notes: 'Return from order #12345',
+              createdById: 'user-1',
+              locationId: 'loc-1',
+              finishedGoodsLines: {
+                create: expect.objectContaining({
+                  skuId: 'sku-1',
+                  locationId: 'loc-1',
+                  quantityChange: new Prisma.Decimal(25),
+                  costPerUnit: new Prisma.Decimal(10.50),
+                }),
+              },
+            }),
+            select: { id: true },
+          })
+        )
+        // Verify balance update was called
+        expect(mockUpsert).toHaveBeenCalled()
+        return result
+      })
+
+      // Mock getSkuQuantity call for newBalance (after transaction)
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
+      vi.mocked(prisma.finishedGoodsBalance.findUnique).mockResolvedValue({
+        quantity: new Prisma.Decimal(125),
       } as never)
 
       const result = await receiveFinishedGoods({
@@ -505,37 +505,39 @@ describe('Finished Goods Service', () => {
 
       expect(result.id).toBe('trans-1')
       expect(result.newBalance).toBe(125)
-      expect(prisma.transaction.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          companyId: 'company-1',
-          type: 'receipt',
-          skuId: 'sku-1',
-          supplier: 'Customer Return',
-          notes: 'Return from order #12345',
-          createdById: 'user-1',
-          locationId: 'loc-1',
-          finishedGoodsLines: {
-            create: expect.objectContaining({
-              skuId: 'sku-1',
-              locationId: 'loc-1',
-              quantityChange: new Prisma.Decimal(25),
-              costPerUnit: new Prisma.Decimal(10.50),
-            }),
-          },
-        }),
-        select: { id: true },
-      })
     })
 
     it('works without optional costPerUnit', async () => {
-      // Mock SKU verification for getSkuQuantity call
-      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
-      vi.mocked(prisma.transaction.create).mockResolvedValue({
-        id: 'trans-1',
-      } as never)
+      const createdTransaction = { id: 'trans-1' }
 
-      vi.mocked(prisma.finishedGoodsLine.aggregate).mockResolvedValue({
-        _sum: { quantityChange: new Prisma.Decimal(50) },
+      // Mock $transaction for the receive operation
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        const mockCreate = vi.fn().mockResolvedValue(createdTransaction)
+        const mockUpsert = vi.fn().mockResolvedValue({})
+        const tx = {
+          transaction: { create: mockCreate },
+          finishedGoodsBalance: { upsert: mockUpsert },
+        }
+        const result = await callback(tx as unknown as Prisma.TransactionClient)
+        // Verify costPerUnit is null
+        expect(mockCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              finishedGoodsLines: {
+                create: expect.objectContaining({
+                  costPerUnit: null,
+                }),
+              },
+            }),
+          })
+        )
+        return result
+      })
+
+      // Mock getSkuQuantity call for newBalance (after transaction)
+      vi.mocked(prisma.sKU.findFirst).mockResolvedValue({ id: 'sku-1' } as never)
+      vi.mocked(prisma.finishedGoodsBalance.findUnique).mockResolvedValue({
+        quantity: new Prisma.Decimal(50),
       } as never)
 
       const result = await receiveFinishedGoods({
@@ -549,17 +551,7 @@ describe('Finished Goods Service', () => {
       })
 
       expect(result.id).toBe('trans-1')
-      expect(prisma.transaction.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            finishedGoodsLines: {
-              create: expect.objectContaining({
-                costPerUnit: null,
-              }),
-            },
-          }),
-        })
-      )
+      expect(result.newBalance).toBe(50)
     })
   })
 })

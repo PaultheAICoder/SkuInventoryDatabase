@@ -11,6 +11,40 @@ import { getDefaultLocationId } from './location'
 import { isLotExpired } from './expiry'
 
 /**
+ * Update inventory balance atomically within a transaction
+ * Creates the balance record if it doesn't exist
+ * @param tx - Prisma transaction client
+ * @param componentId - The component ID
+ * @param locationId - The location ID
+ * @param quantityDelta - The amount to add (positive) or subtract (negative)
+ */
+export async function updateInventoryBalance(
+  tx: Prisma.TransactionClient,
+  componentId: string,
+  locationId: string,
+  quantityDelta: number
+): Promise<void> {
+  await tx.inventoryBalance.upsert({
+    where: {
+      componentId_locationId: {
+        componentId,
+        locationId,
+      },
+    },
+    create: {
+      componentId,
+      locationId,
+      quantity: new Prisma.Decimal(quantityDelta),
+    },
+    update: {
+      quantity: {
+        increment: new Prisma.Decimal(quantityDelta),
+      },
+    },
+  })
+}
+
+/**
  * Fetch and merge company settings with defaults
  * Returns validated settings or defaults if validation fails
  */
@@ -34,14 +68,11 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
 }
 
 /**
- * Calculate the on-hand quantity for a component by summing all transaction lines
+ * Get the on-hand quantity for a component using the InventoryBalance table
  * Optionally filter by location - if locationId is omitted, returns global total
  *
- * For transfers, special handling is needed:
- * - Non-transfer transactions: use transaction.locationId
- * - Transfer transactions:
- *   - negative line = outgoing from fromLocationId
- *   - positive line = incoming to toLocationId
+ * This is an O(1) lookup from the pre-computed balance table instead of O(N) aggregation.
+ * Balance table is updated atomically with each transaction.
  */
 export async function getComponentQuantity(
   componentId: string,
@@ -58,86 +89,33 @@ export async function getComponentQuantity(
   }
 
   if (!locationId) {
-    // Global total - sum all lines for this component (only approved transactions)
-    const result = await prisma.transactionLine.aggregate({
-      where: {
-        componentId,
-        transaction: {
-          companyId,
-          status: 'approved', // Exclude drafts and rejected
-        },
-      },
-      _sum: { quantityChange: true },
+    // Global total - sum all location balances for this component
+    const result = await prisma.inventoryBalance.aggregate({
+      where: { componentId },
+      _sum: { quantity: true },
     })
-    return result._sum.quantityChange?.toNumber() ?? 0
+    return result._sum.quantity?.toNumber() ?? 0
   }
 
-  // Location-specific total requires handling transfers specially
-  // For non-transfer transactions: use transaction.locationId
-  // For transfer transactions:
-  //   - negative line = fromLocationId
-  //   - positive line = toLocationId
-
-  // Get regular (non-transfer) transaction lines at this location
-  const regularResult = await prisma.transactionLine.aggregate({
+  // Location-specific - direct O(1) lookup
+  const balance = await prisma.inventoryBalance.findUnique({
     where: {
-      componentId,
-      transaction: {
-        companyId,
+      componentId_locationId: {
+        componentId,
         locationId,
-        type: { not: 'transfer' },
-        status: 'approved', // Exclude drafts and rejected
       },
     },
-    _sum: { quantityChange: true },
+    select: { quantity: true },
   })
 
-  // Get transfer lines where this is the FROM location (negative = outgoing)
-  const transferFromResult = await prisma.transactionLine.aggregate({
-    where: {
-      componentId,
-      quantityChange: { lt: 0 },
-      transaction: {
-        companyId,
-        type: 'transfer',
-        fromLocationId: locationId,
-        status: 'approved', // Exclude drafts and rejected
-      },
-    },
-    _sum: { quantityChange: true },
-  })
-
-  // Get transfer lines where this is the TO location (positive = incoming)
-  const transferToResult = await prisma.transactionLine.aggregate({
-    where: {
-      componentId,
-      quantityChange: { gt: 0 },
-      transaction: {
-        companyId,
-        type: 'transfer',
-        toLocationId: locationId,
-        status: 'approved', // Exclude drafts and rejected
-      },
-    },
-    _sum: { quantityChange: true },
-  })
-
-  const regular = regularResult._sum.quantityChange?.toNumber() ?? 0
-  const transferFrom = transferFromResult._sum.quantityChange?.toNumber() ?? 0
-  const transferTo = transferToResult._sum.quantityChange?.toNumber() ?? 0
-
-  return regular + transferFrom + transferTo
+  return balance?.quantity.toNumber() ?? 0
 }
 
 /**
- * Calculate quantities for multiple components at once
+ * Get quantities for multiple components at once using the InventoryBalance table
  * Optionally filter by location - if locationId is omitted, returns global totals
  *
- * For transfers, special handling is needed:
- * - Non-transfer transactions: use transaction.locationId
- * - Transfer transactions:
- *   - negative line = outgoing from fromLocationId
- *   - positive line = incoming to toLocationId
+ * This is an efficient batch lookup from the pre-computed balance table.
  */
 export async function getComponentQuantities(
   componentIds: string[],
@@ -154,45 +132,6 @@ export async function getComponentQuantities(
   })
   const validIds = validComponents.map(c => c.id)
 
-  // If no valid components, return empty map with zeros for requested IDs
-  if (validIds.length === 0) {
-    const quantities = new Map<string, number>()
-    for (const id of componentIds) {
-      quantities.set(id, 0)
-    }
-    return quantities
-  }
-
-  if (!locationId) {
-    // Global totals - no location filtering needed (only approved transactions)
-    const results = await prisma.transactionLine.groupBy({
-      by: ['componentId'],
-      where: {
-        componentId: { in: validIds },
-        transaction: {
-          companyId,
-          status: 'approved', // Exclude drafts and rejected
-        },
-      },
-      _sum: { quantityChange: true },
-    })
-
-    const quantities = new Map<string, number>()
-    for (const result of results) {
-      quantities.set(result.componentId, result._sum.quantityChange?.toNumber() ?? 0)
-    }
-
-    // Ensure all originally requested components have an entry (even if 0)
-    for (const id of componentIds) {
-      if (!quantities.has(id)) {
-        quantities.set(id, 0)
-      }
-    }
-
-    return quantities
-  }
-
-  // Location-specific totals require handling transfers specially
   const quantities = new Map<string, number>()
 
   // Initialize all to 0 (for all originally requested IDs)
@@ -200,73 +139,41 @@ export async function getComponentQuantities(
     quantities.set(id, 0)
   }
 
-  // Get regular (non-transfer) transaction lines at this location
-  const regularResults = await prisma.transactionLine.groupBy({
-    by: ['componentId'],
-    where: {
-      componentId: { in: validIds },
-      transaction: {
-        companyId,
+  if (validIds.length === 0) {
+    return quantities
+  }
+
+  if (!locationId) {
+    // Global totals - aggregate across all locations from balance table
+    const results = await prisma.inventoryBalance.groupBy({
+      by: ['componentId'],
+      where: { componentId: { in: validIds } },
+      _sum: { quantity: true },
+    })
+
+    for (const result of results) {
+      quantities.set(result.componentId, result._sum.quantity?.toNumber() ?? 0)
+    }
+  } else {
+    // Location-specific - direct lookups from balance table
+    const balances = await prisma.inventoryBalance.findMany({
+      where: {
+        componentId: { in: validIds },
         locationId,
-        type: { not: 'transfer' },
-        status: 'approved', // Exclude drafts and rejected
       },
-    },
-    _sum: { quantityChange: true },
-  })
+      select: { componentId: true, quantity: true },
+    })
 
-  for (const result of regularResults) {
-    const current = quantities.get(result.componentId) ?? 0
-    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
-  }
-
-  // Get transfer lines where this is the FROM location (negative = outgoing)
-  const transferFromResults = await prisma.transactionLine.groupBy({
-    by: ['componentId'],
-    where: {
-      componentId: { in: validIds },
-      quantityChange: { lt: 0 },
-      transaction: {
-        companyId,
-        type: 'transfer',
-        fromLocationId: locationId,
-        status: 'approved', // Exclude drafts and rejected
-      },
-    },
-    _sum: { quantityChange: true },
-  })
-
-  for (const result of transferFromResults) {
-    const current = quantities.get(result.componentId) ?? 0
-    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
-  }
-
-  // Get transfer lines where this is the TO location (positive = incoming)
-  const transferToResults = await prisma.transactionLine.groupBy({
-    by: ['componentId'],
-    where: {
-      componentId: { in: validIds },
-      quantityChange: { gt: 0 },
-      transaction: {
-        companyId,
-        type: 'transfer',
-        toLocationId: locationId,
-        status: 'approved', // Exclude drafts and rejected
-      },
-    },
-    _sum: { quantityChange: true },
-  })
-
-  for (const result of transferToResults) {
-    const current = quantities.get(result.componentId) ?? 0
-    quantities.set(result.componentId, current + (result._sum.quantityChange?.toNumber() ?? 0))
+    for (const balance of balances) {
+      quantities.set(balance.componentId, balance.quantity.toNumber())
+    }
   }
 
   return quantities
 }
 
 /**
- * Get component quantity breakdown by all locations
+ * Get component quantity breakdown by all locations using the InventoryBalance table
  * Returns array of { locationId, locationName, locationType, quantity } for all locations with inventory
  */
 export async function getComponentQuantitiesByLocation(
@@ -282,38 +189,27 @@ export async function getComponentQuantitiesByLocation(
     throw new Error('Component not found or access denied')
   }
 
-  // Get all active locations for the company
-  const locations = await prisma.location.findMany({
+  // Get all balances for this component with location info (filter out zero balances)
+  const balances = await prisma.inventoryBalance.findMany({
     where: {
-      companyId,
-      isActive: true,
+      componentId,
+      quantity: { not: new Prisma.Decimal(0) },
     },
-    select: {
-      id: true,
-      name: true,
-      type: true,
+    include: {
+      location: {
+        select: { id: true, name: true, type: true },
+      },
     },
   })
 
-  // Calculate quantity for each location
-  const result: Array<{ locationId: string; locationName: string; locationType: string; quantity: number }> = []
-
-  for (const location of locations) {
-    const quantity = await getComponentQuantity(componentId, companyId, location.id)
-    if (quantity !== 0) {
-      result.push({
-        locationId: location.id,
-        locationName: location.name,
-        locationType: location.type,
-        quantity,
-      })
-    }
-  }
-
-  // Sort by location name
-  result.sort((a, b) => a.locationName.localeCompare(b.locationName))
-
-  return result
+  return balances
+    .map(b => ({
+      locationId: b.location.id,
+      locationName: b.location.name,
+      locationType: b.location.type,
+      quantity: b.quantity.toNumber(),
+    }))
+    .sort((a, b) => a.locationName.localeCompare(b.locationName))
 }
 
 /**
@@ -502,6 +398,11 @@ export async function createReceiptTransaction(params: {
       })
     }
 
+    // Update inventory balance atomically
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, componentId, locationIdToUse, quantity)
+    }
+
     return transaction
   })
 }
@@ -523,47 +424,56 @@ export async function createAdjustmentTransaction(params: {
 
   const locationIdToUse = locationId ?? await getDefaultLocationId(companyId)
 
-  // Get component for cost snapshot
-  const component = await prisma.component.findUnique({
-    where: { id: componentId },
-  })
+  return prisma.$transaction(async (tx) => {
+    // Get component for cost snapshot
+    const component = await tx.component.findUnique({
+      where: { id: componentId },
+    })
 
-  if (!component) {
-    throw new Error('Component not found')
-  }
+    if (!component) {
+      throw new Error('Component not found')
+    }
 
-  return prisma.transaction.create({
-    data: {
-      companyId,
-      type: 'adjustment',
-      date,
-      reason,
-      notes,
-      createdById,
-      locationId: locationIdToUse,
-      lines: {
-        create: {
-          componentId,
-          quantityChange: new Prisma.Decimal(quantity),
-          costPerUnit: component.costPerUnit,
-        },
-      },
-    },
-    include: {
-      lines: {
-        include: {
-          component: {
-            select: { id: true, name: true, skuCode: true },
+    const transaction = await tx.transaction.create({
+      data: {
+        companyId,
+        type: 'adjustment',
+        date,
+        reason,
+        notes,
+        createdById,
+        locationId: locationIdToUse,
+        lines: {
+          create: {
+            componentId,
+            quantityChange: new Prisma.Decimal(quantity),
+            costPerUnit: component.costPerUnit,
           },
         },
       },
-      createdBy: {
-        select: { id: true, name: true },
+      include: {
+        lines: {
+          include: {
+            component: {
+              select: { id: true, name: true, skuCode: true },
+            },
+          },
+        },
+        createdBy: {
+          select: { id: true, name: true },
+        },
+        location: {
+          select: { id: true, name: true },
+        },
       },
-      location: {
-        select: { id: true, name: true },
-      },
-    },
+    })
+
+    // Update inventory balance atomically
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, componentId, locationIdToUse, quantity)
+    }
+
+    return transaction
   })
 }
 
@@ -650,6 +560,11 @@ export async function createInitialTransaction(params: {
           updatedById: createdById,
         },
       })
+    }
+
+    // Update inventory balance atomically
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, componentId, locationIdToUse, quantity)
     }
 
     return transaction
@@ -1181,6 +1096,18 @@ export async function createBuildTransaction(params: {
       },
     })
 
+    // Update inventory balances for consumed components
+    if (locationIdToUse) {
+      for (const line of consumptionLines) {
+        await updateInventoryBalance(
+          tx,
+          line.componentId,
+          locationIdToUse,
+          (line.quantityChange as Prisma.Decimal).toNumber() // negative value decrements
+        )
+      }
+    }
+
     // Create finished goods line atomically if outputting FG
     let outputQuantityActual: number | null = null
     if (shouldOutputFG && outputLocationIdToUse) {
@@ -1194,6 +1121,26 @@ export async function createBuildTransaction(params: {
           locationId: outputLocationIdToUse,
           quantityChange: new Prisma.Decimal(outputQty),
           costPerUnit: new Prisma.Decimal(unitBomCost),
+        },
+      })
+
+      // Update finished goods balance
+      await tx.finishedGoodsBalance.upsert({
+        where: {
+          skuId_locationId: {
+            skuId,
+            locationId: outputLocationIdToUse,
+          },
+        },
+        create: {
+          skuId,
+          locationId: outputLocationIdToUse,
+          quantity: new Prisma.Decimal(outputQty),
+        },
+        update: {
+          quantity: {
+            increment: new Prisma.Decimal(outputQty),
+          },
         },
       })
     }
@@ -1317,48 +1264,18 @@ export async function getComponentsWithReorderStatus(params: {
   const orderByColumn = sortColumnMap[safeSortBy] || 'c."name"'
 
   // Build the quantity subquery based on whether we have a locationId filter
+  // Using InventoryBalance table for O(1) lookups instead of aggregating TransactionLines
   let quantitySubquery: string
 
   if (locationId) {
-    // Location-specific quantities require handling transfers specially
-    // This combines three patterns:
-    // 1. Non-transfer transactions at this location
-    // 2. Transfer lines where this is fromLocationId (negative)
-    // 3. Transfer lines where this is toLocationId (positive)
+    // Location-specific quantities from InventoryBalance table
     quantitySubquery = `
       SELECT c.id as "componentId", COALESCE(
         (
-          -- Non-transfer transactions at this location
-          SELECT COALESCE(SUM(tl."quantityChange"), 0)
-          FROM "TransactionLine" tl
-          JOIN "Transaction" t ON tl."transactionId" = t.id
-          WHERE tl."componentId" = c.id
-            AND t."companyId" = $1
-            AND t."status" = 'approved'
-            AND t."locationId" = $5
-            AND t."type" != 'transfer'
-        ) + (
-          -- Transfer lines where this is FROM location (negative lines)
-          SELECT COALESCE(SUM(tl."quantityChange"), 0)
-          FROM "TransactionLine" tl
-          JOIN "Transaction" t ON tl."transactionId" = t.id
-          WHERE tl."componentId" = c.id
-            AND t."companyId" = $1
-            AND t."status" = 'approved'
-            AND t."type" = 'transfer'
-            AND t."fromLocationId" = $5
-            AND tl."quantityChange" < 0
-        ) + (
-          -- Transfer lines where this is TO location (positive lines)
-          SELECT COALESCE(SUM(tl."quantityChange"), 0)
-          FROM "TransactionLine" tl
-          JOIN "Transaction" t ON tl."transactionId" = t.id
-          WHERE tl."componentId" = c.id
-            AND t."companyId" = $1
-            AND t."status" = 'approved'
-            AND t."type" = 'transfer'
-            AND t."toLocationId" = $5
-            AND tl."quantityChange" > 0
+          SELECT ib.quantity
+          FROM "InventoryBalance" ib
+          WHERE ib."componentId" = c.id
+            AND ib."locationId" = $5
         ),
         0
       ) as qty_sum
@@ -1366,16 +1283,13 @@ export async function getComponentsWithReorderStatus(params: {
       WHERE c."companyId" = $1
     `
   } else {
-    // Global quantities - simpler aggregation
+    // Global quantities - sum all location balances from InventoryBalance table
     quantitySubquery = `
       SELECT c.id as "componentId", COALESCE(
         (
-          SELECT SUM(tl."quantityChange")
-          FROM "TransactionLine" tl
-          JOIN "Transaction" t ON tl."transactionId" = t.id
-          WHERE tl."componentId" = c.id
-            AND t."companyId" = $1
-            AND t."status" = 'approved'
+          SELECT SUM(ib.quantity)
+          FROM "InventoryBalance" ib
+          WHERE ib."componentId" = c.id
         ),
         0
       ) as qty_sum

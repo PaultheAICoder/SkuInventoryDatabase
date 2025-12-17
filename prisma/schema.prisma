@@ -59,10 +59,12 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  transactions       Transaction[]       @relation("TransactionLocation")
-  transfersFrom      Transaction[]       @relation("TransferFrom")
-  transfersTo        Transaction[]       @relation("TransferTo")
-  finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsAtLocation")
+  transactions        Transaction[]       @relation("TransactionLocation")
+  transfersFrom       Transaction[]       @relation("TransferFrom")
+  transfersTo         Transaction[]       @relation("TransferTo")
+  finishedGoodsLines  FinishedGoodsLine[] @relation("FinishedGoodsAtLocation")
+  inventoryBalances   InventoryBalance[]
+  finishedGoodsBalances FinishedGoodsBalance[]
 
   @@unique([companyId, name])
   @@index([companyId, isActive])
@@ -205,15 +207,29 @@ model Component {
   updatedById   String
   updatedBy     User     @relation("ComponentUpdatedBy", fields: [updatedById], references: [id])
 
-  bomLines         BOMLine[]
-  transactionLines TransactionLine[]
-  alertState       ComponentAlertState?
-  lots             Lot[]
+  bomLines          BOMLine[]
+  transactionLines  TransactionLine[]
+  alertState        ComponentAlertState?
+  lots              Lot[]
+  inventoryBalances InventoryBalance[]
 
   @@unique([brandId, name])
   @@unique([brandId, skuCode])
   @@index([brandId, isActive])
   @@index([companyId, isActive])
+}
+
+model InventoryBalance {
+  id          String    @id @default(uuid())
+  componentId String
+  component   Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  locationId  String
+  location    Location  @relation(fields: [locationId], references: [id])
+  quantity    Decimal   @db.Decimal(10, 4)
+
+  @@unique([componentId, locationId])
+  @@index([componentId])
+  @@index([locationId])
 }
 
 model Lot {
@@ -385,7 +401,8 @@ model SKU {
   transactions       Transaction[]
   defectThresholds   DefectThreshold[]
   defectAlerts       DefectAlert[]
-  finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
+  finishedGoodsLines    FinishedGoodsLine[] @relation("FinishedGoodsLines")
+  finishedGoodsBalances FinishedGoodsBalance[]
 
   // Channel mapping relations
   channelMappings SkuChannelMapping[]
@@ -396,6 +413,19 @@ model SKU {
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
   @@index([companyId, isActive])
+}
+
+model FinishedGoodsBalance {
+  id         String   @id @default(uuid())
+  skuId      String
+  sku        SKU      @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  quantity   Decimal  @db.Decimal(10, 4)
+
+  @@unique([skuId, locationId])
+  @@index([skuId])
+  @@index([locationId])
 }
 
 // Note: Partial unique index "one_active_bom_per_sku" enforces one active BOM per SKU

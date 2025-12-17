@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
-import { getComponentQuantity } from './inventory'
+import { getComponentQuantity, updateInventoryBalance } from './inventory'
 
 export interface TransferResult {
   id: string
@@ -155,6 +155,10 @@ export async function createTransferTransaction(params: {
         },
       },
     })
+
+    // 5. Update inventory balances atomically
+    await updateInventoryBalance(tx, componentId, fromLocationId, -quantity)
+    await updateInventoryBalance(tx, componentId, toLocationId, quantity)
 
     return {
       id: transaction.id,

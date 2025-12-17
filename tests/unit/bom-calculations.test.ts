@@ -17,8 +17,9 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
     },
-    transactionLine: {
+    inventoryBalance: {
       groupBy: vi.fn(),
+      findMany: vi.fn(),
     },
     component: {
       findMany: vi.fn(),
@@ -233,9 +234,9 @@ describe('calculateMaxBuildableUnits', () => {
     // comp-1: 100 on hand, needs 2 per unit -> can build 50
     // comp-2: 30 on hand, needs 5 per unit -> can build 6
     // Max buildable = min(50, 6) = 6
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
-      { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(30) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(100) } },
+      { componentId: 'comp-2', _sum: { quantity: new Prisma.Decimal(30) } },
     ] as never)
 
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
@@ -258,7 +259,7 @@ describe('calculateMaxBuildableUnits', () => {
       { id: 'comp-1' },
     ] as never)
 
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([])
 
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(0)
@@ -280,8 +281,8 @@ describe('calculateMaxBuildableUnits', () => {
       { id: 'comp-1' },
     ] as never)
 
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(50) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(50) } },
     ] as never)
 
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
@@ -304,8 +305,8 @@ describe('calculateMaxBuildableUnits', () => {
       { id: 'comp-1' },
     ] as never)
 
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(10) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(10) } },
     ] as never)
 
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')

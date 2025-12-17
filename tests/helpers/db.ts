@@ -34,10 +34,12 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   // Delete in correct order to respect foreign keys
   await prisma.defectAlert.deleteMany({}) // Must delete before transactions (FK constraint)
   await prisma.finishedGoodsLine.deleteMany({})
+  await prisma.finishedGoodsBalance.deleteMany({}) // New balance table for SKUs
   await prisma.transactionLine.deleteMany({})
   await prisma.transaction.deleteMany({})
   await prisma.lotBalance.deleteMany({})
   await prisma.lot.deleteMany({})
+  await prisma.inventoryBalance.deleteMany({}) // New balance table for components
   await prisma.bOMLine.deleteMany({})
   await prisma.bOMVersion.deleteMany({})
   await prisma.sKU.deleteMany({})

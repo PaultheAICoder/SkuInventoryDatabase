@@ -171,7 +171,7 @@ describe('Transfer Service', () => {
       )
     })
 
-    it('creates transaction with two lines (negative and positive)', async () => {
+    it('creates transaction with two lines (negative and positive) and updates balances', async () => {
       vi.mocked(getComponentQuantity).mockResolvedValue(100) // Plenty available
 
       const createdTransaction = {
@@ -203,6 +203,8 @@ describe('Transfer Service', () => {
         ],
       }
 
+      const mockUpsert = vi.fn().mockResolvedValue({})
+
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
           component: {
@@ -224,6 +226,9 @@ describe('Transfer Service', () => {
           transaction: {
             create: vi.fn().mockResolvedValue(createdTransaction),
           },
+          inventoryBalance: {
+            upsert: mockUpsert,
+          },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
       })
@@ -237,6 +242,8 @@ describe('Transfer Service', () => {
       expect(Number(result.lines[0].quantityChange)).toBe(-10)
       // Second line should be positive (addition to destination)
       expect(Number(result.lines[1].quantityChange)).toBe(10)
+      // Verify balance updates were called (2 calls: from and to locations)
+      expect(mockUpsert).toHaveBeenCalledTimes(2)
     })
 
     it('uses $transaction for atomicity', async () => {
@@ -274,6 +281,9 @@ describe('Transfer Service', () => {
           },
           transaction: {
             create: vi.fn().mockResolvedValue(createdTransaction),
+          },
+          inventoryBalance: {
+            upsert: vi.fn().mockResolvedValue({}),
           },
         }
         return callback(tx as unknown as Prisma.TransactionClient)
@@ -334,6 +344,9 @@ describe('Transfer Service', () => {
           },
           transaction: {
             create: vi.fn().mockResolvedValue(createdTransaction),
+          },
+          inventoryBalance: {
+            upsert: vi.fn().mockResolvedValue({}),
           },
         }
         return callback(tx as unknown as Prisma.TransactionClient)

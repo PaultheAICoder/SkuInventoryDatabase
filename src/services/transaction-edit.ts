@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma, TransactionType } from '@prisma/client'
-import { getComponentQuantity, checkInsufficientInventory } from './inventory'
-import { getSkuQuantity } from './finished-goods'
+import { getComponentQuantity, checkInsufficientInventory, updateInventoryBalance } from './inventory'
+import { getSkuQuantity, updateFinishedGoodsBalance } from './finished-goods'
 import { getDefaultLocationId } from './location'
 import type {
   UpdateReceiptInput,
@@ -20,11 +20,12 @@ import type {
 
 /**
  * Reverse the inventory effects of a transaction's transaction lines
- * This function reverses lot balances and deletes existing transaction lines
+ * This function reverses lot balances, inventory balances, and deletes existing transaction lines
  */
 async function reverseTransactionLines(
   tx: Prisma.TransactionClient,
-  transactionId: string
+  transactionId: string,
+  transaction?: { type: string; locationId: string | null; fromLocationId: string | null; toLocationId: string | null }
 ): Promise<void> {
   // Get existing transaction lines
   const lines = await tx.transactionLine.findMany({
@@ -32,7 +33,19 @@ async function reverseTransactionLines(
     include: { lot: true },
   })
 
-  // Reverse lot balance changes for lines with lots
+  // If we don't have transaction info, fetch it
+  let txInfo = transaction
+  if (!txInfo) {
+    const t = await tx.transaction.findUnique({
+      where: { id: transactionId },
+      select: { type: true, locationId: true, fromLocationId: true, toLocationId: true },
+    })
+    if (t) {
+      txInfo = t
+    }
+  }
+
+  // Reverse lot balance changes and inventory balance changes
   for (const line of lines) {
     if (line.lotId) {
       // Decrement reverses the original change
@@ -47,6 +60,26 @@ async function reverseTransactionLines(
         },
       })
     }
+
+    // Reverse inventory balance based on transaction type
+    if (txInfo) {
+      const reverseQty = -line.quantityChange.toNumber() // Negate to reverse
+
+      if (txInfo.type === 'transfer') {
+        // For transfers, we need to figure out which line is for which location
+        const qty = line.quantityChange.toNumber()
+        if (qty < 0 && txInfo.fromLocationId) {
+          // Negative line is outgoing from source - reverse by adding back
+          await updateInventoryBalance(tx, line.componentId, txInfo.fromLocationId, -qty)
+        } else if (qty > 0 && txInfo.toLocationId) {
+          // Positive line is incoming to destination - reverse by subtracting
+          await updateInventoryBalance(tx, line.componentId, txInfo.toLocationId, -qty)
+        }
+      } else if (txInfo.locationId) {
+        // For non-transfer transactions, use the transaction's locationId
+        await updateInventoryBalance(tx, line.componentId, txInfo.locationId, reverseQty)
+      }
+    }
   }
 
   // Delete existing transaction lines (will recreate with new values)
@@ -57,12 +90,24 @@ async function reverseTransactionLines(
 
 /**
  * Reverse finished goods effects from a transaction
+ * This function reverses finished goods balances and deletes existing lines
  */
 async function reverseFinishedGoodsLines(
   tx: Prisma.TransactionClient,
   transactionId: string
 ): Promise<void> {
-  // Just delete them - the quantity changes are calculated from summing all lines
+  // Get existing finished goods lines before deleting
+  const lines = await tx.finishedGoodsLine.findMany({
+    where: { transactionId },
+    select: { skuId: true, locationId: true, quantityChange: true },
+  })
+
+  // Reverse the balance changes
+  for (const line of lines) {
+    await updateFinishedGoodsBalance(tx, line.skuId, line.locationId, -line.quantityChange.toNumber())
+  }
+
+  // Delete the finished goods lines
   await tx.finishedGoodsLine.deleteMany({
     where: { transactionId },
   })
@@ -193,7 +238,12 @@ export async function updateReceiptTransaction(params: {
       })
     }
 
-    // 9. Update transaction header
+    // 9. Update inventory balance for new line
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, input.componentId, locationIdToUse, input.quantity)
+    }
+
+    // 10. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {
@@ -265,7 +315,12 @@ export async function updateAdjustmentTransaction(params: {
       },
     })
 
-    // 6. Update transaction header
+    // 6. Update inventory balance for new line
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, input.componentId, locationIdToUse, input.quantity)
+    }
+
+    // 7. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {
@@ -340,7 +395,12 @@ export async function updateInitialTransaction(params: {
       },
     })
 
-    // 7. Update transaction header
+    // 7. Update inventory balance for new line
+    if (locationIdToUse) {
+      await updateInventoryBalance(tx, input.componentId, locationIdToUse, input.quantity)
+    }
+
+    // 8. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {
@@ -446,7 +506,11 @@ export async function updateTransferTransaction(params: {
       ],
     })
 
-    // 7. Update transaction header
+    // 7. Update inventory balances for transfer
+    await updateInventoryBalance(tx, input.componentId, input.fromLocationId, -input.quantity)
+    await updateInventoryBalance(tx, input.componentId, input.toLocationId, input.quantity)
+
+    // 8. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {
@@ -627,7 +691,15 @@ export async function updateBuildTransaction(params: {
       }
     }
 
-    // 7. Create finished goods line (same location as build)
+    // 7. Update inventory balances for consumed components
+    if (locationIdToUse) {
+      for (const bomLine of bomLines) {
+        const requiredQty = bomLine.quantityPerUnit.toNumber() * input.unitsToBuild
+        await updateInventoryBalance(tx, bomLine.componentId, locationIdToUse, -requiredQty)
+      }
+    }
+
+    // 8. Create finished goods line (same location as build)
     const outputLocationId = locationIdToUse ?? await getDefaultLocationId(companyId)
     if (outputLocationId) {
       await tx.finishedGoodsLine.create({
@@ -639,9 +711,12 @@ export async function updateBuildTransaction(params: {
           costPerUnit: new Prisma.Decimal(unitBomCost),
         },
       })
+
+      // Update finished goods balance
+      await updateFinishedGoodsBalance(tx, existingTransaction.skuId, outputLocationId, input.unitsToBuild)
     }
 
-    // 8. Update transaction header
+    // 9. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {
@@ -735,7 +810,10 @@ export async function updateOutboundTransaction(params: {
       },
     })
 
-    // 7. Update transaction header
+    // 7. Update finished goods balance
+    await updateFinishedGoodsBalance(tx, input.skuId, locationIdToUse, -input.quantity)
+
+    // 8. Update transaction header
     const updatedTransaction = await tx.transaction.update({
       where: { id: transactionId },
       data: {

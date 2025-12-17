@@ -1,6 +1,7 @@
 /**
  * Unit tests for checkInsufficientInventory function
  * Tests the inventory sufficiency check for BOM builds
+ * Now uses InventoryBalance table instead of TransactionLine aggregation
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
@@ -10,8 +11,9 @@ vi.mock('@/lib/db', () => ({
     bOMLine: {
       findMany: vi.fn(),
     },
-    transactionLine: {
+    inventoryBalance: {
       groupBy: vi.fn(),
+      findMany: vi.fn(),
     },
     component: {
       findMany: vi.fn(),
@@ -46,8 +48,8 @@ describe('checkInsufficientInventory', () => {
     ] as never)
 
     // 100 units on hand, building 10 requires 20 -> sufficient
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(100) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
@@ -72,8 +74,8 @@ describe('checkInsufficientInventory', () => {
     ] as never)
 
     // Only 20 units on hand, building 10 requires 50 -> shortage of 30
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(20) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(20) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
@@ -126,9 +128,9 @@ describe('checkInsufficientInventory', () => {
 
     // comp-1: sufficient (100 on hand, need 20)
     // comp-2: insufficient (10 on hand, need 30)
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(100) } },
-      { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(10) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(100) } },
+      { componentId: 'comp-2', _sum: { quantity: new Prisma.Decimal(10) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
@@ -163,9 +165,9 @@ describe('checkInsufficientInventory', () => {
     ] as never)
 
     // Both insufficient
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(5) } },
-      { componentId: 'comp-2', _sum: { quantityChange: new Prisma.Decimal(10) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(5) } },
+      { componentId: 'comp-2', _sum: { quantity: new Prisma.Decimal(10) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
@@ -191,8 +193,8 @@ describe('checkInsufficientInventory', () => {
       },
     ] as never)
 
-    // No inventory at all
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([])
+    // No inventory at all - groupBy returns empty when no balance records exist
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([])
 
     const result = await checkInsufficientInventory({
       bomVersionId: 'bom-1',
@@ -218,8 +220,8 @@ describe('checkInsufficientInventory', () => {
       },
     ] as never)
 
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(2) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(2) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
@@ -246,8 +248,8 @@ describe('checkInsufficientInventory', () => {
       },
     ] as never)
 
-    vi.mocked(prisma.transactionLine.groupBy).mockResolvedValue([
-      { componentId: 'comp-1', _sum: { quantityChange: new Prisma.Decimal(10) } },
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal(10) } },
     ] as never)
 
     const result = await checkInsufficientInventory({
