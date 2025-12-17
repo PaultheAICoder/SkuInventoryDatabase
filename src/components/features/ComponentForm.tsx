@@ -13,7 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 import type { ComponentResponse } from '@/types/component'
+import { parseApiError, type FieldErrors } from '@/lib/api-errors'
 
 interface CategoryOption {
   value: string
@@ -39,6 +41,7 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [categories, setCategories] = useState<CategoryOption[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
 
@@ -100,8 +103,19 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.message || 'Failed to save component')
+        const parsed = parseApiError(data)
+
+        setFieldErrors(parsed.fieldErrors)
+        setError(parsed.message)
+
+        toast.error('Failed to save component', {
+          description: parsed.message,
+        })
+        return
       }
+
+      // Clear field errors on success
+      setFieldErrors({})
 
       if (onSuccess) {
         onSuccess()
@@ -110,7 +124,12 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
         router.refresh()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      // Handle network errors or unexpected failures
+      const message = err instanceof Error ? err.message : 'An error occurred'
+      setError(message)
+      toast.error('Failed to save component', {
+        description: message,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -139,6 +158,9 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
                 placeholder="e.g., Medium Tool"
                 required
               />
+              {fieldErrors.name && (
+                <p className="text-sm text-destructive">{fieldErrors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -151,6 +173,9 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
                 required
                 disabled={isEditing}
               />
+              {fieldErrors.skuCode && (
+                <p className="text-sm text-destructive">{fieldErrors.skuCode}</p>
+              )}
             </div>
           </div>
 

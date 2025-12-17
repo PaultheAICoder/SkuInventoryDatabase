@@ -14,9 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 import type { SKUResponse } from '@/types/sku'
 import type { ComponentResponse } from '@/types/component'
 import { salesChannels } from '@/types'
+import { parseApiError, type FieldErrors } from '@/lib/api-errors'
 
 interface BOMLineState {
   componentId: string
@@ -37,6 +39,7 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [components, setComponents] = useState<ComponentResponse[]>([])
   const [loadingComponents, setLoadingComponents] = useState(true)
 
@@ -133,8 +136,20 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.message || 'Failed to save SKU')
+        const parsed = parseApiError(data)
+
+        setFieldErrors(parsed.fieldErrors)
+        setError(parsed.message)
+
+        // Show toast for immediate feedback
+        toast.error('Failed to save SKU', {
+          description: parsed.message,
+        })
+        return
       }
+
+      // Clear field errors on successful submit
+      setFieldErrors({})
 
       const result = await res.json()
 
@@ -148,7 +163,12 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
         router.refresh()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      // Handle network errors or unexpected failures
+      const message = err instanceof Error ? err.message : 'An error occurred'
+      setError(message)
+      toast.error('Failed to save SKU', {
+        description: message,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -190,6 +210,9 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
               required
               disabled={isEditing}
             />
+            {fieldErrors.internalCode && (
+              <p className="text-sm text-destructive">{fieldErrors.internalCode}</p>
+            )}
           </div>
 
           {/* Company (read-only from session) */}

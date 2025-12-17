@@ -133,7 +133,12 @@ export async function POST(request: NextRequest) {
           })
           return error('Invalid brand selection. Please refresh the page and try again.', 400, 'BadRequest')
         case 'DUPLICATE_INTERNAL_CODE':
-          return conflict('A SKU with this internal code already exists')
+          return error(
+            'A SKU with this internal code already exists',
+            409,
+            'Conflict',
+            [{ field: 'internalCode', message: 'This internal code is already in use' }]
+          )
       }
 
       // Handle database constraint violations

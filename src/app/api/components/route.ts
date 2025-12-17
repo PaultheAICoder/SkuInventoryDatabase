@@ -7,10 +7,10 @@ import {
   created,
   paginated,
   unauthorized,
-  conflict,
   serverError,
   parseBody,
   parseQuery,
+  error,
 } from '@/lib/api-response'
 import { createComponentSchema, componentListQuerySchema } from '@/types/component'
 import { getComponentQuantities, calculateReorderStatus, getCompanySettings, getComponentsWithReorderStatus } from '@/services/inventory'
@@ -166,9 +166,19 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       if (existing.name === data.name) {
-        return conflict('A component with this name already exists')
+        return error(
+          'A component with this name already exists',
+          409,
+          'Conflict',
+          [{ field: 'name', message: 'This name is already in use' }]
+        )
       }
-      return conflict('A component with this SKU code already exists')
+      return error(
+        'A component with this SKU code already exists',
+        409,
+        'Conflict',
+        [{ field: 'skuCode', message: 'This SKU code is already in use' }]
+      )
     }
 
     const component = await prisma.component.create({
