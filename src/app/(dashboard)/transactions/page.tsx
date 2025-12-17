@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronLeft, ChevronRight, Filter, Plus, FileCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Filter, Plus, FileCheck, Receipt } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ExportButton } from '@/components/features/ExportButton'
 import Link from 'next/link'
 import { LocationFilter } from '@/components/features/LocationFilter'
@@ -345,8 +346,16 @@ function TransactionLogContent() {
               <TableBody>
                 {transactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      No transactions found.
+                    <TableCell colSpan={6} className="p-0">
+                      <EmptyState
+                        icon={Receipt}
+                        title="No transactions found"
+                        description="Record your first inventory transaction to start tracking component movements."
+                        action={{
+                          label: "New Transaction",
+                          href: "/transactions/new"
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
