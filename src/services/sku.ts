@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from './bom'
 import { getSkuQuantities } from './finished-goods'
+import { parseFractionOrNumber } from '@/lib/utils'
 import type { SKUResponse } from '@/types/sku'
 
 /**
@@ -30,6 +31,48 @@ export interface GetSkusWithCostsResult {
     page: number
     pageSize: number
   }
+}
+
+/**
+ * Parameters for createSku service function
+ */
+export interface CreateSkuParams {
+  companyId: string
+  brandId: string | null // null = resolve from companyId
+  userId: string
+  input: {
+    name: string
+    internalCode: string
+    salesChannel: string
+    externalIds: Record<string, string>
+    notes?: string | null
+    bomLines?: Array<{
+      componentId: string
+      quantityPerUnit: string
+    }>
+  }
+}
+
+/**
+ * Result type for createSku service function
+ */
+export interface CreateSkuResult {
+  id: string
+  name: string
+  internalCode: string
+  salesChannel: string
+  externalIds: Record<string, string>
+  notes: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  createdBy: { id: string; name: string }
+  activeBom: {
+    id: string
+    versionName: string
+    unitCost: string
+  } | null
+  maxBuildableUnits: number | null
 }
 
 /**
@@ -128,4 +171,156 @@ export async function getSkusWithCosts(params: GetSkusWithCostsParams): Promise<
   })
 
   return { data, meta: { total, page, pageSize } }
+}
+
+/**
+ * Create a new SKU with optional inline BOM
+ *
+ * This is the single source of truth for SKU creation.
+ * Handles:
+ * - Brand validation/resolution
+ * - Duplicate internalCode check
+ * - SKU creation
+ * - Optional BOM version creation with lines
+ *
+ * @throws Error if brand not found or internalCode already exists
+ */
+export async function createSku(params: CreateSkuParams): Promise<CreateSkuResult> {
+  const { companyId, brandId: providedBrandId, userId, input } = params
+
+  // Resolve brand ID
+  let brandId = providedBrandId
+
+  if (!brandId) {
+    // Fall back to first active brand if none selected
+    const brand = await prisma.brand.findFirst({
+      where: { companyId, isActive: true },
+    })
+    if (!brand) {
+      throw new Error('NO_ACTIVE_BRAND')
+    }
+    brandId = brand.id
+  } else {
+    // Validate brand belongs to selected company
+    const validBrand = await prisma.brand.findFirst({
+      where: {
+        id: brandId,
+        companyId,
+        isActive: true,
+      },
+    })
+
+    if (!validBrand) {
+      throw new Error('INVALID_BRAND')
+    }
+  }
+
+  // Check for duplicate internalCode within the company
+  const existing = await prisma.sKU.findFirst({
+    where: {
+      companyId,
+      internalCode: input.internalCode,
+    },
+  })
+
+  if (existing) {
+    throw new Error('DUPLICATE_INTERNAL_CODE')
+  }
+
+  // Check if BOM lines are provided
+  const hasBomLines = input.bomLines && input.bomLines.length > 0
+
+  if (hasBomLines) {
+    // Create SKU and BOM version in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create SKU
+      const sku = await tx.sKU.create({
+        data: {
+          brandId,
+          companyId,
+          name: input.name,
+          internalCode: input.internalCode,
+          salesChannel: input.salesChannel,
+          externalIds: input.externalIds as Prisma.InputJsonValue,
+          notes: input.notes,
+          createdById: userId,
+          updatedById: userId,
+        },
+        include: {
+          createdBy: { select: { id: true, name: true } },
+        },
+      })
+
+      // Create BOM version with lines
+      const bomVersion = await tx.bOMVersion.create({
+        data: {
+          skuId: sku.id,
+          versionName: 'v1',
+          effectiveStartDate: new Date(),
+          isActive: true,
+          createdById: userId,
+          lines: {
+            create: input.bomLines!.map((line) => ({
+              componentId: line.componentId,
+              quantityPerUnit: parseFractionOrNumber(line.quantityPerUnit) ?? 1,
+            })),
+          },
+        },
+      })
+
+      return { sku, bomVersion }
+    })
+
+    return {
+      id: result.sku.id,
+      name: result.sku.name,
+      internalCode: result.sku.internalCode,
+      salesChannel: result.sku.salesChannel,
+      externalIds: result.sku.externalIds as Record<string, string>,
+      notes: result.sku.notes,
+      isActive: result.sku.isActive,
+      createdAt: result.sku.createdAt.toISOString(),
+      updatedAt: result.sku.updatedAt.toISOString(),
+      createdBy: result.sku.createdBy,
+      activeBom: {
+        id: result.bomVersion.id,
+        versionName: result.bomVersion.versionName,
+        unitCost: '0.0000', // Will be calculated on refresh
+      },
+      maxBuildableUnits: null,
+    }
+  }
+
+  // No BOM lines - create SKU only
+  const sku = await prisma.sKU.create({
+    data: {
+      brandId,
+      companyId,
+      name: input.name,
+      internalCode: input.internalCode,
+      salesChannel: input.salesChannel,
+      externalIds: input.externalIds as Prisma.InputJsonValue,
+      notes: input.notes,
+      createdById: userId,
+      updatedById: userId,
+    },
+    include: {
+      createdBy: { select: { id: true, name: true } },
+    },
+  })
+
+  return {
+    id: sku.id,
+    name: sku.name,
+    internalCode: sku.internalCode,
+    salesChannel: sku.salesChannel,
+    externalIds: sku.externalIds as Record<string, string>,
+    notes: sku.notes,
+    isActive: sku.isActive,
+    createdAt: sku.createdAt.toISOString(),
+    updatedAt: sku.updatedAt.toISOString(),
+    createdBy: sku.createdBy,
+    activeBom: null,
+    maxBuildableUnits: null,
+  }
 }
