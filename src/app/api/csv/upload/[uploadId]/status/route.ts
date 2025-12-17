@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { error } from '@/lib/api-response'
 
 export async function GET(
   request: NextRequest,
@@ -25,23 +26,13 @@ export async function GET(
 
     const { uploadId } = await params
 
-    // Get user's primary company via UserCompany junction
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true },
-    })
-
-    if (!userCompany?.companyId) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    const companyId = userCompany.companyId
+    const companyId = selectedCompanyId
 
     // Get sync log for upload
     const syncLog = await prisma.syncLog.findFirst({

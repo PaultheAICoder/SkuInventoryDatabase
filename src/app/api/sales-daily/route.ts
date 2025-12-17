@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { error } from '@/lib/api-response'
 import { Prisma } from '@prisma/client'
 import { calculateOrganicPercentage } from '@/services/sales-daily/calculator'
 import { format, subDays, parseISO, startOfDay, endOfDay } from 'date-fns'
@@ -27,19 +28,15 @@ export async function GET(request: NextRequest) {
     const _groupBy = searchParams.get('groupBy') || 'day' // day, week, month - reserved for future aggregation
     const channel = searchParams.get('channel') // amazon, shopify, or null for all
 
-    // Get user's company
-    const userCompany = await prisma.userCompany.findFirst({
-      where: { userId: session.user.id, isPrimary: true },
-      select: { companyId: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'User must belong to a company' }, { status: 400 })
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
     // Get brands for this company
     const brands = await prisma.brand.findMany({
-      where: { companyId: userCompany.companyId },
+      where: { companyId: selectedCompanyId },
       select: { id: true, name: true },
     })
     const brandIds = brands.map(b => b.id)

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { error } from '@/lib/api-response'
 import { parseFile, validateFile, previewFile, detectFileType } from '@/services/csv/parser'
 import { isSourceSupported, getSupportedSources } from '@/services/csv/mappers'
 import type { CsvSource, FileType } from '@/services/csv/types'
@@ -23,31 +24,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user's primary company via UserCompany junction
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany?.companyId) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
+    // Use selected company from session (not primary company)
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Admin or Ops only for file uploads
-    if (userCompany.role !== 'admin' && userCompany.role !== 'ops') {
+    // Use selected brand from session if available
+    const selectedBrandId = session.user.selectedBrandId
+
+    // Admin or Ops only for file uploads (check via session role)
+    if (session.user.role !== 'admin' && session.user.role !== 'ops') {
       return NextResponse.json(
         { error: 'Admin or Ops permission required' },
         { status: 403 }
       )
     }
 
-    const companyId = userCompany.companyId
+    const companyId = selectedCompanyId
 
     // Parse multipart form data
     const formData = await request.formData()
@@ -80,11 +74,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate brand belongs to company
-    if (brandId) {
+    // Validate brand: use form brandId, fall back to session selectedBrandId
+    const effectiveBrandId = brandId || selectedBrandId
+    if (effectiveBrandId) {
       const brand = await prisma.brand.findFirst({
         where: {
-          id: brandId,
+          id: effectiveBrandId,
           companyId,
         },
       })
@@ -146,7 +141,7 @@ export async function POST(request: NextRequest) {
         fileSize: file.size,
         metadata: {
           source,
-          brandId,
+          brandId: effectiveBrandId || brandId,
           fileType,
           dateRange: startDate && endDate ? { startDate, endDate } : undefined,
         },
@@ -158,7 +153,7 @@ export async function POST(request: NextRequest) {
       fileContent,
       {
         source: source as CsvSource,
-        brandId: brandId || undefined,
+        brandId: effectiveBrandId || brandId || undefined,
         fileType: fileType as FileType,
         dateRange: startDate && endDate
           ? { startDate, endDate }
@@ -225,17 +220,14 @@ export async function GET() {
       )
     }
 
-    // Get user's primary company for role check
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { role: true },
-    })
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
-    // Admin or Ops only for file upload info
-    if (!userCompany || (userCompany.role !== 'admin' && userCompany.role !== 'ops')) {
+    // Admin or Ops only for file upload info (check via session role)
+    if (session.user.role !== 'admin' && session.user.role !== 'ops') {
       return NextResponse.json(
         { error: 'Admin or Ops permission required' },
         { status: 403 }

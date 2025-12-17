@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { error } from '@/lib/api-response'
 
 /**
  * DELETE /api/asin-mapping/[id]
@@ -25,18 +26,14 @@ export async function DELETE(
 
     const { id } = params
 
-    // Get user's company and role
-    const userCompany = await prisma.userCompany.findFirst({
-      where: { userId: session.user.id, isPrimary: true },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'User must belong to a company' }, { status: 400 })
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Only admin can delete mappings
-    if (userCompany.role !== 'admin') {
+    // Only admin can delete mappings (check via session role)
+    if (session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only admins can delete ASIN mappings' },
         { status: 403 }
@@ -56,7 +53,7 @@ export async function DELETE(
     }
 
     // Verify mapping belongs to user's company
-    if (mapping.brand.companyId !== userCompany.companyId) {
+    if (mapping.brand.companyId !== selectedCompanyId) {
       return NextResponse.json({ error: 'Mapping not found' }, { status: 404 })
     }
 

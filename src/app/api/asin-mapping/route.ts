@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { error } from '@/lib/api-response'
 
 interface SKUSuggestion {
   id: string
@@ -51,19 +52,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
-    // Get user's company brands
-    const userCompany = await prisma.userCompany.findFirst({
-      where: { userId: session.user.id, isPrimary: true },
-      select: { companyId: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'User must belong to a company' }, { status: 400 })
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
     // Get brands for this company
     const brands = await prisma.brand.findMany({
-      where: { companyId: userCompany.companyId },
+      where: { companyId: selectedCompanyId },
       select: { id: true, name: true },
     })
     const brandIds = brands.map(b => b.id)
@@ -137,7 +134,7 @@ export async function GET(request: NextRequest) {
 
       // Get SKUs for suggestions
       const skus = await prisma.sKU.findMany({
-        where: { companyId: userCompany.companyId },
+        where: { companyId: selectedCompanyId },
         select: { id: true, internalCode: true, name: true },
       })
 
@@ -214,18 +211,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user's company
-    const userCompany = await prisma.userCompany.findFirst({
-      where: { userId: session.user.id, isPrimary: true },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json({ error: 'User must belong to a company' }, { status: 400 })
+    // Use selected company from session
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Only admin can create ASIN mappings
-    if (userCompany.role !== 'admin') {
+    // Only admin can create ASIN mappings (check via session role)
+    if (session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only admins can create ASIN mappings' },
         { status: 403 }
@@ -234,7 +227,7 @@ export async function POST(request: NextRequest) {
 
     // Verify brand belongs to user's company
     const brand = await prisma.brand.findFirst({
-      where: { id: brandId, companyId: userCompany.companyId },
+      where: { id: brandId, companyId: selectedCompanyId },
     })
 
     if (!brand) {
@@ -243,7 +236,7 @@ export async function POST(request: NextRequest) {
 
     // Verify SKU exists and belongs to user's company
     const sku = await prisma.sKU.findFirst({
-      where: { id: skuId, companyId: userCompany.companyId },
+      where: { id: skuId, companyId: selectedCompanyId },
     })
 
     if (!sku) {
