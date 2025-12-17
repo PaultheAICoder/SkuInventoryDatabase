@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { parseQuery, unauthorized, forbidden, serverError, validationError } from '@/lib/api-response'
+import { parseQuery, unauthorized, forbidden, serverError, validationError, error } from '@/lib/api-response'
 import { createDraftSchema, draftListQuerySchema } from '@/types/draft'
 import { createDraftTransaction, getDraftTransactions } from '@/services/draft-transaction'
 
@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
     const { page, pageSize, type, status, sortBy, sortOrder } = queryResult.data
 
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const result = await getDraftTransactions({
       companyId: selectedCompanyId,
@@ -75,6 +78,9 @@ export async function POST(request: NextRequest) {
     }
 
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const draft = await createDraftTransaction({
       companyId: selectedCompanyId,

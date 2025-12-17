@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { unauthorized, serverError } from '@/lib/api-response'
+import { unauthorized, serverError, error } from '@/lib/api-response'
 import { getDraftCount } from '@/services/draft-transaction'
 
 // =============================================================================
@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
     }
 
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const count = await getDraftCount(selectedCompanyId)
 

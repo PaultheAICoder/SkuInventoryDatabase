@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { unauthorized, forbidden, serverError } from '@/lib/api-response'
+import { unauthorized, forbidden, serverError, error } from '@/lib/api-response'
 import { approveDraftTransaction } from '@/services/draft-transaction'
 
 // =============================================================================
@@ -29,6 +29,9 @@ export async function POST(
 
     const { id } = await params
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const result = await approveDraftTransaction({
       id,

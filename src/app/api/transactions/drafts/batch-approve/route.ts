@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { unauthorized, forbidden, serverError, validationError } from '@/lib/api-response'
+import { unauthorized, forbidden, serverError, validationError, error } from '@/lib/api-response'
 import { batchApproveDraftsSchema } from '@/types/draft'
 import { batchApproveDrafts } from '@/services/draft-transaction'
 
@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
     }
 
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const result = await batchApproveDrafts({
       draftIds: parsed.data.draftIds,

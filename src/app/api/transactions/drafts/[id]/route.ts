@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { unauthorized, forbidden, notFound, serverError } from '@/lib/api-response'
+import { unauthorized, forbidden, notFound, serverError, error } from '@/lib/api-response'
 import { updateDraftSchema } from '@/types/draft'
 import {
   getDraftTransaction,
@@ -29,6 +29,9 @@ export async function GET(
 
     const { id } = await params
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const draft = await getDraftTransaction({
       id,
@@ -68,6 +71,9 @@ export async function PUT(
 
     const { id } = await params
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     const body = await request.json()
     const parsed = updateDraftSchema.safeParse(body)
@@ -120,6 +126,9 @@ export async function DELETE(
 
     const { id } = await params
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     await deleteDraftTransaction({
       id,
