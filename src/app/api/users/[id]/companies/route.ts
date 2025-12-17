@@ -154,8 +154,15 @@ export async function PUT(
         ? currentPrimary.companyId
         : companyIds[0]
 
-      // Get user's primary company to determine role
-      const userPrimaryCompanyId = currentPrimary?.companyId
+      // Fetch existing roles before deletion to preserve them
+      const existingUserCompanies = await tx.userCompany.findMany({
+        where: { userId: id },
+        select: { companyId: true, role: true },
+      })
+      // Create a map of companyId -> role for lookup
+      const existingRoles = new Map(
+        existingUserCompanies.map((uc) => [uc.companyId, uc.role])
+      )
 
       // Delete existing UserCompany records for this user
       await tx.userCompany.deleteMany({
@@ -163,10 +170,11 @@ export async function PUT(
       })
 
       // Create new UserCompany records with proper isPrimary
+      // Preserve existing role, default to 'ops' for newly assigned companies
       const userCompanyRecords = companyIds.map((companyId) => ({
         userId: id,
         companyId,
-        role: userPrimaryCompanyId === companyId ? UserRole.admin : UserRole.ops,
+        role: existingRoles.get(companyId) ?? UserRole.ops,
         isPrimary: companyId === newPrimaryCompanyId,
       }))
 
