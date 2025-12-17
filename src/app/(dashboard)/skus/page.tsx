@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SKUTable } from '@/components/features/SKUTable'
+import { SKUTableSkeleton } from '@/components/features/SKUTableSkeleton'
 import { ExportButton } from '@/components/features/ExportButton'
 import { getSkusWithCosts } from '@/services/sku'
 
@@ -66,7 +67,7 @@ export default async function SKUsPage({
         </div>
       </div>
 
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<SKUTableSkeleton />}>
         <SKUTable
           skus={skus}
           total={meta.total}
