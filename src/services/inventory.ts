@@ -1238,3 +1238,319 @@ export async function createBuildTransaction(params: {
     warning: insufficientItems.length > 0,
   }
 }
+
+/**
+ * Result type for components with computed reorder status
+ */
+export interface ComponentWithReorderStatus {
+  id: string
+  name: string
+  skuCode: string
+  category: string | null
+  unitOfMeasure: string
+  costPerUnit: string
+  reorderPoint: number
+  leadTimeDays: number
+  notes: string | null
+  isActive: boolean
+  quantityOnHand: number
+  reorderStatus: 'critical' | 'warning' | 'ok'
+  createdAt: string
+  updatedAt: string
+  createdBy: { id: string; name: string }
+}
+
+/**
+ * Fetch components with computed reorderStatus at the DB level.
+ * Supports filtering by status, pagination, and sorting.
+ * Optionally filters quantities by location.
+ *
+ * This function pushes the status computation to SQL to avoid
+ * loading all components when filtering by reorderStatus.
+ */
+export async function getComponentsWithReorderStatus(params: {
+  companyId: string
+  brandId?: string
+  page: number
+  pageSize: number
+  sortBy: string
+  sortOrder: 'asc' | 'desc'
+  search?: string
+  category?: string
+  isActive?: boolean
+  reorderStatus: 'critical' | 'warning' | 'ok'
+  locationId?: string
+  reorderWarningMultiplier: number
+}): Promise<{ data: ComponentWithReorderStatus[]; total: number }> {
+  const {
+    companyId,
+    brandId,
+    page,
+    pageSize,
+    sortBy,
+    sortOrder,
+    search,
+    category,
+    isActive,
+    reorderStatus,
+    locationId,
+    reorderWarningMultiplier,
+  } = params
+
+  const offset = (page - 1) * pageSize
+
+  // Validate sortBy to prevent SQL injection (only allow known columns)
+  const allowedSortColumns = ['name', 'skuCode', 'category', 'costPerUnit', 'reorderPoint', 'createdAt']
+  const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : 'name'
+  const safeSortOrder = sortOrder === 'desc' ? 'DESC' : 'ASC'
+
+  // Map sortBy to actual column name with proper quoting
+  const sortColumnMap: Record<string, string> = {
+    name: 'c."name"',
+    skuCode: 'c."skuCode"',
+    category: 'c."category"',
+    costPerUnit: 'c."costPerUnit"',
+    reorderPoint: 'c."reorderPoint"',
+    createdAt: 'c."createdAt"',
+  }
+  const orderByColumn = sortColumnMap[safeSortBy] || 'c."name"'
+
+  // Build the quantity subquery based on whether we have a locationId filter
+  let quantitySubquery: string
+
+  if (locationId) {
+    // Location-specific quantities require handling transfers specially
+    // This combines three patterns:
+    // 1. Non-transfer transactions at this location
+    // 2. Transfer lines where this is fromLocationId (negative)
+    // 3. Transfer lines where this is toLocationId (positive)
+    quantitySubquery = `
+      SELECT c.id as "componentId", COALESCE(
+        (
+          -- Non-transfer transactions at this location
+          SELECT COALESCE(SUM(tl."quantityChange"), 0)
+          FROM "TransactionLine" tl
+          JOIN "Transaction" t ON tl."transactionId" = t.id
+          WHERE tl."componentId" = c.id
+            AND t."companyId" = $1
+            AND t."status" = 'approved'
+            AND t."locationId" = $5
+            AND t."type" != 'transfer'
+        ) + (
+          -- Transfer lines where this is FROM location (negative lines)
+          SELECT COALESCE(SUM(tl."quantityChange"), 0)
+          FROM "TransactionLine" tl
+          JOIN "Transaction" t ON tl."transactionId" = t.id
+          WHERE tl."componentId" = c.id
+            AND t."companyId" = $1
+            AND t."status" = 'approved'
+            AND t."type" = 'transfer'
+            AND t."fromLocationId" = $5
+            AND tl."quantityChange" < 0
+        ) + (
+          -- Transfer lines where this is TO location (positive lines)
+          SELECT COALESCE(SUM(tl."quantityChange"), 0)
+          FROM "TransactionLine" tl
+          JOIN "Transaction" t ON tl."transactionId" = t.id
+          WHERE tl."componentId" = c.id
+            AND t."companyId" = $1
+            AND t."status" = 'approved'
+            AND t."type" = 'transfer'
+            AND t."toLocationId" = $5
+            AND tl."quantityChange" > 0
+        ),
+        0
+      ) as qty_sum
+      FROM "Component" c
+      WHERE c."companyId" = $1
+    `
+  } else {
+    // Global quantities - simpler aggregation
+    quantitySubquery = `
+      SELECT c.id as "componentId", COALESCE(
+        (
+          SELECT SUM(tl."quantityChange")
+          FROM "TransactionLine" tl
+          JOIN "Transaction" t ON tl."transactionId" = t.id
+          WHERE tl."componentId" = c.id
+            AND t."companyId" = $1
+            AND t."status" = 'approved'
+        ),
+        0
+      ) as qty_sum
+      FROM "Component" c
+      WHERE c."companyId" = $1
+    `
+  }
+
+  // Build WHERE clause conditions dynamically
+  const conditions: string[] = ['c."companyId" = $1']
+  const queryParams: (string | number | boolean)[] = [companyId]
+  let paramIndex = 2
+
+  if (brandId) {
+    conditions.push(`c."brandId" = $${paramIndex}`)
+    queryParams.push(brandId)
+    paramIndex++
+  }
+
+  if (isActive !== undefined) {
+    conditions.push(`c."isActive" = $${paramIndex}`)
+    queryParams.push(isActive)
+    paramIndex++
+  }
+
+  if (category) {
+    conditions.push(`c."category" = $${paramIndex}`)
+    queryParams.push(category)
+    paramIndex++
+  }
+
+  if (search) {
+    conditions.push(`(c."name" ILIKE $${paramIndex} OR c."skuCode" ILIKE $${paramIndex})`)
+    queryParams.push(`%${search}%`)
+    paramIndex++
+  }
+
+  // Store locationId param index for quantity subquery
+  const locationParamIndex = paramIndex
+  if (locationId) {
+    queryParams.push(locationId)
+    paramIndex++
+  }
+
+  // Add reorderWarningMultiplier to params (always needed for the CASE statement in SELECT)
+  const multiplierParamIndex = paramIndex
+  queryParams.push(reorderWarningMultiplier)
+  paramIndex++
+
+  // Build reorderStatus condition for WHERE clause
+  // Cast reorderPoint to numeric for float multiplication
+  let statusCondition: string
+  if (reorderStatus === 'critical') {
+    statusCondition = `q.qty_sum <= c."reorderPoint" AND c."reorderPoint" > 0`
+  } else if (reorderStatus === 'warning') {
+    statusCondition = `q.qty_sum > c."reorderPoint" AND q.qty_sum <= c."reorderPoint"::numeric * $${multiplierParamIndex}::numeric AND c."reorderPoint" > 0`
+  } else {
+    // 'ok' status
+    statusCondition = `c."reorderPoint" = 0 OR q.qty_sum > c."reorderPoint"::numeric * $${multiplierParamIndex}::numeric`
+  }
+
+  const whereClause = conditions.join(' AND ')
+
+  // Adjust the quantity subquery to use the correct parameter index for locationId
+  const adjustedQuantitySubquery = locationId
+    ? quantitySubquery.replace(/\$5/g, `$${locationParamIndex}`)
+    : quantitySubquery
+
+  // Main query with CTE for quantities
+  const dataQuery = `
+    WITH quantities AS (
+      ${adjustedQuantitySubquery}
+    )
+    SELECT
+      c.id,
+      c.name,
+      c."skuCode",
+      c.category,
+      c."unitOfMeasure",
+      c."costPerUnit"::text,
+      c."reorderPoint",
+      c."leadTimeDays",
+      c.notes,
+      c."isActive",
+      c."createdAt",
+      c."updatedAt",
+      c."createdById",
+      u.id as "createdById",
+      u.name as "createdByName",
+      COALESCE(q.qty_sum, 0)::int as "quantityOnHand",
+      CASE
+        WHEN c."reorderPoint" = 0 THEN 'ok'
+        WHEN COALESCE(q.qty_sum, 0) <= c."reorderPoint" THEN 'critical'
+        WHEN COALESCE(q.qty_sum, 0) <= c."reorderPoint"::numeric * $${multiplierParamIndex}::numeric THEN 'warning'
+        ELSE 'ok'
+      END as "reorderStatus"
+    FROM "Component" c
+    LEFT JOIN quantities q ON q."componentId" = c.id
+    LEFT JOIN "User" u ON u.id = c."createdById"
+    WHERE ${whereClause}
+      AND (${statusCondition})
+    ORDER BY ${orderByColumn} ${safeSortOrder}
+    LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+  `
+
+  // Count query
+  // Note: We include a dummy reference to the multiplier param to keep param count consistent
+  // This ensures both queries receive the same parameters
+  const countQuery = `
+    WITH quantities AS (
+      ${adjustedQuantitySubquery}
+    )
+    SELECT COUNT(*)::int as total
+    FROM "Component" c
+    LEFT JOIN quantities q ON q."componentId" = c.id
+    WHERE ${whereClause}
+      AND (${statusCondition})
+      AND ($${multiplierParamIndex}::numeric IS NOT NULL OR TRUE)
+  `
+
+  // Add limit and offset params
+  const dataParams = [...queryParams, pageSize, offset]
+  const countParams = queryParams
+
+  // Execute both queries in parallel
+  type DataRow = {
+    id: string
+    name: string
+    skuCode: string
+    category: string | null
+    unitOfMeasure: string
+    costPerUnit: string
+    reorderPoint: number
+    leadTimeDays: number
+    notes: string | null
+    isActive: boolean
+    createdAt: Date
+    updatedAt: Date
+    createdById: string
+    createdByName: string
+    quantityOnHand: number
+    reorderStatus: 'critical' | 'warning' | 'ok'
+  }
+
+  type CountRow = {
+    total: number
+  }
+
+  const [dataRows, countRows] = await Promise.all([
+    prisma.$queryRawUnsafe<DataRow[]>(dataQuery, ...dataParams),
+    prisma.$queryRawUnsafe<CountRow[]>(countQuery, ...countParams),
+  ])
+
+  const total = countRows[0]?.total ?? 0
+
+  // Transform to response format
+  const data: ComponentWithReorderStatus[] = dataRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    skuCode: row.skuCode,
+    category: row.category,
+    unitOfMeasure: row.unitOfMeasure,
+    costPerUnit: row.costPerUnit,
+    reorderPoint: row.reorderPoint,
+    leadTimeDays: row.leadTimeDays,
+    notes: row.notes,
+    isActive: row.isActive,
+    quantityOnHand: row.quantityOnHand,
+    reorderStatus: row.reorderStatus,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    createdBy: {
+      id: row.createdById,
+      name: row.createdByName,
+    },
+  }))
+
+  return { data, total }
+}

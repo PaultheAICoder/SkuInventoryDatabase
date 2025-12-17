@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Button } from '@/components/ui/button'
 import { ComponentTable } from '@/components/features/ComponentTable'
-import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
+import { getComponentQuantities, calculateReorderStatus, getCompanySettings, getComponentsWithReorderStatus } from '@/services/inventory'
 import { Plus } from 'lucide-react'
 import { ExportButton } from '@/components/features/ExportButton'
 import type { ComponentResponse } from '@/types/component'
@@ -53,59 +53,26 @@ async function getComponents(
     }),
   }
 
-  // When filtering by reorderStatus, we need to:
-  // 1. Fetch ALL matching components (without pagination)
-  // 2. Compute reorder status for ALL
-  // 3. Filter by reorderStatus
-  // 4. Apply pagination to filtered set
+  // When filtering by reorderStatus, use DB-side computation
+  // This avoids loading all components into memory for large datasets
   if (params.reorderStatus) {
-    // Fetch all components matching other filters (no pagination)
-    const allComponents = await prisma.component.findMany({
-      where,
-      orderBy: { [params.sortBy]: params.sortOrder },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-      },
+    const result = await getComponentsWithReorderStatus({
+      companyId: selectedCompanyId,
+      page: params.page,
+      pageSize: params.pageSize,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+      search: params.search,
+      category: params.category,
+      isActive: true, // Page always shows active components only
+      reorderStatus: params.reorderStatus as 'critical' | 'warning' | 'ok',
+      locationId: params.locationId,
+      reorderWarningMultiplier: settings.reorderWarningMultiplier,
     })
-
-    // Get quantities for ALL components (filtered by location if specified)
-    const componentIds = allComponents.map((c) => c.id)
-    const quantities = await getComponentQuantities(componentIds, selectedCompanyId, params.locationId)
-
-    // Transform and compute reorder status for ALL
-    const allWithStatus: ComponentResponse[] = allComponents.map((component) => {
-      const quantityOnHand = quantities.get(component.id) ?? 0
-      const status = calculateReorderStatus(quantityOnHand, component.reorderPoint, settings.reorderWarningMultiplier)
-
-      return {
-        id: component.id,
-        name: component.name,
-        skuCode: component.skuCode,
-        category: component.category,
-        unitOfMeasure: component.unitOfMeasure,
-        costPerUnit: component.costPerUnit.toString(),
-        reorderPoint: component.reorderPoint,
-        leadTimeDays: component.leadTimeDays,
-        notes: component.notes,
-        isActive: component.isActive,
-        quantityOnHand,
-        reorderStatus: status,
-        createdAt: component.createdAt.toISOString(),
-        updatedAt: component.updatedAt.toISOString(),
-        createdBy: component.createdBy,
-      }
-    })
-
-    // Filter by reorderStatus BEFORE pagination
-    const filtered = allWithStatus.filter((c) => c.reorderStatus === params.reorderStatus)
-
-    // Apply pagination to filtered set
-    const start = (params.page - 1) * params.pageSize
-    const paginatedData = filtered.slice(start, start + params.pageSize)
 
     return {
-      components: paginatedData,
-      total: filtered.length, // Total of ALL matching records, not just current page
+      components: result.data,
+      total: result.total,
     }
   }
 
