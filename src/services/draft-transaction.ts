@@ -5,6 +5,7 @@ import { checkInsufficientInventory, getComponentQuantities, updateInventoryBala
 import { updateFinishedGoodsBalance } from './finished-goods'
 import { getDefaultLocationId } from './location'
 import { consumeLotsForBuildTx } from './lot-selection'
+import { toLocalDateString } from '@/lib/utils'
 
 // =============================================================================
 // Transform Helpers
@@ -34,7 +35,7 @@ function transformDraftTransaction(tx: Prisma.TransactionGetPayload<{
     id: tx.id,
     type: tx.type as DraftTransactionResponse['type'],
     status: tx.status as DraftTransactionResponse['status'],
-    date: tx.date.toISOString().split('T')[0],
+    date: toLocalDateString(tx.date),
     sku: tx.sku,
     bomVersion: tx.bomVersion,
     locationId: tx.locationId,
@@ -64,7 +65,7 @@ function transformDraftTransaction(tx: Prisma.TransactionGetPayload<{
         ? {
             id: line.lot.id,
             lotNumber: line.lot.lotNumber,
-            expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+            expiryDate: line.lot.expiryDate ? toLocalDateString(line.lot.expiryDate) : null,
           }
         : null,
     })),

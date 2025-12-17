@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toLocalDateString } from '@/lib/utils'
 
 interface TransferDialogProps {
   open: boolean
@@ -43,7 +44,7 @@ export function TransferDialog({
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     quantity: '',
     fromLocationId: '',
     toLocationId: '',
@@ -55,7 +56,7 @@ export function TransferDialog({
       fetchLocations()
       // Reset form when opening
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: toLocalDateString(new Date()),
         quantity: '',
         fromLocationId: '',
         toLocationId: '',

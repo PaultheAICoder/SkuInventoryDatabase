@@ -11,6 +11,7 @@ import {
   parseRouteResponse,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { GET as getComponents, POST as createComponent } from '@/app/api/components/route'
@@ -89,7 +90,7 @@ describe('API Authentication', () => {
           componentId: 'fake-id',
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       const response = await createReceipt(request)
@@ -109,7 +110,7 @@ describe('API Authentication', () => {
           componentId: 'fake-id',
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       const response = await createReceipt(request)

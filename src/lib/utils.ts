@@ -47,6 +47,22 @@ export function formatDateString(
 }
 
 /**
+ * Convert a Date object to a YYYY-MM-DD string in local timezone.
+ *
+ * IMPORTANT: This replaces `.toISOString().split('T')[0]` which converts to UTC
+ * and can shift the date by -1 day for users west of UTC.
+ *
+ * @param date - Date object to format
+ * @returns String in YYYY-MM-DD format (local timezone)
+ */
+export function toLocalDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
  * Parse a fraction string (e.g., "1/45") or decimal number to a numeric value.
  * Returns null if the input is invalid.
  */

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, serverError, parseBody } from '@/lib/api-response'
 import { createInitialSchema } from '@/types/transaction'
 import { createInitialTransaction } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 // POST /api/transactions/initial - Create an initial (opening balance) transaction
 export async function POST(request: NextRequest) {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     return created({
       id: transaction.id,
       type: transaction.type,
-      date: transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(transaction.date),
       notes: transaction.notes,
       locationId: transaction.locationId,
       location: transaction.location,

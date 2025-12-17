@@ -12,6 +12,7 @@ import {
 import { updateBOMVersionSchema } from '@/types/bom'
 import { getComponentQuantities } from '@/services/inventory'
 import { calculateBOMUnitCost, updateBOMVersion } from '@/services/bom'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -82,8 +83,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       skuId: bomVersion.skuId,
       sku: bomVersion.sku,
       versionName: bomVersion.versionName,
-      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(bomVersion.effectiveStartDate),
+      effectiveEndDate: bomVersion.effectiveEndDate ? toLocalDateString(bomVersion.effectiveEndDate) : null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
       defectNotes: bomVersion.defectNotes,
@@ -182,8 +183,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       id: bomVersion.id,
       skuId: bomVersion.skuId,
       versionName: bomVersion.versionName,
-      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(bomVersion.effectiveStartDate),
+      effectiveEndDate: bomVersion.effectiveEndDate ? toLocalDateString(bomVersion.effectiveEndDate) : null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
       defectNotes: bomVersion.defectNotes,

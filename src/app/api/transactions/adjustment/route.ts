@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, serverError, parseBody } from '@/lib/api-response'
 import { createAdjustmentSchema } from '@/types/transaction'
 import { createAdjustmentTransaction } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 // POST /api/transactions/adjustment - Create an adjustment transaction
 export async function POST(request: NextRequest) {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     return created({
       id: transaction.id,
       type: transaction.type,
-      date: transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(transaction.date),
       reason: transaction.reason,
       notes: transaction.notes,
       locationId: transaction.locationId,

@@ -12,6 +12,7 @@ import {
 import { cloneBOMVersionSchema } from '@/types/bom'
 import { cloneBOMVersion, calculateBOMUnitCost } from '@/services/bom'
 import { getComponentQuantities } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -69,8 +70,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       id: newBomVersion.id,
       skuId: newBomVersion.skuId,
       versionName: newBomVersion.versionName,
-      effectiveStartDate: newBomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: newBomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(newBomVersion.effectiveStartDate),
+      effectiveEndDate: newBomVersion.effectiveEndDate ? toLocalDateString(newBomVersion.effectiveEndDate) : null,
       isActive: newBomVersion.isActive,
       notes: newBomVersion.notes,
       unitCost: unitCost.toFixed(4),

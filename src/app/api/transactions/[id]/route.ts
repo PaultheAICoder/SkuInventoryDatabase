@@ -11,6 +11,7 @@ import {
   updateBuildSchema,
   updateOutboundSchema,
 } from '@/types/transaction-edit'
+import { toLocalDateString } from '@/lib/utils'
 
 export async function GET(
   request: NextRequest,
@@ -94,7 +95,7 @@ export async function GET(
       data: {
         id: transaction.id,
         type: transaction.type,
-        date: transaction.date.toISOString().split('T')[0],
+        date: toLocalDateString(transaction.date),
         company: transaction.company,
         sku: transaction.sku,
         bomVersion: transaction.bomVersion,

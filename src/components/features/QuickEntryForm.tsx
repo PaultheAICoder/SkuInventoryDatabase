@@ -17,6 +17,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
 import { salesChannels } from '@/types'
+import { toLocalDateString } from '@/lib/utils'
 
 interface ComponentOption {
   id: string
@@ -75,7 +76,7 @@ export function QuickEntryForm() {
 
   // Inbound form data (receiving components)
   const [inboundFormData, setInboundFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     componentId: '',
     quantity: '',
     supplier: '',
@@ -88,7 +89,7 @@ export function QuickEntryForm() {
 
   // Outbound form data (shipping SKUs)
   const [outboundFormData, setOutboundFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     skuId: '',
     salesChannel: '',
     quantity: '',
@@ -98,7 +99,7 @@ export function QuickEntryForm() {
 
   // Adjustment form data
   const [adjustmentFormData, setAdjustmentFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     componentId: '',
     adjustmentType: 'subtract' as 'add' | 'subtract',
     quantity: '',
@@ -330,7 +331,7 @@ export function QuickEntryForm() {
     setSuccessMessage(null)
     setError(null)
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalDateString(new Date())
 
     if (transactionType === 'inbound') {
       setInboundFormData({

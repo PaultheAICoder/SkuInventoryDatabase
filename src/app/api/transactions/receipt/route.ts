@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, serverError, parseBody } from '@/lib/api-response'
 import { createReceiptSchema } from '@/types/transaction'
 import { createReceiptTransaction } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 // POST /api/transactions/receipt - Create a receipt transaction
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     return created({
       id: transaction.id,
       type: transaction.type,
-      date: transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(transaction.date),
       supplier: transaction.supplier,
       notes: transaction.notes,
       locationId: transaction.locationId,
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
           ? {
               id: line.lot.id,
               lotNumber: line.lot.lotNumber,
-              expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+              expiryDate: line.lot.expiryDate ? toLocalDateString(line.lot.expiryDate) : null,
             }
           : null,
       })),

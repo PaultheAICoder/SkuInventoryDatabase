@@ -15,6 +15,7 @@ import {
 import { updateSKUSchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnits } from '@/services/bom'
 import { getSkuInventorySummary } from '@/services/finished-goods'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -112,8 +113,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       bomVersions: sku.bomVersions.map((v) => ({
         id: v.id,
         versionName: v.versionName,
-        effectiveStartDate: v.effectiveStartDate.toISOString().split('T')[0],
-        effectiveEndDate: v.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+        effectiveStartDate: toLocalDateString(v.effectiveStartDate),
+        effectiveEndDate: v.effectiveEndDate ? toLocalDateString(v.effectiveEndDate) : null,
         isActive: v.isActive,
         unitCost: (bomCosts.get(v.id) ?? 0).toFixed(4),
         lineCount: v.lines.length,

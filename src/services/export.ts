@@ -3,6 +3,8 @@
  * Handles generating CSV files for components, SKUs, and transactions
  */
 
+import { toLocalDateString } from '@/lib/utils'
+
 export interface CSVColumn<T> {
   header: string
   accessor: (item: T) => string | number | null | undefined
@@ -246,6 +248,6 @@ export const forecastExportColumns: CSVColumn<ForecastExportData>[] = [
 export function generateExportFilename(
   type: 'components' | 'skus' | 'transactions' | 'lots' | 'forecasts'
 ): string {
-  const date = new Date().toISOString().split('T')[0]
+  const date = toLocalDateString(new Date())
   return `${type}-export-${date}.csv`
 }

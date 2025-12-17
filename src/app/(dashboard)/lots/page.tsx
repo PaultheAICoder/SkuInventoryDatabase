@@ -7,6 +7,7 @@ import { LotTable } from '@/components/features/LotTable'
 import { ExportButton } from '@/components/features/ExportButton'
 import { calculateExpiryStatus } from '@/services/lot'
 import type { LotResponse, ExpiryStatus } from '@/types/lot'
+import { toLocalDateString } from '@/lib/utils'
 
 interface PageProps {
   searchParams: Promise<{
@@ -74,7 +75,7 @@ async function getLots(
         componentId: lot.componentId,
         componentName: lot.component.name,
         componentSkuCode: lot.component.skuCode,
-        expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+        expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
         receivedQuantity: lot.receivedQuantity.toString(),
         balance: lot.balance?.quantity.toString() ?? '0',
         supplier: lot.supplier,
@@ -128,7 +129,7 @@ async function getLots(
       componentId: lot.componentId,
       componentName: lot.component.name,
       componentSkuCode: lot.component.skuCode,
-      expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+      expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
       receivedQuantity: lot.receivedQuantity.toString(),
       balance: lot.balance?.quantity.toString() ?? '0',
       supplier: lot.supplier,

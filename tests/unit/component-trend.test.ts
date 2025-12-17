@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { toLocalDateString } from '@/lib/utils'
 
 // Test component trend calculation logic
 // These are pure function tests - no database required
@@ -51,7 +52,7 @@ function calculateTrendFromTransactions(
   const currentDate = new Date(startDate)
 
   while (currentDate <= today) {
-    const dateStr = currentDate.toISOString().split('T')[0]
+    const dateStr = toLocalDateString(currentDate)
 
     if (dailyTotals.has(dateStr)) {
       lastKnownQuantity = dailyTotals.get(dateStr)!
@@ -80,9 +81,9 @@ describe('Component Trend Calculation', () => {
       d3.setDate(d3.getDate() - 1)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 100 },
-        { date: d2.toISOString().split('T')[0], quantityChange: -30 },
-        { date: d3.toISOString().split('T')[0], quantityChange: 50 },
+        { date: toLocalDateString(d1), quantityChange: 100 },
+        { date: toLocalDateString(d2), quantityChange: -30 },
+        { date: toLocalDateString(d3), quantityChange: 50 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)
@@ -102,7 +103,7 @@ describe('Component Trend Calculation', () => {
       const today = new Date()
       const sameDay = new Date(today)
       sameDay.setDate(sameDay.getDate() - 2)
-      const sameDayStr = sameDay.toISOString().split('T')[0]
+      const sameDayStr = toLocalDateString(sameDay)
 
       // Two transactions on the same date - but they're separate entries
       // The calculation sums them up
@@ -126,8 +127,8 @@ describe('Component Trend Calculation', () => {
       d2.setDate(d2.getDate() - 1)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 100 },
-        { date: d2.toISOString().split('T')[0], quantityChange: -150 },
+        { date: toLocalDateString(d1), quantityChange: 100 },
+        { date: toLocalDateString(d2), quantityChange: -150 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)
@@ -143,7 +144,7 @@ describe('Component Trend Calculation', () => {
       singleDay.setDate(singleDay.getDate() - 2)
 
       const transactions = [
-        { date: singleDay.toISOString().split('T')[0], quantityChange: 500 },
+        { date: toLocalDateString(singleDay), quantityChange: 500 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)
@@ -165,8 +166,8 @@ describe('Component Trend Calculation', () => {
       recentDate.setDate(recentDate.getDate() - 2)
 
       const transactions = [
-        { date: oldDate.toISOString().split('T')[0], quantityChange: 100 },
-        { date: recentDate.toISOString().split('T')[0], quantityChange: 50 },
+        { date: toLocalDateString(oldDate), quantityChange: 100 },
+        { date: toLocalDateString(recentDate), quantityChange: 50 },
       ]
 
       // Only look at last 7 days
@@ -187,7 +188,7 @@ describe('Component Trend Calculation', () => {
       d1.setDate(d1.getDate() - 5)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 100 },
+        { date: toLocalDateString(d1), quantityChange: 100 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)
@@ -202,7 +203,7 @@ describe('Component Trend Calculation', () => {
       d1.setDate(d1.getDate() - 45)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 100 },
+        { date: toLocalDateString(d1), quantityChange: 100 },
       ]
 
       // 90 days should be sampled to ~30 points
@@ -222,7 +223,7 @@ describe('Component Trend Calculation', () => {
       oldDate.setDate(oldDate.getDate() - 60)
 
       const transactions = [
-        { date: oldDate.toISOString().split('T')[0], quantityChange: 100 },
+        { date: toLocalDateString(oldDate), quantityChange: 100 },
       ]
 
       // Only look at last 7 days
@@ -240,7 +241,7 @@ describe('Component Trend Calculation', () => {
       d1.setDate(d1.getDate() - 3)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 0 },
+        { date: toLocalDateString(d1), quantityChange: 0 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)
@@ -255,7 +256,7 @@ describe('Component Trend Calculation', () => {
       d1.setDate(d1.getDate() - 2)
 
       const transactions = [
-        { date: d1.toISOString().split('T')[0], quantityChange: 1000000 },
+        { date: toLocalDateString(d1), quantityChange: 1000000 },
       ]
 
       const trend = calculateTrendFromTransactions(transactions, 7)

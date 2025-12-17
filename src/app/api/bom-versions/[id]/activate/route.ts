@@ -10,6 +10,7 @@ import {
 } from '@/lib/api-response'
 import { activateBOMVersion, calculateBOMUnitCost } from '@/services/bom'
 import { getComponentQuantities } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -57,8 +58,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       id: bomVersion.id,
       skuId: bomVersion.skuId,
       versionName: bomVersion.versionName,
-      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(bomVersion.effectiveStartDate),
+      effectiveEndDate: bomVersion.effectiveEndDate ? toLocalDateString(bomVersion.effectiveEndDate) : null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
       unitCost: unitCost.toFixed(4),

@@ -6,6 +6,7 @@
   "scout_plan_end": "2025-12-17T18:36:44.000Z",
   "build_start": "2025-12-17T18:36:58.000Z",
   "build_end": "2025-12-17T18:41:38.000Z",
-  "cleanup_start": "2025-12-17T18:42:00.000Z",
-  "cleanup_end": "2025-12-17T18:50:00.000Z"
+  "test_cleanup_start": "2025-12-17T18:41:51.000Z",
+  "test_cleanup_end": "2025-12-17T18:47:01.000Z",
+  "workflow_end": "2025-12-17T18:47:01.000Z"
 }

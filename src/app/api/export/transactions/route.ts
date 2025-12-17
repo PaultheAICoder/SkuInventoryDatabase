@@ -10,6 +10,7 @@ import {
   generateExportFilename,
   type TransactionExportData,
 } from '@/services/export'
+import { toLocalDateString } from '@/lib/utils'
 
 // GET /api/export/transactions - Export transactions to CSV
 export async function GET(request: NextRequest) {
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
           exportData.push({
             id: tx.id,
             type: tx.type,
-            date: tx.date.toISOString().split('T')[0],
+            date: toLocalDateString(tx.date),
             skuName: tx.sku?.name ?? null,
             skuCode: tx.sku?.internalCode ?? null,
             salesChannel: tx.salesChannel,
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
         exportData.push({
           id: tx.id,
           type: tx.type,
-          date: tx.date.toISOString().split('T')[0],
+          date: toLocalDateString(tx.date),
           skuName: tx.sku?.name ?? null,
           skuCode: tx.sku?.internalCode ?? null,
           salesChannel: tx.salesChannel,

@@ -21,6 +21,7 @@ import {
   getOrCreateDefaultLocation,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { POST as createBuild } from '@/app/api/transactions/build/route'
@@ -157,7 +158,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -204,7 +205,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -246,7 +247,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 3,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -278,7 +279,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -332,7 +333,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 2,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -504,7 +505,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: skuB.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -598,7 +599,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: skuB.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -643,7 +644,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {

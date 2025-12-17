@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toLocalDateString } from '@/lib/utils'
 
 interface AdjustmentDialogProps {
   open: boolean
@@ -52,7 +53,7 @@ export function AdjustmentDialog({
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     adjustmentType: 'subtract' as 'add' | 'subtract',
     quantity: '',
     reason: '',
@@ -113,7 +114,7 @@ export function AdjustmentDialog({
 
       // Reset form
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: toLocalDateString(new Date()),
         adjustmentType: 'subtract',
         quantity: '',
         reason: '',

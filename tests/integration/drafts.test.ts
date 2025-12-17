@@ -18,6 +18,7 @@ import {
   createTestComponentInDb,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { GET as getDrafts, POST as createDraft } from '@/app/api/transactions/drafts/route'
@@ -101,7 +102,7 @@ describe('Draft Transactions API - selectedCompanyId Validation (Issue #287)', (
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'receipt',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
@@ -123,7 +124,7 @@ describe('Draft Transactions API - selectedCompanyId Validation (Issue #287)', (
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'receipt',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           quantity: 100,
         }),
       })

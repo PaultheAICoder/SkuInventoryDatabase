@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, notFound, serverError } from '@/lib/api-response'
 import { checkLotAvailabilityForBuild } from '@/services/lot-selection'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           lotId: lot.lotId,
           lotNumber: lot.lotNumber,
           quantity: lot.quantity,
-          expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+          expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
         })),
         isPooled: a.isPooled,
         isSufficient: a.isSufficient,

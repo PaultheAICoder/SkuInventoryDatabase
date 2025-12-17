@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { toLocalDateString } from '@/lib/utils'
 
 // Test the analytics calculation logic
 // These are pure function tests - no database required
@@ -68,7 +69,7 @@ describe('Analytics Calculations', () => {
       const diff = date.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
       const monday = new Date(date)
       monday.setDate(diff)
-      const key = monday.toISOString().split('T')[0]
+      const key = toLocalDateString(monday)
       expect(key).toBe('2025-12-01') // Monday of that week
     })
   })
