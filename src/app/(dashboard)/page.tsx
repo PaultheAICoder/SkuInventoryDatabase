@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DashboardStats } from '@/components/features/DashboardStats'
 import { CriticalComponentsList } from '@/components/features/CriticalComponentsList'
@@ -81,6 +82,11 @@ export default function DashboardPage() {
   const [timeFilter, setTimeFilter] = useState<number | null>(30)
   const [locationId, setLocationId] = useState<string | undefined>(undefined)
   const [expiryData, setExpiryData] = useState<ExpiryData | null>(null)
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null)
+
+  const toggleExpand = (txId: string) => {
+    setExpandedTxId((prev) => (prev === txId ? null : txId))
+  }
 
   // Refetch when company changes, time filter changes, or location changes
   useEffect(() => {
@@ -195,43 +201,104 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {data.recentTransactions.slice(0, 5).map((tx) => (
-                    <TableRow key={tx.id}>
+                    <React.Fragment key={tx.id}>
+                    <TableRow>
                       <TableCell className="font-mono text-sm" suppressHydrationWarning>
                         {formatDateString(tx.date)}
                       </TableCell>
                       <TableCell className="capitalize">{tx.type}</TableCell>
                       <TableCell>
-                        {tx.lines[0] && (
-                          <Link
-                            href={`/components/${tx.lines[0].component.id}`}
-                            className="hover:underline"
-                          >
-                            {tx.lines[0].component.name}
-                          </Link>
-                        )}
-                        {tx.lines.length > 1 && (
-                          <span className="text-muted-foreground">
-                            {' '}
-                            +{tx.lines.length - 1} more
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {tx.lines.length > 1 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleExpand(tx.id)
+                              }}
+                              className="p-0.5 hover:bg-muted rounded"
+                              aria-label={expandedTxId === tx.id ? 'Collapse lines' : 'Expand lines'}
+                            >
+                              {expandedTxId === tx.id ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </button>
+                          )}
+                          <div>
+                            {tx.lines[0] && (
+                              <Link
+                                href={`/components/${tx.lines[0].component.id}`}
+                                className="hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {tx.lines[0].component.name}
+                              </Link>
+                            )}
+                            {tx.lines.length > 1 && expandedTxId !== tx.id && (
+                              <span className="text-muted-foreground text-xs ml-1">
+                                +{tx.lines.length - 1} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {tx.lines[0] && (
-                          <span
-                            className={`font-mono ${
-                              parseFloat(tx.lines[0].quantityChange) >= 0
-                                ? 'text-green-600'
-                                : 'text-red-600'
-                            }`}
-                            suppressHydrationWarning
-                          >
-                            {parseFloat(tx.lines[0].quantityChange) >= 0 ? '+' : ''}
-                            {parseFloat(tx.lines[0].quantityChange).toLocaleString()}
+                        {expandedTxId === tx.id ? (
+                          <span className="text-xs text-muted-foreground">
+                            {tx.lines.length} items
                           </span>
+                        ) : (
+                          tx.lines[0] && (
+                            <span
+                              className={`font-mono ${
+                                parseFloat(tx.lines[0].quantityChange) >= 0
+                                  ? 'text-green-600'
+                                  : 'text-red-600'
+                              }`}
+                              suppressHydrationWarning
+                            >
+                              {parseFloat(tx.lines[0].quantityChange) >= 0 ? '+' : ''}
+                              {parseFloat(tx.lines[0].quantityChange).toLocaleString()}
+                            </span>
+                          )
                         )}
                       </TableCell>
                     </TableRow>
+                    {expandedTxId === tx.id && (
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={4} className="py-2">
+                          <div className="pl-4 space-y-1">
+                            <p className="text-xs text-muted-foreground font-medium mb-2">
+                              All items in this transaction:
+                            </p>
+                            {tx.lines.map((line, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <Link
+                                  href={`/components/${line.component.id}`}
+                                  className="hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {line.component.name}
+                                </Link>
+                                <span
+                                  className={`font-mono ${
+                                    parseFloat(line.quantityChange) >= 0
+                                      ? 'text-green-600'
+                                      : 'text-red-600'
+                                  }`}
+                                  suppressHydrationWarning
+                                >
+                                  {parseFloat(line.quantityChange) >= 0 ? '+' : ''}
+                                  {parseFloat(line.quantityChange).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
