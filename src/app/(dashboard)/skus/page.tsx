@@ -7,9 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SKUTable } from '@/components/features/SKUTable'
 import { ExportButton } from '@/components/features/ExportButton'
-import { prisma } from '@/lib/db'
-import { Prisma } from '@prisma/client'
-import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
+import { getSkusWithCosts } from '@/services/sku'
 
 interface SearchParams {
   page?: string
@@ -19,90 +17,6 @@ interface SearchParams {
   sortBy?: string
   sortOrder?: string
   locationId?: string
-}
-
-async function getSKUs(searchParams: SearchParams, selectedCompanyId: string) {
-  const page = parseInt(searchParams.page || '1', 10)
-  const pageSize = parseInt(searchParams.pageSize || '50', 10)
-  const search = searchParams.search
-  const salesChannel = searchParams.salesChannel
-  const sortBy = (searchParams.sortBy || 'createdAt') as keyof Prisma.SKUOrderByWithRelationInput
-  const sortOrder = (searchParams.sortOrder || 'desc') as 'asc' | 'desc'
-  const locationId = searchParams.locationId
-
-  // Build where clause - scope by companyId
-  const where: Prisma.SKUWhereInput = {
-    companyId: selectedCompanyId,
-    ...(salesChannel && { salesChannel }),
-    ...(search && {
-      OR: [
-        { name: { contains: search, mode: 'insensitive' } },
-        { internalCode: { contains: search, mode: 'insensitive' } },
-      ],
-    }),
-  }
-
-  // Get total count
-  const total = await prisma.sKU.count({ where })
-
-  // Get SKUs with active BOM
-  const skus = await prisma.sKU.findMany({
-    where,
-    skip: (page - 1) * pageSize,
-    take: pageSize,
-    orderBy: { [sortBy]: sortOrder },
-    include: {
-      createdBy: { select: { id: true, name: true } },
-      bomVersions: {
-        where: { isActive: true },
-        take: 1,
-        select: {
-          id: true,
-          versionName: true,
-        },
-      },
-    },
-  })
-
-  // Get BOM costs and buildable units
-  const skuIds = skus.map((s) => s.id)
-  const activeBomIds = skus
-    .filter((s) => s.bomVersions[0])
-    .map((s) => s.bomVersions[0].id)
-
-  const [bomCosts, buildableUnits] = await Promise.all([
-    activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds, selectedCompanyId) : new Map<string, number>(),
-    skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId, locationId) : new Map<string, number | null>(),
-  ])
-
-  // Transform response
-  const data = skus.map((sku) => {
-    const activeBom = sku.bomVersions[0]
-    const unitCost = activeBom ? bomCosts.get(activeBom.id) ?? 0 : null
-
-    return {
-      id: sku.id,
-      name: sku.name,
-      internalCode: sku.internalCode,
-      salesChannel: sku.salesChannel,
-      externalIds: sku.externalIds as Record<string, string>,
-      notes: sku.notes,
-      isActive: sku.isActive,
-      createdAt: sku.createdAt.toISOString(),
-      updatedAt: sku.updatedAt.toISOString(),
-      createdBy: sku.createdBy,
-      activeBom: activeBom
-        ? {
-            id: activeBom.id,
-            versionName: activeBom.versionName,
-            unitCost: unitCost?.toFixed(4) ?? '0.0000',
-          }
-        : null,
-      maxBuildableUnits: buildableUnits.get(sku.id) ?? null,
-    }
-  })
-
-  return { data, meta: { total, page, pageSize } }
 }
 
 export default async function SKUsPage({
@@ -119,7 +33,20 @@ export default async function SKUsPage({
 
   // Use selected company for scoping
   const selectedCompanyId = session.user.selectedCompanyId
-  const { data: skus, meta } = await getSKUs(params, selectedCompanyId)
+  const selectedBrandId = session.user.selectedBrandId
+
+  // Use service to get SKUs with costs
+  const { data: skus, meta } = await getSkusWithCosts({
+    companyId: selectedCompanyId,
+    brandId: selectedBrandId ?? undefined,
+    page: parseInt(params.page || '1', 10),
+    pageSize: parseInt(params.pageSize || '50', 10),
+    search: params.search,
+    salesChannel: params.salesChannel,
+    sortBy: (params.sortBy || 'createdAt') as 'name' | 'internalCode' | 'salesChannel' | 'createdAt',
+    sortOrder: (params.sortOrder || 'desc') as 'asc' | 'desc',
+    locationId: params.locationId,
+  })
 
   return (
     <div className="space-y-6">

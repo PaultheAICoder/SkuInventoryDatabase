@@ -14,8 +14,7 @@ import {
   error,
 } from '@/lib/api-response'
 import { createSKUSchema, skuListQuerySchema } from '@/types/sku'
-import { calculateBOMUnitCosts, calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
-import { getSkuQuantities } from '@/services/finished-goods'
+import { getSkusWithCosts } from '@/services/sku'
 import { parseFractionOrNumber } from '@/lib/utils'
 
 // GET /api/skus - List SKUs with filtering and pagination
@@ -39,86 +38,23 @@ export async function GET(request: NextRequest) {
     // Get selected brand (may be null for "all brands")
     const selectedBrandId = session.user.selectedBrandId
 
-    // Build where clause - scope by companyId and optionally brandId
-    const where: Prisma.SKUWhereInput = {
+    // Use service to get SKUs with costs
+    const result = await getSkusWithCosts({
       companyId: selectedCompanyId,
-      // Only add brandId filter if a specific brand is selected
-      ...(selectedBrandId && { brandId: selectedBrandId }),
-      ...(isActive !== undefined && { isActive }),
-      ...(salesChannel && { salesChannel }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { internalCode: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    }
-
-    // Get total count
-    const total = await prisma.sKU.count({ where })
-
-    // Get SKUs with active BOM
-    const skus = await prisma.sKU.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { [sortBy]: sortOrder },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        bomVersions: {
-          where: { isActive: true },
-          take: 1,
-          select: {
-            id: true,
-            versionName: true,
-          },
-        },
-      },
+      brandId: selectedBrandId ?? undefined,
+      page,
+      pageSize,
+      search,
+      salesChannel,
+      isActive,
+      sortBy,
+      sortOrder,
+      locationId,
     })
 
-    // Get BOM costs and buildable units
-    const skuIds = skus.map((s) => s.id)
-    const activeBomIds = skus
-      .filter((s) => s.bomVersions[0])
-      .map((s) => s.bomVersions[0].id)
-
-    const [bomCosts, buildableUnits, finishedGoodsQtys] = await Promise.all([
-      activeBomIds.length > 0 ? calculateBOMUnitCosts(activeBomIds, selectedCompanyId!) : new Map<string, number>(),
-      skuIds.length > 0 ? calculateMaxBuildableUnitsForSKUs(skuIds, selectedCompanyId!, locationId) : new Map<string, number | null>(),
-      skuIds.length > 0 ? getSkuQuantities(skuIds, selectedCompanyId!, locationId) : new Map<string, number>(),
-    ])
-
-    // Transform response
-    const data = skus.map((sku) => {
-      const activeBom = sku.bomVersions[0]
-      const unitCost = activeBom ? bomCosts.get(activeBom.id) ?? 0 : null
-
-      return {
-        id: sku.id,
-        name: sku.name,
-        internalCode: sku.internalCode,
-        salesChannel: sku.salesChannel,
-        externalIds: sku.externalIds as Record<string, string>,
-        notes: sku.notes,
-        isActive: sku.isActive,
-        createdAt: sku.createdAt.toISOString(),
-        updatedAt: sku.updatedAt.toISOString(),
-        createdBy: sku.createdBy,
-        activeBom: activeBom
-          ? {
-              id: activeBom.id,
-              versionName: activeBom.versionName,
-              unitCost: unitCost?.toFixed(4) ?? '0.0000',
-            }
-          : null,
-        maxBuildableUnits: buildableUnits.get(sku.id) ?? null,
-        finishedGoodsQuantity: finishedGoodsQtys.get(sku.id) ?? 0,
-      }
-    })
-
-    return paginated(data, total, page, pageSize)
-  } catch (error) {
-    console.error('Error listing SKUs:', error)
+    return paginated(result.data, result.meta.total, result.meta.page, result.meta.pageSize)
+  } catch (err) {
+    console.error('Error listing SKUs:', err)
     return serverError()
   }
 }
