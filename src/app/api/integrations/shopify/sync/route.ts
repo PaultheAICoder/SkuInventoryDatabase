@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { syncAll } from '@/services/shopify/sync'
 
@@ -21,34 +21,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user's primary company
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
-    }
-
-    // Admin or Ops only (sync can be triggered by ops team)
-    if (userCompany.role !== 'admin' && userCompany.role !== 'ops') {
+    // Admin or Ops only (using company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin' && companyRole !== 'ops') {
       return NextResponse.json(
         { error: 'Admin or Ops permission required' },
         { status: 403 }
       )
     }
 
+    const companyId = session.user.selectedCompanyId
+
     // Get connection
     const connection = await prisma.shopifyConnection.findFirst({
       where: {
-        companyId: userCompany.companyId,
+        companyId,
         isActive: true,
       },
     })
