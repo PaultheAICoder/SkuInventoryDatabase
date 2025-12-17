@@ -15,6 +15,17 @@ vi.mock('sonner', () => ({
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+// Helper function to fill bug structured fields
+async function fillBugFields(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText('Title *'), 'Test bug title description')
+  await user.type(screen.getByLabelText(/What should happen/), 'Expected behavior text here')
+  await user.type(screen.getByLabelText(/What actually happens/), 'Actual behavior text here')
+  await user.type(screen.getByLabelText(/Steps to reproduce/), 'Step 1\nStep 2\nStep 3')
+}
+
+// Note: fillFeatureFields helper removed due to Radix UI Select component issues with jsdom.
+// Feature fields testing is done separately without full Select interaction.
+
 describe('FeedbackDialog', () => {
   beforeEach(() => {
     mockFetch.mockClear()
@@ -48,38 +59,40 @@ describe('FeedbackDialog', () => {
   })
 
   describe('state machine transitions', () => {
-    it('transitions from select-type to describe when bug selected', async () => {
+    it('transitions from select-type to structured-fields when bug selected', async () => {
       const user = userEvent.setup()
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
 
-      expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
-      expect(screen.getByLabelText('Description *')).toBeInTheDocument()
+      expect(screen.getByText('Report a Bug')).toBeInTheDocument()
+      expect(screen.getByLabelText('Title *')).toBeInTheDocument()
+      expect(screen.getByLabelText(/What should happen/)).toBeInTheDocument()
     })
 
-    it('transitions from select-type to describe when feature selected', async () => {
+    it('transitions from select-type to structured-fields when feature selected', async () => {
       const user = userEvent.setup()
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Request a Feature'))
 
-      expect(screen.getByText('Describe Your Feature Request')).toBeInTheDocument()
+      expect(screen.getByText('Request a Feature')).toBeInTheDocument()
+      expect(screen.getByLabelText('Title *')).toBeInTheDocument()
     })
 
-    it('transitions from describe to clarify after valid description', async () => {
+    it('transitions from structured-fields to clarify after valid bug submission', async () => {
       const user = userEvent.setup()
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          data: { questions: ['Q1?', 'Q2?'] }
         })
       })
 
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'This is a detailed bug description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -93,7 +106,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -105,7 +118,7 @@ describe('FeedbackDialog', () => {
 
       // Complete flow to submission
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed bug description here')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -116,7 +129,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -130,7 +142,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -143,7 +155,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed bug description here')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -153,7 +165,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -161,30 +172,30 @@ describe('FeedbackDialog', () => {
       })
     })
 
-    it('back button returns from describe to select-type', async () => {
+    it('back button returns from structured-fields to select-type', async () => {
       const user = userEvent.setup()
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      expect(screen.getByLabelText('Title *')).toBeInTheDocument()
 
       await user.click(screen.getByText('Back'))
       expect(screen.getByText('Submit Feedback')).toBeInTheDocument()
     })
 
-    it('back button returns from clarify to describe', async () => {
+    it('back button returns from clarify to structured-fields', async () => {
       const user = userEvent.setup()
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+          data: { questions: ['Q1?', 'Q2?'] }
         })
       })
 
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -192,60 +203,95 @@ describe('FeedbackDialog', () => {
       })
 
       await user.click(screen.getByText('Back'))
-      expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      expect(screen.getByLabelText('Title *')).toBeInTheDocument()
     })
   })
 
-  describe('form validation', () => {
-    describe('description validation', () => {
-      it('displays character count', async () => {
+  describe('structured fields validation', () => {
+    describe('bug fields validation', () => {
+      it('displays page URL as read-only field', async () => {
         const user = userEvent.setup()
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        expect(screen.getByText('0/2000 characters (minimum 10)')).toBeInTheDocument()
+
+        const pageUrlInput = screen.getByLabelText('Page URL')
+        expect(pageUrlInput).toBeInTheDocument()
+        expect(pageUrlInput).toBeDisabled()
       })
 
-      it('updates character count as user types', async () => {
+      it('displays character count for title', async () => {
         const user = userEvent.setup()
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Test12345')
-
-        expect(screen.getByText('9/2000 characters (minimum 10)')).toBeInTheDocument()
+        expect(screen.getByText('0/255 characters (minimum 5)')).toBeInTheDocument()
       })
 
-      it('disables Continue button when description < 10 chars', async () => {
+      it('updates title character count as user types', async () => {
         const user = userEvent.setup()
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Short')
+        await user.type(screen.getByLabelText('Title *'), 'Test')
+
+        expect(screen.getByText('4/255 characters (minimum 5)')).toBeInTheDocument()
+      })
+
+      it('disables Continue button when required fields not filled', async () => {
+        const user = userEvent.setup()
+        render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+        await user.click(screen.getByText('Report a Bug'))
 
         expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
       })
 
-      it('enables Continue button when description >= 10 chars', async () => {
+      it('enables Continue button when all required bug fields filled', async () => {
         const user = userEvent.setup()
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'This is enough')
+        await fillBugFields(user)
 
         expect(screen.getByRole('button', { name: 'Continue' })).not.toBeDisabled()
       })
+    })
 
-      it('shows error when trying to submit short description', async () => {
+    describe('feature fields validation', () => {
+      // Note: Radix UI Select has a known issue with jsdom where hasPointerCapture is not a function
+      // These tests verify the UI renders correctly but skip the actual select interaction
+      it('shows Who Benefits dropdown element', async () => {
         const user = userEvent.setup()
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
-        await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Short')
+        await user.click(screen.getByText('Request a Feature'))
 
-        // Button should be disabled, preventing submission
-        const continueBtn = screen.getByRole('button', { name: 'Continue' })
-        expect(continueBtn).toBeDisabled()
+        // Verify the combobox is present (but don't click to open due to jsdom limitation)
+        expect(screen.getByRole('combobox')).toBeInTheDocument()
+        expect(screen.getByText('Select who benefits')).toBeInTheDocument()
+      })
+
+      it('disables Continue button when required feature fields not filled', async () => {
+        const user = userEvent.setup()
+        render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+        await user.click(screen.getByText('Request a Feature'))
+        await user.type(screen.getByLabelText('Title *'), 'Test feature')
+
+        expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+      })
+
+      it('shows feature-specific fields', async () => {
+        const user = userEvent.setup()
+        render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
+
+        await user.click(screen.getByText('Request a Feature'))
+
+        // Verify feature-specific fields are present
+        expect(screen.getByLabelText(/Who would benefit/)).toBeInTheDocument()
+        expect(screen.getByLabelText(/What action do you want/)).toBeInTheDocument()
+        expect(screen.getByLabelText(/Why does this matter/)).toBeInTheDocument()
       })
     })
 
@@ -255,24 +301,23 @@ describe('FeedbackDialog', () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
 
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
           expect(screen.getByText('A Few Quick Questions')).toBeInTheDocument()
         })
 
-        // Only fill 2 of 3 answers
+        // Only fill 1 of 2 answers
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
-        await user.type(textareas[1], 'Answer 2')
 
         expect(screen.getByRole('button', { name: 'Submit Feedback' })).toBeDisabled()
       })
@@ -282,14 +327,14 @@ describe('FeedbackDialog', () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
 
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -299,7 +344,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
 
         expect(screen.getByRole('button', { name: 'Submit Feedback' })).not.toBeDisabled()
       })
@@ -309,20 +353,19 @@ describe('FeedbackDialog', () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Custom Q1?', 'Custom Q2?', 'Custom Q3?'] }
+            data: { questions: ['Custom Q1?', 'Custom Q2?'] }
           })
         })
 
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
           expect(screen.getByText('Custom Q1?')).toBeInTheDocument()
           expect(screen.getByText('Custom Q2?')).toBeInTheDocument()
-          expect(screen.getByText('Custom Q3?')).toBeInTheDocument()
         })
       })
     })
@@ -341,7 +384,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       expect(screen.getByText('Getting Questions...')).toBeInTheDocument()
@@ -351,7 +394,7 @@ describe('FeedbackDialog', () => {
         resolvePromise!({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
       })
@@ -368,7 +411,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       // Loader2 icon with animate-spin class indicates loading
@@ -380,7 +423,7 @@ describe('FeedbackDialog', () => {
         resolvePromise!({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
       })
@@ -397,7 +440,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockReturnValueOnce(pendingSubmit)
@@ -405,7 +448,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -415,7 +458,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       expect(screen.getByText('Submitting Feedback')).toBeInTheDocument()
@@ -443,7 +485,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockReturnValueOnce(pendingSubmit)
@@ -451,7 +493,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -461,7 +503,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       expect(screen.getByText('Please wait...')).toBeInTheDocument()
@@ -486,7 +527,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -499,7 +540,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -509,7 +550,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -523,7 +563,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -536,7 +576,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -546,7 +586,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -564,7 +603,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -577,7 +616,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={mockOnOpenChange} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -587,7 +626,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -609,7 +647,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -620,7 +658,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -630,7 +668,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -644,7 +681,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -655,7 +692,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -665,7 +702,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -679,7 +715,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -690,7 +726,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -700,7 +736,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -717,7 +752,7 @@ describe('FeedbackDialog', () => {
           .mockResolvedValueOnce({
             ok: true,
             json: () => Promise.resolve({
-              data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+              data: { questions: ['Q1?', 'Q2?'] }
             })
           })
           .mockResolvedValueOnce({
@@ -728,7 +763,7 @@ describe('FeedbackDialog', () => {
         render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
         await user.click(screen.getByText('Report a Bug'))
-        await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+        await fillBugFields(user)
         await user.click(screen.getByText('Continue'))
 
         await waitFor(() => {
@@ -738,7 +773,6 @@ describe('FeedbackDialog', () => {
         const textareas = screen.getAllByPlaceholderText('Your answer...')
         await user.type(textareas[0], 'Answer 1')
         await user.type(textareas[1], 'Answer 2')
-        await user.type(textareas[2], 'Answer 3')
         await user.click(screen.getByText('Submit Feedback'))
 
         await waitFor(() => {
@@ -763,9 +797,9 @@ describe('FeedbackDialog', () => {
 
       await user.click(screen.getByText('Report a Bug'))
 
-      const textarea = screen.getByLabelText('Description *')
-      expect(textarea).toBeInTheDocument()
-      expect(textarea.tagName.toLowerCase()).toBe('textarea')
+      const titleInput = screen.getByLabelText('Title *')
+      expect(titleInput).toBeInTheDocument()
+      expect(titleInput.tagName.toLowerCase()).toBe('input')
     })
 
     it('answer textareas have proper labels', async () => {
@@ -773,14 +807,14 @@ describe('FeedbackDialog', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
-          data: { questions: ['Question 1?', 'Question 2?', 'Question 3?'] }
+          data: { questions: ['Question 1?', 'Question 2?'] }
         })
       })
 
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -808,7 +842,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -819,7 +853,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -829,7 +863,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -851,9 +884,9 @@ describe('FeedbackDialog', () => {
       const user = userEvent.setup()
       const { rerender } = render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
-      // Navigate to describe step
+      // Navigate to structured-fields step
       await user.click(screen.getByText('Report a Bug'))
-      expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+      expect(screen.getByLabelText('Title *')).toBeInTheDocument()
 
       // Close dialog
       rerender(<FeedbackDialog open={false} onOpenChange={() => {}} />)
@@ -870,14 +903,14 @@ describe('FeedbackDialog', () => {
       expect(screen.getByText('Report a Bug')).toBeInTheDocument()
     })
 
-    it('clears description when dialog closes', async () => {
+    it('clears title when dialog closes', async () => {
       const user = userEvent.setup()
       const { rerender } = render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Test description')
+      await user.type(screen.getByLabelText('Title *'), 'Test title')
 
-      expect(screen.getByDisplayValue('Test description')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Test title')).toBeInTheDocument()
 
       // Close dialog
       rerender(<FeedbackDialog open={false} onOpenChange={() => {}} />)
@@ -890,7 +923,7 @@ describe('FeedbackDialog', () => {
       rerender(<FeedbackDialog open={true} onOpenChange={() => {}} />)
       await user.click(screen.getByText('Report a Bug'))
 
-      expect(screen.getByLabelText('Description *')).toHaveValue('')
+      expect(screen.getByLabelText('Title *')).toHaveValue('')
     })
 
     it('clears error state when dialog closes', async () => {
@@ -899,7 +932,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -911,7 +944,7 @@ describe('FeedbackDialog', () => {
 
       // Navigate to error state
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -921,7 +954,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -946,28 +978,7 @@ describe('FeedbackDialog', () => {
   })
 
   describe('clarify API error handling', () => {
-    it('uses fallback questions when clarify API fails', async () => {
-      const user = userEvent.setup()
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        json: () => Promise.resolve({
-          message: 'Claude API unavailable'
-        })
-      })
-
-      render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
-
-      await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing clarify API failure')
-      await user.click(screen.getByText('Continue'))
-
-      await waitFor(() => {
-        // Should show the error message from API
-        expect(screen.getByText('Claude API unavailable')).toBeInTheDocument()
-      })
-    })
-
-    it('displays error in describe step when clarify fails', async () => {
+    it('displays error in structured-fields step when clarify fails', async () => {
       const user = userEvent.setup()
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -979,13 +990,13 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing clarify API failure')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
-        // Should stay on describe step and show error
+        // Should stay on structured-fields step and show error
         expect(screen.getByText('Failed to get clarifying questions')).toBeInTheDocument()
-        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+        expect(screen.getByLabelText('Title *')).toBeInTheDocument()
       })
     })
 
@@ -999,13 +1010,13 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing malformed response')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
-        // Should show error and stay on describe step
+        // Should show error and stay on structured-fields step
         expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
-        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+        expect(screen.getByLabelText('Title *')).toBeInTheDocument()
       })
     })
 
@@ -1019,12 +1030,12 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing missing questions')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
         expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
-        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+        expect(screen.getByLabelText('Title *')).toBeInTheDocument()
       })
     })
 
@@ -1038,12 +1049,12 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing wrong type')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
         expect(screen.getByText(/Invalid response/i)).toBeInTheDocument()
-        expect(screen.getByText('Describe the Bug')).toBeInTheDocument()
+        expect(screen.getByLabelText('Title *')).toBeInTheDocument()
       })
     })
 
@@ -1057,7 +1068,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Testing JSON parse failure')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -1074,7 +1085,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -1085,7 +1096,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -1095,7 +1106,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -1111,7 +1121,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -1122,7 +1132,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -1132,7 +1142,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
@@ -1146,7 +1155,7 @@ describe('FeedbackDialog', () => {
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({
-            data: { questions: ['Q1?', 'Q2?', 'Q3?'] }
+            data: { questions: ['Q1?', 'Q2?'] }
           })
         })
         .mockResolvedValueOnce({
@@ -1157,7 +1166,7 @@ describe('FeedbackDialog', () => {
       render(<FeedbackDialog open={true} onOpenChange={() => {}} />)
 
       await user.click(screen.getByText('Report a Bug'))
-      await user.type(screen.getByLabelText('Description *'), 'Detailed description')
+      await fillBugFields(user)
       await user.click(screen.getByText('Continue'))
 
       await waitFor(() => {
@@ -1167,7 +1176,6 @@ describe('FeedbackDialog', () => {
       const textareas = screen.getAllByPlaceholderText('Your answer...')
       await user.type(textareas[0], 'Answer 1')
       await user.type(textareas[1], 'Answer 2')
-      await user.type(textareas[2], 'Answer 3')
       await user.click(screen.getByText('Submit Feedback'))
 
       await waitFor(() => {
