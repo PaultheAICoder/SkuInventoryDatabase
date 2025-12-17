@@ -6,7 +6,7 @@ import { Prisma } from '@prisma/client'
 import { createBrandSchema, brandListQuerySchema } from '@/types/brand'
 
 // GET /api/brands - List brands (admin only)
-// Supports ?all=true to return brands from all companies (for admin editing)
+// Supports ?all=true to return brands from all companies the user has access to
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -29,18 +29,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { page, pageSize, search, isActive, sortBy, sortOrder } = validation.data
+    const { page, pageSize, search, isActive, sortBy, sortOrder, all: showAll } = validation.data
 
-    // Check for admin "all brands" mode
-    const showAll = request.nextUrl.searchParams.get('all') === 'true'
-
-    // Use selected company for scoping (unless showing all)
+    // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
 
-    // Build where clause - only scope by company if NOT showing all
+    // Get all company IDs this user has access to
+    const accessibleCompanyIds = session.user.companies.map(c => c.id)
+
+    // Build where clause - always scope to accessible companies
     const where: Prisma.BrandWhereInput = {}
 
-    if (!showAll) {
+    if (showAll) {
+      // Return brands from ALL companies user has access to (not just selected)
+      where.companyId = { in: accessibleCompanyIds }
+    } else {
+      // Return brands from selected company only
       where.companyId = selectedCompanyId
     }
 

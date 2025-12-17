@@ -26,6 +26,10 @@ export const brandListQuerySchema = z.object({
     .optional(),
   sortBy: z.enum(['name', 'createdAt']).default('name'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
+  all: z
+    .string()
+    .transform((val) => val === 'true')
+    .optional(),
 })
 
 export type BrandListQuery = z.infer<typeof brandListQuerySchema>
