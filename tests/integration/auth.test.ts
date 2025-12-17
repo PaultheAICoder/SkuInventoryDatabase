@@ -146,12 +146,7 @@ describe('API Authentication', () => {
       // Create a session with empty selectedCompanyId to simulate edge case
       const incompleteSession = {
         user: {
-          id: TEST_SESSIONS.admin!.user.id,
-          email: TEST_SESSIONS.admin!.user.email,
-          name: TEST_SESSIONS.admin!.user.name,
-          role: 'admin' as const,
-          companyId: TEST_SESSIONS.admin!.user.companyId,
-          companyName: TEST_SESSIONS.admin!.user.companyName,
+          ...TEST_SESSIONS.admin!.user,
           selectedCompanyId: '', // Empty string simulates missing
         },
       }
@@ -169,12 +164,7 @@ describe('API Authentication', () => {
       // Create a session with empty selectedCompanyId to simulate edge case
       const incompleteSession = {
         user: {
-          id: TEST_SESSIONS.admin!.user.id,
-          email: TEST_SESSIONS.admin!.user.email,
-          name: TEST_SESSIONS.admin!.user.name,
-          role: 'admin' as const,
-          companyId: TEST_SESSIONS.admin!.user.companyId,
-          companyName: TEST_SESSIONS.admin!.user.companyName,
+          ...TEST_SESSIONS.admin!.user,
           selectedCompanyId: '', // Empty string simulates missing
         },
       }

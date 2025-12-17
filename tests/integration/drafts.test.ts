@@ -34,12 +34,7 @@ import { POST as batchApproveDrafts } from '@/app/api/transactions/drafts/batch-
 function createSessionWithoutCompany(): TestUserSession {
   return {
     user: {
-      id: TEST_SESSIONS.admin!.user.id,
-      email: TEST_SESSIONS.admin!.user.email,
-      name: TEST_SESSIONS.admin!.user.name,
-      role: TEST_SESSIONS.admin!.user.role,
-      companyId: TEST_SESSIONS.admin!.user.companyId,
-      companyName: TEST_SESSIONS.admin!.user.companyName,
+      ...TEST_SESSIONS.admin!.user,
       selectedCompanyId: undefined as unknown as string, // Simulate missing company
     },
   }

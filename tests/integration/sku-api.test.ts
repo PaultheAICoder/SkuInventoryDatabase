@@ -147,13 +147,10 @@ describe('SKU API', () => {
       // Create a session with a non-existent user ID (simulates stale JWT after DB reseed)
       const staleSession = {
         user: {
+          ...TEST_SESSIONS.admin!.user,
           id: '00000000-0000-0000-0000-000000000000', // Non-existent user
           email: 'deleted@example.com',
           name: 'Deleted User',
-          role: 'admin' as const,
-          companyId: TEST_SESSIONS.admin!.user.companyId,
-          companyName: 'Tonsil Tech',
-          selectedCompanyId: TEST_SESSIONS.admin!.user.selectedCompanyId,
         },
       }
       setTestSession(staleSession)

@@ -79,6 +79,17 @@ describe('Tenant Scoping', () => {
         companyId: otherCompany.id,
         companyName: otherCompany.name,
         selectedCompanyId: otherCompany.id,
+        selectedCompanyName: otherCompany.name,
+        companies: [{ id: otherCompany.id, name: otherCompany.name, role: 'admin' }],
+        companiesWithBrands: [{
+          id: otherCompany.id,
+          name: otherCompany.name,
+          role: 'admin',
+          brands: [{ id: 'other-brand', name: 'Other Brand Test' }],
+        }],
+        brands: [{ id: 'other-brand', name: 'Other Brand Test' }],
+        selectedBrandId: null,
+        selectedBrandName: null,
       },
     }
   })
