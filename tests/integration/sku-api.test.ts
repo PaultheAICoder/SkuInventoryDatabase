@@ -14,10 +14,12 @@ import {
   cleanupBeforeTest,
   createTestRequest,
   parseRouteResponse,
+  createTestSKUInDb,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
 
 import { POST as createSKU, GET as listSKUs } from '@/app/api/skus/route'
+import { PATCH as updateSKU, GET as getSKU } from '@/app/api/skus/[id]/route'
 
 describe('SKU API', () => {
   beforeAll(async () => {
@@ -206,6 +208,93 @@ describe('SKU API', () => {
       const result = await parseRouteResponse(response)
 
       expect(result.status).toBe(401)
+    })
+  })
+
+  describe('PATCH /api/skus/:id - Optimistic Locking', () => {
+    it('returns version field in SKU response', async () => {
+      // Create a SKU
+      const companyId = TEST_SESSIONS.admin!.user.selectedCompanyId
+      const sku = await createTestSKUInDb(companyId)
+
+      // Fetch the SKU
+      const request = createTestRequest(`/api/skus/${sku.id}`)
+      const response = await getSKU(request, { params: Promise.resolve({ id: sku.id }) })
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(200)
+      expect(result.data).toHaveProperty('version')
+      expect((result.data as { version?: number })?.version).toBe(1) // Initial version
+    })
+
+    it('increments version on successful update', async () => {
+      // Create a SKU
+      const companyId = TEST_SESSIONS.admin!.user.selectedCompanyId
+      const sku = await createTestSKUInDb(companyId)
+
+      // Update the SKU
+      const updateRequest = createTestRequest(`/api/skus/${sku.id}`, {
+        method: 'PATCH',
+        body: {
+          name: 'Updated Name',
+          version: 1,
+        },
+      })
+      const updateResponse = await updateSKU(updateRequest, { params: Promise.resolve({ id: sku.id }) })
+      const updateResult = await parseRouteResponse(updateResponse)
+
+      expect(updateResult.status).toBe(200)
+      expect((updateResult.data as { version?: number })?.version).toBe(2) // Version incremented
+    })
+
+    it('returns 409 VersionConflict when version is stale', async () => {
+      // Create a SKU
+      const companyId = TEST_SESSIONS.admin!.user.selectedCompanyId
+      const sku = await createTestSKUInDb(companyId)
+
+      // First update (succeeds)
+      const firstUpdate = createTestRequest(`/api/skus/${sku.id}`, {
+        method: 'PATCH',
+        body: {
+          name: 'First Update',
+          version: 1,
+        },
+      })
+      await updateSKU(firstUpdate, { params: Promise.resolve({ id: sku.id }) })
+
+      // Second update with stale version (should fail)
+      const staleUpdate = createTestRequest(`/api/skus/${sku.id}`, {
+        method: 'PATCH',
+        body: {
+          name: 'Stale Update',
+          version: 1, // Same version as first request, but DB is now at version 2
+        },
+      })
+      const staleResponse = await updateSKU(staleUpdate, { params: Promise.resolve({ id: sku.id }) })
+      const staleResult = await parseRouteResponse(staleResponse)
+
+      expect(staleResult.status).toBe(409)
+      expect(staleResult.error).toBe('VersionConflict')
+    })
+
+    it('allows update without version (backward compatibility)', async () => {
+      // Create a SKU
+      const companyId = TEST_SESSIONS.admin!.user.selectedCompanyId
+      const sku = await createTestSKUInDb(companyId)
+
+      // Update without version (should succeed for backward compatibility)
+      const updateRequest = createTestRequest(`/api/skus/${sku.id}`, {
+        method: 'PATCH',
+        body: {
+          name: 'Update without version',
+          // No version field
+        },
+      })
+      const updateResponse = await updateSKU(updateRequest, { params: Promise.resolve({ id: sku.id }) })
+      const updateResult = await parseRouteResponse(updateResponse)
+
+      expect(updateResult.status).toBe(200)
+      expect((updateResult.data as { name?: string })?.name).toBe('Update without version')
     })
   })
 })

@@ -1,6 +1,7 @@
 /**
  * Unit tests for BOM calculation functions
- * Tests calculateBOMUnitCost, calculateBOMUnitCosts, calculateMaxBuildableUnits, and calculateLineCosts
+ * Tests calculateBOMUnitCost, calculateBOMUnitCosts, calculateMaxBuildableUnits, calculateLineCosts,
+ * and VersionConflictError for optimistic locking (issue #309)
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
@@ -12,10 +13,13 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     bOMLine: {
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
     },
     bOMVersion: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      update: vi.fn(),
     },
     inventoryBalance: {
       groupBy: vi.fn(),
@@ -24,6 +28,7 @@ vi.mock('@/lib/db', () => ({
     component: {
       findMany: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }))
 
@@ -32,6 +37,8 @@ import {
   calculateBOMUnitCosts,
   calculateMaxBuildableUnits,
   calculateLineCosts,
+  VersionConflictError,
+  updateBOMVersion,
 } from '@/services/bom'
 import { prisma } from '@/lib/db'
 
@@ -373,5 +380,143 @@ describe('calculateLineCosts', () => {
 
     const result = calculateLineCosts(lines)
     expect(result[0].lineCost).toBeCloseTo(0.999, 3)
+  })
+})
+
+describe('VersionConflictError', () => {
+  it('creates error with correct name and message', () => {
+    const error = new VersionConflictError('BOM version')
+    expect(error.name).toBe('VersionConflictError')
+    expect(error.message).toBe('VERSION_CONFLICT')
+  })
+
+  it('is instanceof Error', () => {
+    const error = new VersionConflictError()
+    expect(error).toBeInstanceOf(Error)
+  })
+})
+
+describe('updateBOMVersion optimistic locking', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('throws VersionConflictError when version is stale', async () => {
+    // Setup: The $transaction mock needs to execute the callback
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      // Create a mock transaction context
+      const tx = {
+        bOMVersion: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'bom-1',
+            version: 2, // DB has version 2
+          }),
+          update: vi.fn(),
+        },
+        bOMLine: {
+          deleteMany: vi.fn(),
+          createMany: vi.fn(),
+        },
+      }
+      return callback(tx as unknown as typeof prisma)
+    })
+
+    // Call updateBOMVersion with version 1 (stale)
+    await expect(
+      updateBOMVersion({
+        bomVersionId: 'bom-1',
+        companyId: TEST_COMPANY_ID,
+        versionName: 'Updated Name',
+        version: 1, // Client has version 1, but DB has version 2
+      })
+    ).rejects.toThrow(VersionConflictError)
+  })
+
+  it('does not throw when version matches', async () => {
+    // Setup: The $transaction mock to return updated BOM
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        bOMVersion: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'bom-1',
+            version: 1, // DB has version 1 (matches client)
+          }),
+          update: vi.fn().mockResolvedValue({
+            id: 'bom-1',
+            skuId: 'sku-1',
+            versionName: 'Updated Name',
+            effectiveStartDate: new Date(),
+            effectiveEndDate: null,
+            isActive: true,
+            notes: null,
+            defectNotes: null,
+            qualityMetadata: {},
+            version: 2, // Incremented
+            createdAt: new Date(),
+            lines: [],
+            createdBy: { id: 'user-1', name: 'Test User' },
+          }),
+        },
+        bOMLine: {
+          deleteMany: vi.fn(),
+          createMany: vi.fn(),
+        },
+      }
+      return callback(tx as unknown as typeof prisma)
+    })
+
+    // Call updateBOMVersion with version 1 (matches DB)
+    const result = await updateBOMVersion({
+      bomVersionId: 'bom-1',
+      companyId: TEST_COMPANY_ID,
+      versionName: 'Updated Name',
+      version: 1,
+    })
+
+    expect(result.versionName).toBe('Updated Name')
+    expect(result.version).toBe(2)
+  })
+
+  it('allows update without version parameter (backward compatibility)', async () => {
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+      const tx = {
+        bOMVersion: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'bom-1',
+            version: 5, // Any version
+          }),
+          update: vi.fn().mockResolvedValue({
+            id: 'bom-1',
+            skuId: 'sku-1',
+            versionName: 'No Version Check',
+            effectiveStartDate: new Date(),
+            effectiveEndDate: null,
+            isActive: true,
+            notes: null,
+            defectNotes: null,
+            qualityMetadata: {},
+            version: 6,
+            createdAt: new Date(),
+            lines: [],
+            createdBy: { id: 'user-1', name: 'Test User' },
+          }),
+        },
+        bOMLine: {
+          deleteMany: vi.fn(),
+          createMany: vi.fn(),
+        },
+      }
+      return callback(tx as unknown as typeof prisma)
+    })
+
+    // Call without version parameter - should not throw
+    const result = await updateBOMVersion({
+      bomVersionId: 'bom-1',
+      companyId: TEST_COMPANY_ID,
+      versionName: 'No Version Check',
+      // No version parameter
+    })
+
+    expect(result.versionName).toBe('No Version Check')
   })
 })

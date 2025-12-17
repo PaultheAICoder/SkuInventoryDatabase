@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "BOMVersion" ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 1;
+
+-- AlterTable
+ALTER TABLE "SKU" ADD COLUMN     "version" INTEGER NOT NULL DEFAULT 1;

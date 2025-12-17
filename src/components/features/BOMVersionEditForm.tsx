@@ -158,11 +158,19 @@ export function BOMVersionEditForm({
             quantityPerUnit: line.quantityPerUnit,
             notes: line.notes || null,
           })),
+          version: initialData.version, // Optimistic locking version
         }),
       })
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+
+        // Check for version conflict error
+        if (data.error === 'VersionConflict') {
+          setError('This BOM version has been modified by another user. Please refresh and try again.')
+          return
+        }
+
         throw new Error(data?.message || 'Failed to update BOM version')
       }
 

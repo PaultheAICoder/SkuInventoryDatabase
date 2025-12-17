@@ -30,6 +30,7 @@ export type CreateSKUInput = z.infer<typeof createSKUSchema>
 // SKU update schema (all fields optional)
 export const updateSKUSchema = createSKUSchema.partial().extend({
   isActive: z.boolean().optional(),
+  version: z.number().int().positive().optional(), // Required for optimistic locking
 })
 
 export type UpdateSKUInput = z.infer<typeof updateSKUSchema>
@@ -70,6 +71,7 @@ export interface SKUResponse {
   externalIds: Record<string, string>
   notes: string | null
   isActive: boolean
+  version: number // Optimistic locking version
   createdAt: string
   updatedAt: string
   createdBy?: { id: string; name: string }

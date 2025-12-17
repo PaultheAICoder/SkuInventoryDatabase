@@ -57,6 +57,7 @@ export const updateBOMVersionSchema = z.object({
   defectNotes: z.string().optional().nullable(),
   qualityMetadata: z.record(z.string(), z.unknown()).optional(),
   lines: z.array(bomLineSchema).optional(),
+  version: z.number().int().positive().optional(), // Required for optimistic locking
 })
 
 export type UpdateBOMVersionInput = z.infer<typeof updateBOMVersionSchema>
@@ -106,6 +107,7 @@ export interface BOMVersionResponse {
   defectNotes: string | null
   qualityMetadata: Record<string, unknown>
   unitCost: string
+  version: number // Optimistic locking version
   lines: BOMLineResponse[]
   createdAt: string
   createdBy?: { id: string; name: string }

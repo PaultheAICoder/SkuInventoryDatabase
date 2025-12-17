@@ -64,6 +64,7 @@ export interface CreateSkuResult {
   externalIds: Record<string, string>
   notes: string | null
   isActive: boolean
+  version: number
   createdAt: string
   updatedAt: string
   createdBy: { id: string; name: string }
@@ -73,6 +74,51 @@ export interface CreateSkuResult {
     unitCost: string
   } | null
   maxBuildableUnits: number | null
+}
+
+/**
+ * Parameters for updateSku service function
+ */
+export interface UpdateSkuParams {
+  skuId: string
+  companyId: string
+  userId: string
+  input: {
+    name?: string
+    internalCode?: string
+    salesChannel?: string
+    externalIds?: Record<string, string>
+    notes?: string | null
+    isActive?: boolean
+    version?: number // Required for optimistic locking
+  }
+}
+
+/**
+ * Result type for updateSku service function
+ */
+export interface UpdateSkuResult {
+  id: string
+  name: string
+  internalCode: string
+  salesChannel: string
+  externalIds: Record<string, string>
+  notes: string | null
+  isActive: boolean
+  version: number
+  createdAt: string
+  updatedAt: string
+  createdBy: { id: string; name: string }
+}
+
+/**
+ * Custom error for version conflicts in optimistic locking
+ */
+export class VersionConflictError extends Error {
+  constructor(_resource: string = 'Record') {
+    super('VERSION_CONFLICT')
+    this.name = 'VersionConflictError'
+  }
 }
 
 /**
@@ -130,6 +176,8 @@ export async function getSkusWithCosts(params: GetSkusWithCostsParams): Promise<
     },
   })
 
+  // Note: SKU model now includes `version` field for optimistic locking
+
   // Get BOM costs and buildable units
   const skuIds = skus.map((s) => s.id)
   const activeBomIds = skus
@@ -155,6 +203,7 @@ export async function getSkusWithCosts(params: GetSkusWithCostsParams): Promise<
       externalIds: sku.externalIds as Record<string, string>,
       notes: sku.notes,
       isActive: sku.isActive,
+      version: sku.version,
       createdAt: sku.createdAt.toISOString(),
       updatedAt: sku.updatedAt.toISOString(),
       createdBy: sku.createdBy,
@@ -279,6 +328,7 @@ export async function createSku(params: CreateSkuParams): Promise<CreateSkuResul
       externalIds: result.sku.externalIds as Record<string, string>,
       notes: result.sku.notes,
       isActive: result.sku.isActive,
+      version: result.sku.version,
       createdAt: result.sku.createdAt.toISOString(),
       updatedAt: result.sku.updatedAt.toISOString(),
       createdBy: result.sku.createdBy,
@@ -317,10 +367,83 @@ export async function createSku(params: CreateSkuParams): Promise<CreateSkuResul
     externalIds: sku.externalIds as Record<string, string>,
     notes: sku.notes,
     isActive: sku.isActive,
+    version: sku.version,
     createdAt: sku.createdAt.toISOString(),
     updatedAt: sku.updatedAt.toISOString(),
     createdBy: sku.createdBy,
     activeBom: null,
     maxBuildableUnits: null,
+  }
+}
+
+/**
+ * Update an existing SKU with optimistic locking
+ *
+ * @throws VersionConflictError if version mismatch detected
+ * @throws Error with 'SKU_NOT_FOUND' if SKU doesn't exist
+ * @throws Error with 'DUPLICATE_INTERNAL_CODE' if code already exists
+ */
+export async function updateSku(params: UpdateSkuParams): Promise<UpdateSkuResult> {
+  const { skuId, companyId, userId, input } = params
+
+  // Verify SKU exists and get current version
+  const existing = await prisma.sKU.findFirst({
+    where: { id: skuId, companyId },
+    select: { id: true, version: true, brandId: true, internalCode: true },
+  })
+
+  if (!existing) {
+    throw new Error('SKU_NOT_FOUND')
+  }
+
+  // Check version for optimistic locking
+  if (input.version !== undefined && existing.version > input.version) {
+    throw new VersionConflictError('SKU')
+  }
+
+  // Check for duplicate internalCode if changed
+  if (input.internalCode && input.internalCode !== existing.internalCode) {
+    const duplicate = await prisma.sKU.findFirst({
+      where: {
+        brandId: existing.brandId,
+        internalCode: input.internalCode,
+        id: { not: skuId },
+      },
+    })
+    if (duplicate) {
+      throw new Error('DUPLICATE_INTERNAL_CODE')
+    }
+  }
+
+  // Update with version increment
+  const sku = await prisma.sKU.update({
+    where: { id: skuId },
+    data: {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.internalCode !== undefined && { internalCode: input.internalCode }),
+      ...(input.salesChannel !== undefined && { salesChannel: input.salesChannel }),
+      ...(input.externalIds !== undefined && { externalIds: input.externalIds as Prisma.InputJsonValue }),
+      ...(input.notes !== undefined && { notes: input.notes }),
+      ...(input.isActive !== undefined && { isActive: input.isActive }),
+      updatedById: userId,
+      version: { increment: 1 },
+    },
+    include: {
+      createdBy: { select: { id: true, name: true } },
+    },
+  })
+
+  return {
+    id: sku.id,
+    name: sku.name,
+    internalCode: sku.internalCode,
+    salesChannel: sku.salesChannel,
+    externalIds: sku.externalIds as Record<string, string>,
+    notes: sku.notes,
+    isActive: sku.isActive,
+    version: sku.version,
+    createdAt: sku.createdAt.toISOString(),
+    updatedAt: sku.updatedAt.toISOString(),
+    createdBy: sku.createdBy,
   }
 }

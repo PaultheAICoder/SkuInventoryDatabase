@@ -2,12 +2,12 @@ import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { Prisma } from '@prisma/client'
 import {
   success,
   unauthorized,
   notFound,
   conflict,
+  versionConflict,
   serverError,
   parseBody,
   error,
@@ -15,6 +15,7 @@ import {
 import { updateSKUSchema } from '@/types/sku'
 import { calculateBOMUnitCosts, calculateMaxBuildableUnits } from '@/services/bom'
 import { getSkuInventorySummary } from '@/services/finished-goods'
+import { updateSku, VersionConflictError } from '@/services/sku'
 import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
@@ -98,6 +99,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       externalIds: sku.externalIds as Record<string, string>,
       notes: sku.notes,
       isActive: sku.isActive,
+      version: sku.version,
       createdAt: sku.createdAt.toISOString(),
       updatedAt: sku.updatedAt.toISOString(),
       createdBy: sku.createdBy,
@@ -156,85 +158,58 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Check SKU exists and belongs to user's selected company
-    const existing = await prisma.sKU.findFirst({
-      where: {
-        id,
-        companyId: selectedCompanyId,
-      },
-    })
-
-    if (!existing) {
-      return notFound('SKU')
-    }
-
-    // Check for duplicate internalCode if changed
-    if (data.internalCode && data.internalCode !== existing.internalCode) {
-      const duplicate = await prisma.sKU.findFirst({
-        where: {
-          brandId: existing.brandId,
-          internalCode: data.internalCode,
-          id: { not: id },
-        },
-      })
-
-      if (duplicate) {
-        return conflict('A SKU with this internal code already exists')
-      }
-    }
-
-    const sku = await prisma.sKU.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.internalCode !== undefined && { internalCode: data.internalCode }),
-        ...(data.salesChannel !== undefined && { salesChannel: data.salesChannel }),
-        ...(data.externalIds !== undefined && { externalIds: data.externalIds as Prisma.InputJsonValue }),
-        ...(data.notes !== undefined && { notes: data.notes }),
-        ...(data.isActive !== undefined && { isActive: data.isActive }),
-        updatedById: session.user.id,
-      },
-      include: {
-        createdBy: { select: { id: true, name: true } },
-        bomVersions: {
-          where: { isActive: true },
-          take: 1,
-        },
-      },
+    // Update via service (handles version check and duplicate code check)
+    const result = await updateSku({
+      skuId: id,
+      companyId: selectedCompanyId,
+      userId: session.user.id,
+      input: data,
     })
 
     // Calculate active BOM cost
-    const activeBom = sku.bomVersions[0]
+    const activeBom = await prisma.sKU.findUnique({
+      where: { id },
+      select: {
+        bomVersions: {
+          where: { isActive: true },
+          take: 1,
+          select: { id: true, versionName: true },
+        },
+      },
+    })
+
     let activeBomCost: number | null = null
-    if (activeBom) {
-      const costs = await calculateBOMUnitCosts([activeBom.id], selectedCompanyId)
-      activeBomCost = costs.get(activeBom.id) ?? 0
+    if (activeBom?.bomVersions[0]) {
+      const costs = await calculateBOMUnitCosts([activeBom.bomVersions[0].id], selectedCompanyId)
+      activeBomCost = costs.get(activeBom.bomVersions[0].id) ?? 0
     }
 
     const maxBuildableUnits = await calculateMaxBuildableUnits(id, selectedCompanyId)
 
     return success({
-      id: sku.id,
-      name: sku.name,
-      internalCode: sku.internalCode,
-      salesChannel: sku.salesChannel,
-      externalIds: sku.externalIds as Record<string, string>,
-      notes: sku.notes,
-      isActive: sku.isActive,
-      createdAt: sku.createdAt.toISOString(),
-      updatedAt: sku.updatedAt.toISOString(),
-      createdBy: sku.createdBy,
-      activeBom: activeBom
+      ...result,
+      activeBom: activeBom?.bomVersions[0]
         ? {
-            id: activeBom.id,
-            versionName: activeBom.versionName,
+            id: activeBom.bomVersions[0].id,
+            versionName: activeBom.bomVersions[0].versionName,
             unitCost: activeBomCost?.toFixed(4) ?? '0.0000',
           }
         : null,
       maxBuildableUnits,
     })
-  } catch (error) {
-    console.error('Error updating SKU:', error)
+  } catch (err) {
+    if (err instanceof VersionConflictError) {
+      return versionConflict('SKU')
+    }
+    if (err instanceof Error) {
+      switch (err.message) {
+        case 'SKU_NOT_FOUND':
+          return notFound('SKU')
+        case 'DUPLICATE_INTERNAL_CODE':
+          return conflict('A SKU with this internal code already exists')
+      }
+    }
+    console.error('Error updating SKU:', err)
     return serverError()
   }
 }
