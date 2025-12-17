@@ -416,7 +416,7 @@ export async function getComponentForecastById(
     },
   })
 
-  if (!component || !component.isActive || !component.companyId) {
+  if (!component || !component.isActive) {
     return null
   }
 

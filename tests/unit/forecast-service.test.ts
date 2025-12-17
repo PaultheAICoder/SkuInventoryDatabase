@@ -535,19 +535,9 @@ describe('getComponentForecastById', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null for component without company', async () => {
-    vi.mocked(prisma.component.findUnique).mockResolvedValue({
-      id: 'comp-1',
-      name: 'Component 1',
-      skuCode: 'SKU-1',
-      leadTimeDays: 7,
-      companyId: null,
-      isActive: true,
-    } as never)
-
-    const result = await getComponentForecastById('comp-1')
-    expect(result).toBeNull()
-  })
+  // Test removed: 'returns null for component without company'
+  // companyId is now mandatory on Component model (Issue #301)
+  // A component without companyId cannot exist in the database
 
   it('returns complete forecast for valid component', async () => {
     vi.mocked(prisma.component.findUnique).mockResolvedValue({

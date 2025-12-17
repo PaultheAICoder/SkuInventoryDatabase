@@ -56,8 +56,6 @@ async function calculateComponentQuantities(): Promise<ComponentQuantityByLocati
 
   // For each component, calculate quantities at each relevant location
   for (const component of components) {
-    if (!component.companyId) continue
-
     // Get locations for this company
     const companyLocations = locations.filter(l => l.companyId === component.companyId)
 
@@ -242,8 +240,6 @@ async function verifyBalances(): Promise<{ componentMatch: boolean; skuMatch: bo
   let mismatches = 0
 
   for (const balance of inventoryBalances) {
-    if (!balance.component.companyId) continue
-
     // Recalculate using the same logic
     const regularResult = await prisma.transactionLine.aggregate({
       where: {

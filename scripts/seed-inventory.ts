@@ -94,6 +94,7 @@ async function main() {
       const component = await tx.component.create({
         data: {
           brandId: brand.id,
+          companyId: company.id,
           name: item.name,
           skuCode: item.skuCode,
           category: 'Inventory',

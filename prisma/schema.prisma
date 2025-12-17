@@ -59,11 +59,11 @@ model Location {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  transactions        Transaction[]       @relation("TransactionLocation")
-  transfersFrom       Transaction[]       @relation("TransferFrom")
-  transfersTo         Transaction[]       @relation("TransferTo")
-  finishedGoodsLines  FinishedGoodsLine[] @relation("FinishedGoodsAtLocation")
-  inventoryBalances   InventoryBalance[]
+  transactions          Transaction[]          @relation("TransactionLocation")
+  transfersFrom         Transaction[]          @relation("TransferFrom")
+  transfersTo           Transaction[]          @relation("TransferTo")
+  finishedGoodsLines    FinishedGoodsLine[]    @relation("FinishedGoodsAtLocation")
+  inventoryBalances     InventoryBalance[]
   finishedGoodsBalances FinishedGoodsBalance[]
 
   @@unique([companyId, name])
@@ -141,7 +141,7 @@ model User {
   userCompanies UserCompany[]
 
   // Feedback relation
-  feedbacks         Feedback[]
+  feedbacks Feedback[]
 
   // V2: Integration relations
   asinMappingsCreated AsinSkuMapping[] @relation("AsinMappingCreatedBy")
@@ -189,8 +189,8 @@ model Component {
   id            String   @id @default(uuid())
   brandId       String
   brand         Brand    @relation(fields: [brandId], references: [id])
-  companyId     String?
-  company       Company? @relation("CompanyComponents", fields: [companyId], references: [id])
+  companyId     String
+  company       Company  @relation("CompanyComponents", fields: [companyId], references: [id])
   name          String   @db.VarChar(100)
   skuCode       String   @db.VarChar(50)
   category      String?  @db.VarChar(50)
@@ -323,7 +323,7 @@ model Transaction {
   rejectReason String?           @db.VarChar(500)
 
   // BOM snapshot for draft build transactions (frozen at draft creation)
-  bomSnapshot  Json?
+  bomSnapshot Json?
 
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
@@ -397,11 +397,11 @@ model SKU {
   updatedById  String
   updatedBy    User     @relation("SKUUpdatedBy", fields: [updatedById], references: [id])
 
-  bomVersions        BOMVersion[]
-  transactions       Transaction[]
-  defectThresholds   DefectThreshold[]
-  defectAlerts       DefectAlert[]
-  finishedGoodsLines    FinishedGoodsLine[] @relation("FinishedGoodsLines")
+  bomVersions           BOMVersion[]
+  transactions          Transaction[]
+  defectThresholds      DefectThreshold[]
+  defectAlerts          DefectAlert[]
+  finishedGoodsLines    FinishedGoodsLine[]    @relation("FinishedGoodsLines")
   finishedGoodsBalances FinishedGoodsBalance[]
 
   // Channel mapping relations
@@ -651,46 +651,46 @@ model SkuChannelMapping {
 // ============================================
 
 enum FeedbackStatus {
-  pending                  // Issue created
-  resolved                 // Issue closed, notification sent
-  clarification_requested  // Clarification questions sent to user
-  verified                 // User confirmed fix
-  changes_requested        // User needs more work
+  pending // Issue created
+  resolved // Issue closed, notification sent
+  clarification_requested // Clarification questions sent to user
+  verified // User confirmed fix
+  changes_requested // User needs more work
 }
 
 model Feedback {
-  id                    String         @id @default(uuid())
-  userId                String
-  user                  User           @relation(fields: [userId], references: [id])
-  projectId             String         @default("SkuInventoryDatabase") @db.VarChar(100)
+  id        String @id @default(uuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  projectId String @default("SkuInventoryDatabase") @db.VarChar(100)
 
   // GitHub link
-  githubIssueNumber     Int            @unique
-  githubIssueUrl        String         @db.VarChar(500)
+  githubIssueNumber Int    @unique
+  githubIssueUrl    String @db.VarChar(500)
 
   // Status tracking
-  status                FeedbackStatus @default(pending)
+  status FeedbackStatus @default(pending)
 
   // Notification tracking
   notificationSentAt    DateTime?
-  notificationMessageId String?        @db.VarChar(255)
+  notificationMessageId String?   @db.VarChar(255)
 
   // Response tracking
-  responseReceivedAt    DateTime?
-  responseEmailId       String?        @db.VarChar(255)
-  responseContent       String?        @db.Text
-  followUpIssueNumber   Int?
-  followUpIssueUrl      String?        @db.VarChar(500)
+  responseReceivedAt  DateTime?
+  responseEmailId     String?   @db.VarChar(255)
+  responseContent     String?   @db.Text
+  followUpIssueNumber Int?
+  followUpIssueUrl    String?   @db.VarChar(500)
 
   // Clarification tracking
-  clarificationSentAt      DateTime?
-  clarificationMessageId   String?        @db.VarChar(255)
-  clarificationQuestions   String?        @db.Text  // JSON array of questions
-  clarificationAnswers     String?        @db.Text  // User's response text
-  clarificationContext     String?        @db.Text  // JSON: completion report summary, files changed
+  clarificationSentAt    DateTime?
+  clarificationMessageId String?   @db.VarChar(255)
+  clarificationQuestions String?   @db.Text // JSON array of questions
+  clarificationAnswers   String?   @db.Text // User's response text
+  clarificationContext   String?   @db.Text // JSON: completion report summary, files changed
 
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([githubIssueNumber])
@@ -708,12 +708,12 @@ model EmailMonitorState {
 // ============================================
 
 model IntegrationCredential {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   companyId       String
-  company         Company  @relation(fields: [companyId], references: [id])
+  company         Company @relation(fields: [companyId], references: [id])
   brandId         String?
-  brand           Brand?   @relation(fields: [brandId], references: [id])
-  integrationType String   @db.VarChar(50) // "amazon_ads", "shopify", etc.
+  brand           Brand?  @relation(fields: [brandId], references: [id])
+  integrationType String  @db.VarChar(50) // "amazon_ads", "shopify", etc.
 
   // Encrypted credentials (format: iv:encrypted:authTag)
   encryptedAccessToken  String  @db.Text
@@ -774,7 +774,7 @@ model AdCampaign {
   id           String       @id @default(uuid())
   portfolioId  String?
   portfolio    AdPortfolio? @relation(fields: [portfolioId], references: [id])
-  credentialId String       // Denormalized for queries without portfolio
+  credentialId String // Denormalized for queries without portfolio
 
   externalId    String  @db.VarChar(100) // Amazon campaign ID
   name          String  @db.VarChar(200)
@@ -936,7 +936,7 @@ model SyncLog {
 
   startedAt   DateTime  @default(now())
   completedAt DateTime?
-  initiatedBy String?   // userId who triggered the sync
+  initiatedBy String? // userId who triggered the sync
 
   // Metrics
   recordsProcessed Int @default(0)
@@ -951,7 +951,7 @@ model SyncLog {
 
   // For file uploads (CSV/XLSX)
   fileName String? @db.VarChar(255)
-  fileSize Int?    // bytes
+  fileSize Int? // bytes
   metadata Json    @default("{}") // Additional context (dateRange, brandId, etc.)
 
   triggeredById String?
