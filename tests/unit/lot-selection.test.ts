@@ -5,7 +5,10 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     lot: {
       findMany: vi.fn(),
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    component: {
+      findFirst: vi.fn(),
     },
   },
 }))
@@ -19,7 +22,8 @@ import {
 } from '@/services/lot-selection'
 
 const mockLotFindMany = vi.mocked(prisma.lot.findMany)
-const mockLotFindUnique = vi.mocked(prisma.lot.findUnique)
+const mockLotFindFirst = vi.mocked(prisma.lot.findFirst)
+const mockComponentFindFirst = vi.mocked(prisma.component.findFirst)
 
 describe('lot-selection service', () => {
   beforeEach(() => {
@@ -349,6 +353,8 @@ describe('lot-selection service', () => {
   })
 
   describe('validateLotOverrides', () => {
+    const testCompanyId = 'company-abc'
+
     it('validates lot exists and belongs to component', async () => {
       const overrides = [
         {
@@ -357,8 +363,11 @@ describe('lot-selection service', () => {
         },
       ]
 
+      // Component exists in the company
+      mockComponentFindFirst.mockResolvedValue({ id: 'comp-123' } as never)
+
       // Lot exists but belongs to different component
-      mockLotFindUnique.mockResolvedValue({
+      mockLotFindFirst.mockResolvedValue({
         id: 'lot-wrong',
         componentId: 'comp-456', // Different component!
         lotNumber: 'LOT-WRONG',
@@ -371,11 +380,11 @@ describe('lot-selection service', () => {
         balance: { id: 'b1', lotId: 'lot-wrong', quantity: { toNumber: () => 50 }, reservedQuantity: { toNumber: () => 0 } },
       } as never)
 
-      const result = await validateLotOverrides(overrides)
+      const result = await validateLotOverrides(overrides, testCompanyId)
 
       expect(result.valid).toBe(false)
       expect(result.errors).toHaveLength(1)
-      expect(result.errors[0]).toContain('does not belong to component')
+      expect(result.errors[0]).toContain('does not belong to')
     })
 
     it('returns errors for insufficient lot quantity', async () => {
@@ -386,7 +395,10 @@ describe('lot-selection service', () => {
         },
       ]
 
-      mockLotFindUnique.mockResolvedValue({
+      // Component exists in the company
+      mockComponentFindFirst.mockResolvedValue({ id: 'comp-123' } as never)
+
+      mockLotFindFirst.mockResolvedValue({
         id: 'lot-1',
         componentId: 'comp-123',
         lotNumber: 'LOT-001',
@@ -399,7 +411,7 @@ describe('lot-selection service', () => {
         balance: { id: 'b1', lotId: 'lot-1', quantity: { toNumber: () => 20 }, reservedQuantity: { toNumber: () => 0 } }, // Only 20 available
       } as never)
 
-      const result = await validateLotOverrides(overrides)
+      const result = await validateLotOverrides(overrides, testCompanyId)
 
       expect(result.valid).toBe(false)
       expect(result.errors).toHaveLength(1)
@@ -414,7 +426,10 @@ describe('lot-selection service', () => {
         },
       ]
 
-      mockLotFindUnique.mockResolvedValue({
+      // Component exists in the company
+      mockComponentFindFirst.mockResolvedValue({ id: 'comp-123' } as never)
+
+      mockLotFindFirst.mockResolvedValue({
         id: 'lot-1',
         componentId: 'comp-123',
         lotNumber: 'LOT-001',
@@ -427,7 +442,7 @@ describe('lot-selection service', () => {
         balance: { id: 'b1', lotId: 'lot-1', quantity: { toNumber: () => 50 }, reservedQuantity: { toNumber: () => 0 } },
       } as never)
 
-      const result = await validateLotOverrides(overrides)
+      const result = await validateLotOverrides(overrides, testCompanyId)
 
       expect(result.valid).toBe(true)
       expect(result.errors).toHaveLength(0)
@@ -441,13 +456,57 @@ describe('lot-selection service', () => {
         },
       ]
 
-      mockLotFindUnique.mockResolvedValue(null)
+      // Component exists in the company
+      mockComponentFindFirst.mockResolvedValue({ id: 'comp-123' } as never)
 
-      const result = await validateLotOverrides(overrides)
+      // Lot not found (or belongs to different company - same result)
+      mockLotFindFirst.mockResolvedValue(null)
+
+      const result = await validateLotOverrides(overrides, testCompanyId)
 
       expect(result.valid).toBe(false)
       expect(result.errors).toHaveLength(1)
-      expect(result.errors[0]).toContain('not found')
+      expect(result.errors[0]).toContain('not found or access denied')
+    })
+
+    it('rejects component from different company', async () => {
+      const overrides = [
+        {
+          componentId: 'comp-from-other-company',
+          allocations: [{ lotId: 'lot-1', quantity: 10 }],
+        },
+      ]
+
+      // Component not found in the company (belongs to different company)
+      mockComponentFindFirst.mockResolvedValue(null)
+
+      const result = await validateLotOverrides(overrides, testCompanyId)
+
+      expect(result.valid).toBe(false)
+      expect(result.errors).toHaveLength(1)
+      expect(result.errors[0]).toContain('Component')
+      expect(result.errors[0]).toContain('not found or access denied')
+    })
+
+    it('rejects lot from different company', async () => {
+      const overrides = [
+        {
+          componentId: 'comp-123',
+          allocations: [{ lotId: 'lot-from-other-company', quantity: 10 }],
+        },
+      ]
+
+      // Component exists in the company
+      mockComponentFindFirst.mockResolvedValue({ id: 'comp-123' } as never)
+
+      // Lot not found because it belongs to different company
+      mockLotFindFirst.mockResolvedValue(null)
+
+      const result = await validateLotOverrides(overrides, testCompanyId)
+
+      expect(result.valid).toBe(false)
+      expect(result.errors).toHaveLength(1)
+      expect(result.errors[0]).toContain('not found or access denied')
     })
   })
 })

@@ -363,4 +363,309 @@ describe('Lot Consumption Integration', () => {
       expect(fefoBalance?.quantity.toNumber()).toBe(50)
     })
   })
+
+  /**
+   * Helper to create a second company for cross-tenant testing
+   */
+  async function createSecondCompanyWithBrand(): Promise<{
+    companyId: string
+    brandId: string
+    userId: string
+  }> {
+    const prisma = getIntegrationPrisma()
+    const timestamp = Date.now()
+
+    // Create a second company
+    const company = await prisma.company.create({
+      data: {
+        name: `Test Company ${timestamp}`,
+      },
+    })
+
+    // Create a brand for the second company
+    const brand = await prisma.brand.create({
+      data: {
+        companyId: company.id,
+        name: `Test Brand ${timestamp}`,
+      },
+    })
+
+    // Create a default location for the second company
+    await prisma.location.create({
+      data: {
+        companyId: company.id,
+        name: 'Main Warehouse',
+        type: 'warehouse',
+        isDefault: true,
+        isActive: true,
+      },
+    })
+
+    // Get existing admin user ID (we'll use the same user but different company context)
+    const userId = TEST_SESSIONS.admin!.user.id
+
+    return { companyId: company.id, brandId: brand.id, userId }
+  }
+
+  /**
+   * Helper to create component in a specific company/brand
+   */
+  async function createComponentInCompany(
+    companyId: string,
+    brandId: string,
+    userId: string
+  ): Promise<{ id: string; name: string }> {
+    const prisma = getIntegrationPrisma()
+    const timestamp = Date.now()
+    const component = await prisma.component.create({
+      data: {
+        brandId,
+        companyId,
+        name: `Cross-Tenant Component ${timestamp}`,
+        skuCode: `CTC-${timestamp}`,
+        category: 'Test',
+        unitOfMeasure: 'each',
+        costPerUnit: 10.0,
+        createdById: userId,
+        updatedById: userId,
+      },
+    })
+    return { id: component.id, name: component.name }
+  }
+
+  describe('Build with cross-tenant lot override security', () => {
+    it('rejects lot override with lot from different company', async () => {
+      // Use admin session for Company A (primary)
+      setTestSession(TEST_SESSIONS.admin!)
+      const companyAId = TEST_SESSIONS.admin!.user.companyId
+      const userId = TEST_SESSIONS.admin!.user.id
+
+      // Create component and lot in Company A
+      const componentA = await createTestComponentInDb(companyAId)
+      const lotFromCompanyA = await createLotWithBalance(
+        componentA.id,
+        'LOT-COMPANY-A',
+        100,
+        new Date('2025-06-01')
+      )
+
+      // Create Company B dynamically
+      const companyB = await createSecondCompanyWithBrand()
+
+      // Create component in Company B
+      const componentB = await createComponentInCompany(
+        companyB.companyId,
+        companyB.brandId,
+        userId
+      )
+      await createLotWithBalance(componentB.id, 'LOT-COMPANY-B', 100)
+
+      // Create SKU in Company B
+      const prisma = getIntegrationPrisma()
+      const skuB = await prisma.sKU.create({
+        data: {
+          brandId: companyB.brandId,
+          companyId: companyB.companyId,
+          name: `Cross-Tenant SKU ${Date.now()}`,
+          internalCode: `CTSKU-${Date.now()}`,
+          salesChannel: 'Amazon',
+          createdById: userId,
+          updatedById: userId,
+        },
+      })
+
+      // Create BOM for SKU B
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: skuB.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date('2020-01-01'),
+          isActive: true,
+          createdById: userId,
+          lines: {
+            create: [{ componentId: componentB.id, quantityPerUnit: 1 }],
+          },
+        },
+      })
+
+      // Switch session to Company B context
+      setTestSession({
+        user: {
+          ...TEST_SESSIONS.admin!.user,
+          companyId: companyB.companyId,
+          selectedCompanyId: companyB.companyId,
+          companyName: 'Test Company',
+        },
+      })
+
+      // Attempt build in Company B using lot from Company A (should fail)
+      const request = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: skuB.id,
+          unitsToBuild: 1,
+          date: new Date().toISOString().split('T')[0],
+          outputToFinishedGoods: false,
+          lotOverrides: [
+            {
+              componentId: componentB.id, // Company B's component
+              allocations: [
+                { lotId: lotFromCompanyA.lotId, quantity: 1 } // Company A's lot!
+              ],
+            },
+          ],
+        },
+      })
+
+      const response = await createBuild(request)
+      const result = await parseRouteResponse(response)
+
+      // Should be rejected
+      expect(result.status).toBe(400)
+      // error field contains error code, message contains actual message
+      const errorData = result.data as { error: string; message: string }
+      expect(errorData.message).toContain('not found or access denied')
+
+      // Verify Company A's lot was NOT consumed
+      const lotABalance = await prisma.lotBalance.findUnique({
+        where: { lotId: lotFromCompanyA.lotId },
+      })
+      expect(lotABalance?.quantity.toNumber()).toBe(100) // Unchanged
+    })
+
+    it('rejects lot override with component from different company', async () => {
+      // Use admin session for Company A
+      setTestSession(TEST_SESSIONS.admin!)
+      const companyAId = TEST_SESSIONS.admin!.user.companyId
+      const userId = TEST_SESSIONS.admin!.user.id
+
+      // Create component and lot in Company A
+      const componentA = await createTestComponentInDb(companyAId)
+      const lotA = await createLotWithBalance(componentA.id, 'LOT-A-COMP', 100)
+
+      // Create Company B dynamically
+      const companyB = await createSecondCompanyWithBrand()
+
+      // Create component in Company B
+      const componentB = await createComponentInCompany(
+        companyB.companyId,
+        companyB.brandId,
+        userId
+      )
+      await createLotWithBalance(componentB.id, 'LOT-B-COMP', 100)
+
+      // Create SKU in Company B
+      const prisma = getIntegrationPrisma()
+      const skuB = await prisma.sKU.create({
+        data: {
+          brandId: companyB.brandId,
+          companyId: companyB.companyId,
+          name: `Cross-Tenant SKU2 ${Date.now()}`,
+          internalCode: `CTSKU2-${Date.now()}`,
+          salesChannel: 'Amazon',
+          createdById: userId,
+          updatedById: userId,
+        },
+      })
+
+      // Create BOM for SKU B using componentB
+      await prisma.bOMVersion.create({
+        data: {
+          skuId: skuB.id,
+          versionName: 'v1.0',
+          effectiveStartDate: new Date('2020-01-01'),
+          isActive: true,
+          createdById: userId,
+          lines: {
+            create: [{ componentId: componentB.id, quantityPerUnit: 1 }],
+          },
+        },
+      })
+
+      // Switch session to Company B context
+      setTestSession({
+        user: {
+          ...TEST_SESSIONS.admin!.user,
+          companyId: companyB.companyId,
+          selectedCompanyId: companyB.companyId,
+          companyName: 'Test Company',
+        },
+      })
+
+      // Attempt build using Company A's component in override
+      const request = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: skuB.id,
+          unitsToBuild: 1,
+          date: new Date().toISOString().split('T')[0],
+          outputToFinishedGoods: false,
+          lotOverrides: [
+            {
+              componentId: componentA.id, // Company A's component!
+              allocations: [{ lotId: lotA.lotId, quantity: 1 }],
+            },
+          ],
+        },
+      })
+
+      const response = await createBuild(request)
+      const result = await parseRouteResponse(response)
+
+      expect(result.status).toBe(400)
+      // error field contains error code, message contains actual message
+      const errorData = result.data as { error: string; message: string }
+      expect(errorData.message).toContain('not found or access denied')
+    })
+
+    it('accepts valid lot override within same company', async () => {
+      // Use admin session for Company A
+      setTestSession(TEST_SESSIONS.admin!)
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+      const userId = TEST_SESSIONS.admin!.user.id
+
+      // Create component and lot in Company A
+      const component = await createTestComponentInDb(companyId)
+      const lot = await createLotWithBalance(
+        component.id,
+        'LOT-VALID-SAME-CO',
+        100,
+        new Date('2025-06-01')
+      )
+
+      // Create SKU in Company A
+      const sku = await createTestSKUInDb(companyId)
+      await createBOMForSKU(sku.id, userId, [{ componentId: component.id, quantityPerUnit: 2 }])
+
+      // Build with valid lot override (same company)
+      const request = createTestRequest('/api/transactions/build', {
+        method: 'POST',
+        body: {
+          skuId: sku.id,
+          unitsToBuild: 1,
+          date: new Date().toISOString().split('T')[0],
+          outputToFinishedGoods: false,
+          lotOverrides: [
+            {
+              componentId: component.id,
+              allocations: [{ lotId: lot.lotId, quantity: 2 }],
+            },
+          ],
+        },
+      })
+
+      const response = await createBuild(request)
+      const result = await parseRouteResponse(response)
+
+      // Should succeed
+      expect(result.status).toBe(201)
+
+      // Verify lot was consumed
+      const prisma = getIntegrationPrisma()
+      const lotBalance = await prisma.lotBalance.findUnique({
+        where: { lotId: lot.lotId },
+      })
+      expect(lotBalance?.quantity.toNumber()).toBe(98) // 100 - 2
+    })
+  })
 })

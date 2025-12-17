@@ -203,30 +203,49 @@ export async function checkLotAvailabilityForBuild(params: {
 
 /**
  * Validate manual lot overrides
- * Ensures all specified lots exist, belong to the component, and have sufficient quantity
+ * Ensures all specified lots exist, belong to the component, have sufficient quantity,
+ * and that both the component and lot belong to the specified company (tenant isolation)
  */
 export async function validateLotOverrides(
   overrides: Array<{
     componentId: string
     allocations: Array<{ lotId: string; quantity: number }>
-  }>
+  }>,
+  companyId: string
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = []
 
   for (const override of overrides) {
+    // First validate the component belongs to the company
+    const component = await prisma.component.findFirst({
+      where: {
+        id: override.componentId,
+        companyId,
+      },
+      select: { id: true },
+    })
+    if (!component) {
+      errors.push(`Component ${override.componentId} not found or access denied`)
+      continue // Skip all allocations for invalid component
+    }
+
     for (const alloc of override.allocations) {
-      const lot = await prisma.lot.findUnique({
-        where: { id: alloc.lotId },
+      // Query lot with company validation via component relation
+      const lot = await prisma.lot.findFirst({
+        where: {
+          id: alloc.lotId,
+          component: { companyId },
+        },
         include: { balance: true },
       })
 
       if (!lot) {
-        errors.push(`Lot ${alloc.lotId} not found`)
+        errors.push(`Lot ${alloc.lotId} not found or access denied`)
         continue
       }
 
       if (lot.componentId !== override.componentId) {
-        errors.push(`Lot ${lot.lotNumber} does not belong to component ${override.componentId}`)
+        errors.push(`Lot ${lot.lotNumber} does not belong to the specified component`)
         continue
       }
 

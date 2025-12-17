@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, error, serverError, parseBody } from '@/lib/api-response'
 import { createBuildSchema } from '@/types/transaction'
 import { createBuildTransaction, getCompanySettings, checkInsufficientInventory, checkExpiredLotsForBuild } from '@/services/inventory'
+import { validateLotOverrides } from '@/services/lot-selection'
 
 // POST /api/transactions/build - Create a build transaction
 export async function POST(request: NextRequest) {
@@ -125,6 +126,17 @@ export async function POST(request: NextRequest) {
             canOverride: true,
           },
           { status: 400 }
+        )
+      }
+    }
+
+    // Validate lot overrides if provided (tenant isolation security check)
+    if (data.lotOverrides && data.lotOverrides.length > 0) {
+      const lotValidation = await validateLotOverrides(data.lotOverrides, selectedCompanyId)
+      if (!lotValidation.valid) {
+        return error(
+          `Invalid lot overrides: ${lotValidation.errors.join('; ')}`,
+          400
         )
       }
     }
