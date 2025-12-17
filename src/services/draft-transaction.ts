@@ -4,6 +4,7 @@ import type { CreateDraftInput, DraftTransactionResponse, BatchApproveResult, BO
 import { checkInsufficientInventory, getComponentQuantities, updateInventoryBalance } from './inventory'
 import { updateFinishedGoodsBalance } from './finished-goods'
 import { getDefaultLocationId } from './location'
+import { consumeLotsForBuildTx } from './lot-selection'
 
 // =============================================================================
 // Transform Helpers
@@ -485,17 +486,24 @@ export async function approveDraftTransaction(params: {
       // We need to either update the existing transaction lines or create new ones
 
       if (draft.type === 'build' && draft.skuId && draft.bomVersionId && draft.unitsBuild) {
-        // For builds, we need to create the consumption lines
+        // For builds, we need to create the consumption lines with proper FEFO lot consumption
         // Delete placeholder lines if any
         await tx.transactionLine.deleteMany({
           where: { transactionId: id },
         })
 
-        // Use the BOM snapshot captured at draft creation time
-        // This ensures we consume exactly what the draft creator/reviewer saw
+        // Determine BOM lines - prefer snapshot, fallback to current BOM for legacy drafts
+        // Store unitsBuild locally to help TypeScript with narrowing
+        const unitsToBuild = draft.unitsBuild
+        let bomLinesForConsumption: Array<{
+          componentId: string
+          quantityRequired: number
+          costPerUnit: number
+        }>
+        let unitBomCost: number
+
         if (!bomSnapshot || !bomSnapshot.lines || bomSnapshot.lines.length === 0) {
           // Fallback to current BOM if no snapshot exists (legacy drafts)
-          // This maintains backward compatibility
           console.warn(`Draft ${id} has no BOM snapshot, falling back to current BOM`)
           const bomLines = await tx.bOMLine.findMany({
             where: { bomVersionId: draft.bomVersionId },
@@ -504,109 +512,70 @@ export async function approveDraftTransaction(params: {
             },
           })
 
-          for (const bomLine of bomLines) {
-            const requiredQty = bomLine.quantityPerUnit.toNumber() * draft.unitsBuild
+          bomLinesForConsumption = bomLines.map((line) => ({
+            componentId: line.componentId,
+            quantityRequired: line.quantityPerUnit.toNumber() * unitsToBuild,
+            costPerUnit: line.component.costPerUnit.toNumber(),
+          }))
 
-            await tx.transactionLine.create({
-              data: {
-                transactionId: id,
-                componentId: bomLine.componentId,
-                quantityChange: new Prisma.Decimal(-1 * requiredQty),
-                costPerUnit: bomLine.component.costPerUnit,
-              },
-            })
-          }
-
-          const unitBomCost = bomLines.reduce((total, line) => {
+          unitBomCost = bomLines.reduce((total, line) => {
             return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
           }, 0)
-
-          await tx.transaction.update({
-            where: { id },
-            data: {
-              unitBomCost: new Prisma.Decimal(unitBomCost),
-              totalBomCost: new Prisma.Decimal(unitBomCost * draft.unitsBuild),
-            },
-          })
-
-          // Create finished goods output
-          const defaultLocationId = await getDefaultLocationId(companyId)
-          const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
-          await tx.finishedGoodsLine.create({
-            data: {
-              transactionId: id,
-              skuId: draft.skuId,
-              locationId: fgLocationId,
-              quantityChange: new Prisma.Decimal(draft.unitsBuild),
-              costPerUnit: new Prisma.Decimal(unitBomCost),
-            },
-          })
-
-          // Update inventory balances for consumed components (legacy path)
-          if (draft.locationId) {
-            for (const bomLine of bomLines) {
-              const requiredQty = bomLine.quantityPerUnit.toNumber() * draft.unitsBuild
-              await updateInventoryBalance(tx, bomLine.componentId, draft.locationId, -requiredQty)
-            }
-          }
-
-          // Update finished goods balance
-          if (fgLocationId) {
-            await updateFinishedGoodsBalance(tx, draft.skuId, fgLocationId, draft.unitsBuild)
-          }
         } else {
           // Use snapshot data for consumption
-          for (const line of bomSnapshot.lines) {
-            const requiredQty = parseFloat(line.quantityPerUnit) * draft.unitsBuild
+          bomLinesForConsumption = bomSnapshot.lines.map((line) => ({
+            componentId: line.componentId,
+            quantityRequired: parseFloat(line.quantityPerUnit) * unitsToBuild,
+            costPerUnit: parseFloat(line.costPerUnit),
+          }))
 
-            await tx.transactionLine.create({
-              data: {
-                transactionId: id,
-                componentId: line.componentId,
-                quantityChange: new Prisma.Decimal(-1 * requiredQty),
-                costPerUnit: new Prisma.Decimal(line.costPerUnit),
-              },
-            })
-          }
-
-          // Calculate costs from snapshot
-          const unitBomCost = bomSnapshot.lines.reduce((total, line) => {
+          unitBomCost = bomSnapshot.lines.reduce((total, line) => {
             return total + parseFloat(line.quantityPerUnit) * parseFloat(line.costPerUnit)
           }, 0)
+        }
 
-          await tx.transaction.update({
-            where: { id },
-            data: {
-              unitBomCost: new Prisma.Decimal(unitBomCost),
-              totalBomCost: new Prisma.Decimal(unitBomCost * draft.unitsBuild),
-            },
-          })
+        // Use centralized lot consumption service with FEFO algorithm
+        // This creates transaction lines with proper lot assignments and updates lot balances atomically
+        const consumedLots = await consumeLotsForBuildTx({
+          tx,
+          transactionId: id,
+          bomLines: bomLinesForConsumption,
+          allowInsufficientInventory: false, // Drafts should have been validated
+        })
 
-          // Create finished goods output (using snapshot cost)
-          const defaultLocationId = await getDefaultLocationId(companyId)
-          const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
-          await tx.finishedGoodsLine.create({
-            data: {
-              transactionId: id,
-              skuId: draft.skuId,
-              locationId: fgLocationId,
-              quantityChange: new Prisma.Decimal(draft.unitsBuild),
-              costPerUnit: new Prisma.Decimal(unitBomCost),
-            },
-          })
+        // Update transaction with BOM costs
+        await tx.transaction.update({
+          where: { id },
+          data: {
+            unitBomCost: new Prisma.Decimal(unitBomCost),
+            totalBomCost: new Prisma.Decimal(unitBomCost * unitsToBuild),
+          },
+        })
 
-          // Update inventory balances for consumed components (snapshot path)
-          if (draft.locationId) {
-            for (const line of bomSnapshot.lines) {
-              const requiredQty = parseFloat(line.quantityPerUnit) * draft.unitsBuild
-              await updateInventoryBalance(tx, line.componentId, draft.locationId, -requiredQty)
-            }
+        // Create finished goods output
+        const defaultLocationId = await getDefaultLocationId(companyId)
+        const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
+        await tx.finishedGoodsLine.create({
+          data: {
+            transactionId: id,
+            skuId: draft.skuId,
+            locationId: fgLocationId,
+            quantityChange: new Prisma.Decimal(unitsToBuild),
+            costPerUnit: new Prisma.Decimal(unitBomCost),
+          },
+        })
+
+        // Update inventory balances for consumed components
+        // consumeLotsForBuildTx already updated lot balances, now update component inventory balances
+        if (draft.locationId) {
+          for (const consumed of consumedLots) {
+            await updateInventoryBalance(tx, consumed.componentId, draft.locationId, -consumed.quantity)
           }
+        }
 
-          // Update finished goods balance
-          if (fgLocationId) {
-            await updateFinishedGoodsBalance(tx, draft.skuId, fgLocationId, draft.unitsBuild)
-          }
+        // Update finished goods balance
+        if (fgLocationId) {
+          await updateFinishedGoodsBalance(tx, draft.skuId, fgLocationId, unitsToBuild)
         }
       } else if (draft.type === 'transfer' && draft.lines.length > 0) {
         // For transfers, create both outgoing and incoming lines

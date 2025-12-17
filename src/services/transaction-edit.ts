@@ -3,6 +3,7 @@ import { Prisma, TransactionType } from '@prisma/client'
 import { getComponentQuantity, checkInsufficientInventory, updateInventoryBalance } from './inventory'
 import { getSkuQuantity, updateFinishedGoodsBalance } from './finished-goods'
 import { getDefaultLocationId } from './location'
+import { consumeLotsForBuildTx } from './lot-selection'
 import type {
   UpdateReceiptInput,
   UpdateAdjustmentInput,
@@ -611,91 +612,23 @@ export async function updateBuildTransaction(params: {
     }, 0)
     const totalBomCost = unitBomCost * input.unitsToBuild
 
-    // 6. Create new consumption lines with FEFO lot consumption
-    for (const bomLine of bomLines) {
-      const requiredQty = bomLine.quantityPerUnit.toNumber() * input.unitsToBuild
-
-      // Try FEFO lot selection
-      const availableLots = await tx.lot.findMany({
-        where: {
-          componentId: bomLine.componentId,
-          balance: { quantity: { gt: 0 } },
-        },
-        include: { balance: true },
-        orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
-      })
-
-      // Sort nulls to end
-      const sortedLots = availableLots.sort((a, b) => {
-        if (a.expiryDate === null && b.expiryDate === null) return 0
-        if (a.expiryDate === null) return 1
-        if (b.expiryDate === null) return -1
-        return a.expiryDate.getTime() - b.expiryDate.getTime()
-      })
-
-      if (sortedLots.length > 0) {
-        // Component has lots - consume using FEFO
-        let remaining = requiredQty
-
-        for (const lot of sortedLots) {
-          if (remaining <= 0) break
-          const available = lot.balance?.quantity.toNumber() ?? 0
-          const toConsume = Math.min(available, remaining)
-
-          if (toConsume > 0) {
-            await tx.transactionLine.create({
-              data: {
-                transactionId,
-                componentId: bomLine.componentId,
-                quantityChange: new Prisma.Decimal(-1 * toConsume),
-                costPerUnit: bomLine.component.costPerUnit,
-                lotId: lot.id,
-              },
-            })
-
-            // Deduct from LotBalance
-            await tx.lotBalance.update({
-              where: { lotId: lot.id },
-              data: {
-                quantity: { decrement: new Prisma.Decimal(toConsume) },
-              },
-            })
-
-            remaining -= toConsume
-          }
-        }
-
-        // If still remaining and allowInsufficientInventory, add pooled consumption
-        if (remaining > 0 && input.allowInsufficientInventory) {
-          await tx.transactionLine.create({
-            data: {
-              transactionId,
-              componentId: bomLine.componentId,
-              quantityChange: new Prisma.Decimal(-1 * remaining),
-              costPerUnit: bomLine.component.costPerUnit,
-              lotId: null,
-            },
-          })
-        }
-      } else {
-        // Component has no lots - use pooled inventory
-        await tx.transactionLine.create({
-          data: {
-            transactionId,
-            componentId: bomLine.componentId,
-            quantityChange: new Prisma.Decimal(-1 * requiredQty),
-            costPerUnit: bomLine.component.costPerUnit,
-            lotId: null,
-          },
-        })
-      }
-    }
+    // 6. Use centralized lot consumption service with FEFO algorithm
+    // This creates transaction lines and updates lot balances atomically
+    const consumedLots = await consumeLotsForBuildTx({
+      tx,
+      transactionId,
+      bomLines: bomLines.map((line) => ({
+        componentId: line.componentId,
+        quantityRequired: line.quantityPerUnit.toNumber() * input.unitsToBuild,
+        costPerUnit: line.component.costPerUnit.toNumber(),
+      })),
+      allowInsufficientInventory: input.allowInsufficientInventory,
+    })
 
     // 7. Update inventory balances for consumed components
     if (locationIdToUse) {
-      for (const bomLine of bomLines) {
-        const requiredQty = bomLine.quantityPerUnit.toNumber() * input.unitsToBuild
-        await updateInventoryBalance(tx, bomLine.componentId, locationIdToUse, -requiredQty)
+      for (const consumed of consumedLots) {
+        await updateInventoryBalance(tx, consumed.componentId, locationIdToUse, -consumed.quantity)
       }
     }
 

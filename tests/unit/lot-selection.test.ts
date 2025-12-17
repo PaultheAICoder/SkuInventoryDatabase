@@ -6,9 +6,16 @@ vi.mock('@/lib/db', () => ({
     lot: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
     },
     component: {
       findFirst: vi.fn(),
+    },
+    transactionLine: {
+      create: vi.fn(),
+    },
+    lotBalance: {
+      update: vi.fn(),
     },
   },
 }))
@@ -16,9 +23,11 @@ vi.mock('@/lib/db', () => ({
 import { prisma } from '@/lib/db'
 import {
   getAvailableLotsForComponent,
+  getAvailableLotsForComponentTx,
   selectLotsForConsumption,
   checkLotAvailabilityForBuild,
   validateLotOverrides,
+  consumeLotsForBuildTx,
 } from '@/services/lot-selection'
 
 const mockLotFindMany = vi.mocked(prisma.lot.findMany)
@@ -507,6 +516,323 @@ describe('lot-selection service', () => {
       expect(result.valid).toBe(false)
       expect(result.errors).toHaveLength(1)
       expect(result.errors[0]).toContain('not found or access denied')
+    })
+  })
+
+  describe('getAvailableLotsForComponentTx', () => {
+    it('returns lots ordered by expiry date (FEFO) within transaction', async () => {
+      const componentId = 'component-123'
+      const mockLots = [
+        {
+          id: 'lot-1',
+          componentId,
+          lotNumber: 'LOT-001',
+          expiryDate: new Date('2025-03-01'),
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier A',
+          notes: null,
+          createdAt: new Date('2025-01-01'),
+          updatedAt: new Date('2025-01-01'),
+          balance: { id: 'b1', lotId: 'lot-1', quantity: { toNumber: () => 50 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+        {
+          id: 'lot-2',
+          componentId,
+          lotNumber: 'LOT-002',
+          expiryDate: new Date('2025-01-15'), // Earlier expiry - should come first
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier B',
+          notes: null,
+          createdAt: new Date('2025-01-02'),
+          updatedAt: new Date('2025-01-02'),
+          balance: { id: 'b2', lotId: 'lot-2', quantity: { toNumber: () => 30 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+      ]
+
+      // Create a mock transaction client
+      const mockTx = {
+        lot: {
+          findMany: vi.fn().mockResolvedValue(mockLots),
+        },
+      }
+
+      const result = await getAvailableLotsForComponentTx(mockTx as never, componentId)
+
+      expect(result).toHaveLength(2)
+      // FEFO order: earliest expiry first
+      expect(result[0].lotNumber).toBe('LOT-002') // Jan 15
+      expect(result[1].lotNumber).toBe('LOT-001') // Mar 1
+    })
+
+    it('sorts lots without expiry dates to end in transaction', async () => {
+      const componentId = 'component-123'
+      const mockLots = [
+        {
+          id: 'lot-1',
+          componentId,
+          lotNumber: 'LOT-NO-EXPIRY',
+          expiryDate: null, // No expiry - should come last
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier A',
+          notes: null,
+          createdAt: new Date('2025-01-01'),
+          updatedAt: new Date('2025-01-01'),
+          balance: { id: 'b1', lotId: 'lot-1', quantity: { toNumber: () => 50 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+        {
+          id: 'lot-2',
+          componentId,
+          lotNumber: 'LOT-WITH-EXPIRY',
+          expiryDate: new Date('2025-06-01'),
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier B',
+          notes: null,
+          createdAt: new Date('2025-01-02'),
+          updatedAt: new Date('2025-01-02'),
+          balance: { id: 'b2', lotId: 'lot-2', quantity: { toNumber: () => 30 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+      ]
+
+      const mockTx = {
+        lot: {
+          findMany: vi.fn().mockResolvedValue(mockLots),
+        },
+      }
+
+      const result = await getAvailableLotsForComponentTx(mockTx as never, componentId)
+
+      expect(result).toHaveLength(2)
+      // Lots with expiry dates come first
+      expect(result[0].lotNumber).toBe('LOT-WITH-EXPIRY')
+      expect(result[1].lotNumber).toBe('LOT-NO-EXPIRY')
+    })
+  })
+
+  describe('consumeLotsForBuildTx', () => {
+    it('consumes lots using FEFO algorithm', async () => {
+      const transactionId = 'tx-123'
+      const componentId = 'comp-123'
+      const mockLots = [
+        {
+          id: 'lot-1',
+          componentId,
+          lotNumber: 'LOT-EARLIEST',
+          expiryDate: new Date('2025-01-15'),
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier',
+          notes: null,
+          createdAt: new Date('2025-01-01'),
+          updatedAt: new Date('2025-01-01'),
+          balance: { id: 'b1', lotId: 'lot-1', quantity: { toNumber: () => 30 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+        {
+          id: 'lot-2',
+          componentId,
+          lotNumber: 'LOT-LATER',
+          expiryDate: new Date('2025-03-01'),
+          receivedQuantity: { toNumber: () => 100 },
+          supplier: 'Supplier',
+          notes: null,
+          createdAt: new Date('2025-01-02'),
+          updatedAt: new Date('2025-01-02'),
+          balance: { id: 'b2', lotId: 'lot-2', quantity: { toNumber: () => 50 }, reservedQuantity: { toNumber: () => 0 } },
+        },
+      ]
+
+      const mockTx = {
+        lot: {
+          findMany: vi.fn().mockResolvedValue(mockLots),
+          findUnique: vi.fn().mockImplementation(({ where }: { where: { id: string } }) => {
+            const lot = mockLots.find((l) => l.id === where.id)
+            return Promise.resolve(lot ? { lotNumber: lot.lotNumber } : null)
+          }),
+        },
+        transactionLine: {
+          create: vi.fn().mockResolvedValue({ id: 'line-1' }),
+        },
+        lotBalance: {
+          update: vi.fn().mockResolvedValue({}),
+        },
+      }
+
+      // Request 40 units - should use all of lot-1 (30) and 10 from lot-2
+      const result = await consumeLotsForBuildTx({
+        tx: mockTx as never,
+        transactionId,
+        bomLines: [
+          {
+            componentId,
+            quantityRequired: 40,
+            costPerUnit: 10,
+          },
+        ],
+      })
+
+      expect(result).toHaveLength(2)
+      expect(result[0].lotId).toBe('lot-1')
+      expect(result[0].quantity).toBe(30)
+      expect(result[1].lotId).toBe('lot-2')
+      expect(result[1].quantity).toBe(10)
+
+      // Verify transaction lines were created
+      expect(mockTx.transactionLine.create).toHaveBeenCalledTimes(2)
+
+      // Verify lot balances were updated
+      expect(mockTx.lotBalance.update).toHaveBeenCalledTimes(2)
+    })
+
+    it('uses pooled inventory when no lots available', async () => {
+      const transactionId = 'tx-123'
+      const componentId = 'comp-no-lots'
+
+      const mockTx = {
+        lot: {
+          findMany: vi.fn().mockResolvedValue([]), // No lots
+        },
+        transactionLine: {
+          create: vi.fn().mockResolvedValue({ id: 'line-1' }),
+        },
+        lotBalance: {
+          update: vi.fn().mockResolvedValue({}),
+        },
+      }
+
+      const result = await consumeLotsForBuildTx({
+        tx: mockTx as never,
+        transactionId,
+        bomLines: [
+          {
+            componentId,
+            quantityRequired: 25,
+            costPerUnit: 5,
+          },
+        ],
+      })
+
+      expect(result).toHaveLength(1)
+      expect(result[0].lotId).toBeNull()
+      expect(result[0].quantity).toBe(25)
+
+      // Verify transaction line was created with null lotId
+      expect(mockTx.transactionLine.create).toHaveBeenCalledTimes(1)
+      expect(mockTx.transactionLine.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          lotId: null,
+        }),
+      })
+
+      // Lot balance should not be updated for pooled inventory
+      expect(mockTx.lotBalance.update).not.toHaveBeenCalled()
+    })
+
+    it('uses manual lot overrides when provided', async () => {
+      const transactionId = 'tx-123'
+      const componentId = 'comp-123'
+
+      const mockTx = {
+        lot: {
+          findMany: vi.fn(), // Should not be called for overrides
+          findUnique: vi.fn().mockResolvedValue({ lotNumber: 'MANUAL-LOT-001' }),
+        },
+        transactionLine: {
+          create: vi.fn().mockResolvedValue({ id: 'line-1' }),
+        },
+        lotBalance: {
+          update: vi.fn().mockResolvedValue({}),
+        },
+      }
+
+      const result = await consumeLotsForBuildTx({
+        tx: mockTx as never,
+        transactionId,
+        bomLines: [
+          {
+            componentId,
+            quantityRequired: 50, // This will be ignored for overrides
+            costPerUnit: 10,
+          },
+        ],
+        lotOverrides: [
+          {
+            componentId,
+            allocations: [
+              { lotId: 'override-lot-1', quantity: 30 },
+              { lotId: 'override-lot-2', quantity: 20 },
+            ],
+          },
+        ],
+      })
+
+      expect(result).toHaveLength(2)
+      expect(result[0].lotId).toBe('override-lot-1')
+      expect(result[0].quantity).toBe(30)
+      expect(result[1].lotId).toBe('override-lot-2')
+      expect(result[1].quantity).toBe(20)
+
+      // Verify FEFO findMany was NOT called (overrides bypass FEFO)
+      expect(mockTx.lot.findMany).not.toHaveBeenCalled()
+
+      // Verify transaction lines were created
+      expect(mockTx.transactionLine.create).toHaveBeenCalledTimes(2)
+
+      // Verify lot balances were updated
+      expect(mockTx.lotBalance.update).toHaveBeenCalledTimes(2)
+    })
+
+    it('handles multiple BOM lines', async () => {
+      const transactionId = 'tx-123'
+      const mockLotsComp1 = [
+        {
+          id: 'lot-c1-1',
+          componentId: 'comp-1',
+          lotNumber: 'LOT-C1-001',
+          expiryDate: new Date('2025-03-01'),
+          balance: { quantity: { toNumber: () => 100 } },
+        },
+      ]
+      const mockLotsComp2 = [
+        {
+          id: 'lot-c2-1',
+          componentId: 'comp-2',
+          lotNumber: 'LOT-C2-001',
+          expiryDate: new Date('2025-04-01'),
+          balance: { quantity: { toNumber: () => 50 } },
+        },
+      ]
+
+      const mockTx = {
+        lot: {
+          findMany: vi.fn()
+            .mockResolvedValueOnce(mockLotsComp1) // First BOM line
+            .mockResolvedValueOnce(mockLotsComp2), // Second BOM line
+          findUnique: vi.fn().mockImplementation(({ where }: { where: { id: string } }) => {
+            if (where.id === 'lot-c1-1') return Promise.resolve({ lotNumber: 'LOT-C1-001' })
+            if (where.id === 'lot-c2-1') return Promise.resolve({ lotNumber: 'LOT-C2-001' })
+            return Promise.resolve(null)
+          }),
+        },
+        transactionLine: {
+          create: vi.fn().mockResolvedValue({ id: 'line-1' }),
+        },
+        lotBalance: {
+          update: vi.fn().mockResolvedValue({}),
+        },
+      }
+
+      const result = await consumeLotsForBuildTx({
+        tx: mockTx as never,
+        transactionId,
+        bomLines: [
+          { componentId: 'comp-1', quantityRequired: 25, costPerUnit: 10 },
+          { componentId: 'comp-2', quantityRequired: 15, costPerUnit: 20 },
+        ],
+      })
+
+      expect(result).toHaveLength(2)
+      expect(result[0].componentId).toBe('comp-1')
+      expect(result[0].quantity).toBe(25)
+      expect(result[1].componentId).toBe('comp-2')
+      expect(result[1].quantity).toBe(15)
     })
   })
 })

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 import { isLotExpired } from './expiry'
 
 /**
@@ -34,6 +35,19 @@ export interface LotSelectionOptions {
 }
 
 /**
+ * Sort lots using FEFO algorithm (earliest expiry first, nulls last)
+ * This is the canonical implementation used throughout the codebase
+ */
+function sortLotsByFEFO<T extends { expiryDate: Date | null }>(lots: T[]): T[] {
+  return [...lots].sort((a, b) => {
+    if (a.expiryDate === null && b.expiryDate === null) return 0
+    if (a.expiryDate === null) return 1 // nulls to end
+    if (b.expiryDate === null) return -1
+    return a.expiryDate.getTime() - b.expiryDate.getTime()
+  })
+}
+
+/**
  * Get available lots for a component ordered by FEFO (earliest expiry first)
  * Lots without expiry dates are sorted to the end
  */
@@ -66,13 +80,62 @@ export async function getAvailableLotsForComponent(
     ],
   })
 
-  // Sort nulls to end (Prisma puts nulls first by default in asc)
-  const sortedLots = lots.sort((a, b) => {
-    if (a.expiryDate === null && b.expiryDate === null) return 0
-    if (a.expiryDate === null) return 1 // nulls to end
-    if (b.expiryDate === null) return -1
-    return a.expiryDate.getTime() - b.expiryDate.getTime()
+  // Sort nulls to end using FEFO helper (Prisma puts nulls first by default in asc)
+  const sortedLots = sortLotsByFEFO(lots)
+
+  // Map and optionally filter expired lots
+  const result = sortedLots.map((lot) => ({
+    lotId: lot.id,
+    lotNumber: lot.lotNumber,
+    availableQuantity: lot.balance?.quantity.toNumber() ?? 0,
+    expiryDate: lot.expiryDate,
+    isExpired: isLotExpired(lot.expiryDate),
+  }))
+
+  if (excludeExpired) {
+    return result.filter((lot) => !lot.isExpired)
+  }
+
+  return result
+}
+
+/**
+ * Transaction-aware version of getAvailableLotsForComponent
+ * Use within prisma.$transaction() for atomic operations
+ * Ensures FEFO selection is consistent within the transaction
+ */
+export async function getAvailableLotsForComponentTx(
+  tx: Prisma.TransactionClient,
+  componentId: string,
+  options?: LotSelectionOptions
+): Promise<Array<{
+  lotId: string
+  lotNumber: string
+  availableQuantity: number
+  expiryDate: Date | null
+  isExpired: boolean
+}>> {
+  const { excludeExpired = false } = options ?? {}
+
+  // Query Lot joined with LotBalance within the transaction for consistency
+  const lots = await tx.lot.findMany({
+    where: {
+      componentId,
+      balance: {
+        quantity: { gt: 0 },
+      },
+    },
+    include: {
+      balance: true,
+    },
+    orderBy: [
+      { expiryDate: 'asc' }, // FEFO: earliest expiry first
+      { createdAt: 'asc' }, // Tie-breaker: oldest lot first
+    ],
   })
+
+  // Sort nulls to end using FEFO helper (Prisma puts nulls first by default in asc)
+  const sortedLots = sortLotsByFEFO(lots)
 
   // Map and optionally filter expired lots
   const result = sortedLots.map((lot) => ({
@@ -260,4 +323,169 @@ export async function validateLotOverrides(
     valid: errors.length === 0,
     errors,
   }
+}
+
+/**
+ * Result of consuming a lot during a build
+ */
+export interface ConsumedLot {
+  componentId: string
+  lotId: string | null
+  lotNumber: string | null
+  quantity: number
+  costPerUnit: number
+}
+
+/**
+ * Transaction-aware lot consumption for build operations
+ * Creates TransactionLines and updates LotBalance atomically within the provided transaction
+ * Uses FEFO algorithm for automatic lot selection, supports manual overrides and pooled fallback
+ */
+export async function consumeLotsForBuildTx(params: {
+  tx: Prisma.TransactionClient
+  transactionId: string
+  bomLines: Array<{
+    componentId: string
+    quantityRequired: number
+    costPerUnit: number
+  }>
+  lotOverrides?: Array<{
+    componentId: string
+    allocations: Array<{ lotId: string; quantity: number }>
+  }>
+  allowInsufficientInventory?: boolean
+}): Promise<ConsumedLot[]> {
+  const { tx, transactionId, bomLines, lotOverrides, allowInsufficientInventory = false } = params
+  const consumedLots: ConsumedLot[] = []
+
+  for (const bomLine of bomLines) {
+    const { componentId, quantityRequired, costPerUnit } = bomLine
+
+    // Check if this component has a manual override
+    const override = lotOverrides?.find((o) => o.componentId === componentId)
+
+    if (override) {
+      // Use manual lot allocations
+      for (const alloc of override.allocations) {
+        // Create transaction line for manual override
+        await tx.transactionLine.create({
+          data: {
+            transactionId,
+            componentId,
+            quantityChange: new Prisma.Decimal(-1 * alloc.quantity),
+            costPerUnit: new Prisma.Decimal(costPerUnit),
+            lotId: alloc.lotId,
+          },
+        })
+
+        // Deduct from LotBalance atomically
+        await tx.lotBalance.update({
+          where: { lotId: alloc.lotId },
+          data: {
+            quantity: { decrement: new Prisma.Decimal(alloc.quantity) },
+          },
+        })
+
+        // Get lot number for response
+        const lot = await tx.lot.findUnique({
+          where: { id: alloc.lotId },
+          select: { lotNumber: true },
+        })
+
+        consumedLots.push({
+          componentId,
+          lotId: alloc.lotId,
+          lotNumber: lot?.lotNumber ?? null,
+          quantity: alloc.quantity,
+          costPerUnit,
+        })
+      }
+    } else {
+      // Use FEFO lot selection with transaction-aware query
+      const availableLots = await getAvailableLotsForComponentTx(tx, componentId)
+
+      if (availableLots.length > 0) {
+        // Component has lots - consume using FEFO
+        let remaining = quantityRequired
+
+        for (const lot of availableLots) {
+          if (remaining <= 0) break
+          const toConsume = Math.min(lot.availableQuantity, remaining)
+
+          if (toConsume > 0) {
+            // Create transaction line
+            await tx.transactionLine.create({
+              data: {
+                transactionId,
+                componentId,
+                quantityChange: new Prisma.Decimal(-1 * toConsume),
+                costPerUnit: new Prisma.Decimal(costPerUnit),
+                lotId: lot.lotId,
+              },
+            })
+
+            // Deduct from LotBalance atomically
+            await tx.lotBalance.update({
+              where: { lotId: lot.lotId },
+              data: {
+                quantity: { decrement: new Prisma.Decimal(toConsume) },
+              },
+            })
+
+            consumedLots.push({
+              componentId,
+              lotId: lot.lotId,
+              lotNumber: lot.lotNumber,
+              quantity: toConsume,
+              costPerUnit,
+            })
+
+            remaining -= toConsume
+          }
+        }
+
+        // If still remaining and allowInsufficientInventory, add pooled consumption
+        if (remaining > 0 && allowInsufficientInventory) {
+          await tx.transactionLine.create({
+            data: {
+              transactionId,
+              componentId,
+              quantityChange: new Prisma.Decimal(-1 * remaining),
+              costPerUnit: new Prisma.Decimal(costPerUnit),
+              lotId: null,
+            },
+          })
+
+          consumedLots.push({
+            componentId,
+            lotId: null,
+            lotNumber: null,
+            quantity: remaining,
+            costPerUnit,
+          })
+        }
+      } else {
+        // Component has no lots - use pooled inventory (existing behavior)
+        await tx.transactionLine.create({
+          data: {
+            transactionId,
+            componentId,
+            quantityChange: new Prisma.Decimal(-1 * quantityRequired),
+            costPerUnit: new Prisma.Decimal(costPerUnit),
+            lotId: null,
+          },
+        })
+
+        consumedLots.push({
+          componentId,
+          lotId: null,
+          lotNumber: null,
+          quantity: quantityRequired,
+          costPerUnit,
+        })
+      }
+    }
+  }
+
+  return consumedLots
 }

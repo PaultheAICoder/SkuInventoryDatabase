@@ -8,7 +8,7 @@ import {
 } from '@/types/settings'
 import { evaluateDefectThreshold } from './alert'
 import { getDefaultLocationId } from './location'
-import { isLotExpired } from './expiry'
+import { getAvailableLotsForComponent, consumeLotsForBuildTx } from './lot-selection'
 
 /**
  * Update inventory balance atomically within a transaction
@@ -714,6 +714,7 @@ export async function checkInsufficientInventory(params: {
 /**
  * Check if build would use expired lots
  * Returns list of expired lots that would be consumed, or empty array if none
+ * Uses the centralized FEFO algorithm from lot-selection service
  */
 export async function checkExpiredLotsForBuild(params: {
   bomVersionId: string
@@ -740,36 +741,20 @@ export async function checkExpiredLotsForBuild(params: {
   for (const line of bomLines) {
     const requiredQty = line.quantityPerUnit.toNumber() * unitsToBuild
 
-    // Get lots for this component using FEFO (including expired)
-    const lots = await prisma.lot.findMany({
-      where: {
-        componentId: line.componentId,
-        balance: { quantity: { gt: 0 } },
-      },
-      include: { balance: true },
-      orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
-    })
-
-    // Sort nulls to end
-    const sortedLots = lots.sort((a, b) => {
-      if (a.expiryDate === null && b.expiryDate === null) return 0
-      if (a.expiryDate === null) return 1
-      if (b.expiryDate === null) return -1
-      return a.expiryDate.getTime() - b.expiryDate.getTime()
-    })
+    // Use centralized FEFO service for lot selection (include expired lots)
+    const availableLots = await getAvailableLotsForComponent(line.componentId, { excludeExpired: false })
 
     let remaining = requiredQty
-    for (const lot of sortedLots) {
+    for (const lot of availableLots) {
       if (remaining <= 0) break
-      const available = lot.balance?.quantity.toNumber() ?? 0
-      const toConsume = Math.min(available, remaining)
+      const toConsume = Math.min(lot.availableQuantity, remaining)
 
-      if (toConsume > 0 && isLotExpired(lot.expiryDate)) {
+      if (toConsume > 0 && lot.isExpired) {
         expiredLots.push({
           componentId: line.componentId,
           componentName: line.component.name,
           skuCode: line.component.skuCode,
-          lotId: lot.id,
+          lotId: lot.lotId,
           lotNumber: lot.lotNumber,
           expiryDate: lot.expiryDate!.toISOString().split('T')[0],
           quantity: toConsume,
@@ -932,103 +917,7 @@ export async function createBuildTransaction(params: {
       outputLocation = outputLoc
     }
 
-    // Build consumption lines with lot-aware consumption (FEFO algorithm)
-    const consumptionLines: Prisma.TransactionLineCreateManyTransactionInput[] = []
-
-    for (const bomLine of bomLines) {
-      const requiredQty = bomLine.quantityPerUnit.toNumber() * unitsToBuild
-
-      // Check if this component has a manual override
-      const override = lotOverrides?.find((o) => o.componentId === bomLine.componentId)
-
-      if (override) {
-        // Use manual lot allocations
-        for (const alloc of override.allocations) {
-          consumptionLines.push({
-            componentId: bomLine.componentId,
-            quantityChange: new Prisma.Decimal(-1 * alloc.quantity),
-            costPerUnit: bomLine.component.costPerUnit,
-            lotId: alloc.lotId,
-          })
-
-          // Deduct from LotBalance atomically
-          await tx.lotBalance.update({
-            where: { lotId: alloc.lotId },
-            data: {
-              quantity: { decrement: new Prisma.Decimal(alloc.quantity) },
-            },
-          })
-        }
-      } else {
-        // Try FEFO lot selection - query lots within transaction for consistency
-        const availableLots = await tx.lot.findMany({
-          where: {
-            componentId: bomLine.componentId,
-            balance: { quantity: { gt: 0 } },
-          },
-          include: { balance: true },
-          orderBy: [{ expiryDate: 'asc' }, { createdAt: 'asc' }],
-        })
-
-        // Sort nulls to end (Prisma puts nulls first by default in asc)
-        const sortedLots = availableLots.sort((a, b) => {
-          if (a.expiryDate === null && b.expiryDate === null) return 0
-          if (a.expiryDate === null) return 1
-          if (b.expiryDate === null) return -1
-          return a.expiryDate.getTime() - b.expiryDate.getTime()
-        })
-
-        if (sortedLots.length > 0) {
-          // Component has lots - consume using FEFO
-          let remaining = requiredQty
-
-          for (const lot of sortedLots) {
-            if (remaining <= 0) break
-            const available = lot.balance?.quantity.toNumber() ?? 0
-            const toConsume = Math.min(available, remaining)
-
-            if (toConsume > 0) {
-              consumptionLines.push({
-                componentId: bomLine.componentId,
-                quantityChange: new Prisma.Decimal(-1 * toConsume),
-                costPerUnit: bomLine.component.costPerUnit,
-                lotId: lot.id,
-              })
-
-              // Deduct from LotBalance atomically
-              await tx.lotBalance.update({
-                where: { lotId: lot.id },
-                data: {
-                  quantity: { decrement: new Prisma.Decimal(toConsume) },
-                },
-              })
-
-              remaining -= toConsume
-            }
-          }
-
-          // If still remaining and allowInsufficientInventory, add pooled consumption
-          if (remaining > 0 && allowInsufficientInventory) {
-            consumptionLines.push({
-              componentId: bomLine.componentId,
-              quantityChange: new Prisma.Decimal(-1 * remaining),
-              costPerUnit: bomLine.component.costPerUnit,
-              lotId: null,
-            })
-          }
-        } else {
-          // Component has no lots - use pooled inventory (existing behavior)
-          consumptionLines.push({
-            componentId: bomLine.componentId,
-            quantityChange: new Prisma.Decimal(-1 * requiredQty),
-            costPerUnit: bomLine.component.costPerUnit,
-            lotId: null,
-          })
-        }
-      }
-    }
-
-    // Create build transaction with all consumption lines
+    // Create build transaction first (without consumption lines - they will be added by consumeLotsForBuildTx)
     const transaction = await tx.transaction.create({
       data: {
         companyId,
@@ -1046,12 +935,26 @@ export async function createBuildTransaction(params: {
         defectNotes,
         affectedUnits,
         createdById,
-        lines: {
-          createMany: {
-            data: consumptionLines,
-          },
-        },
       },
+    })
+
+    // Use centralized lot consumption service with FEFO algorithm
+    // This creates transaction lines and updates lot balances atomically
+    const consumedLots = await consumeLotsForBuildTx({
+      tx,
+      transactionId: transaction.id,
+      bomLines: bomLines.map((line) => ({
+        componentId: line.componentId,
+        quantityRequired: line.quantityPerUnit.toNumber() * unitsToBuild,
+        costPerUnit: line.component.costPerUnit.toNumber(),
+      })),
+      lotOverrides,
+      allowInsufficientInventory,
+    })
+
+    // Re-fetch transaction with all includes for response
+    const transactionWithIncludes = await tx.transaction.findUniqueOrThrow({
+      where: { id: transaction.id },
       include: {
         sku: {
           select: {
@@ -1097,13 +1000,14 @@ export async function createBuildTransaction(params: {
     })
 
     // Update inventory balances for consumed components
+    // consumeLotsForBuildTx already updated lot balances, now update component inventory balances
     if (locationIdToUse) {
-      for (const line of consumptionLines) {
+      for (const consumed of consumedLots) {
         await updateInventoryBalance(
           tx,
-          line.componentId,
+          consumed.componentId,
           locationIdToUse,
-          (line.quantityChange as Prisma.Decimal).toNumber() // negative value decrements
+          -consumed.quantity // negative value decrements
         )
       }
     }
@@ -1146,7 +1050,7 @@ export async function createBuildTransaction(params: {
     }
 
     return {
-      transaction,
+      transaction: transactionWithIncludes,
       outputLocation,
       outputQuantityActual,
       outputLocationId: outputLocationIdToUse,

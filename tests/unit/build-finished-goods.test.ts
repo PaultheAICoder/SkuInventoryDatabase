@@ -146,6 +146,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
   // Helper to create mock transaction client with lot support
   // Now includes bOMLine since it's fetched inside the transaction for atomicity (Issue #296)
   // Also includes inventoryBalance and finishedGoodsBalance for balance updates
+  // Updated for Issue #303: consumeLotsForBuildTx now creates transaction lines directly
   function createMockTxClient(overrides: {
     locationResult?: { id: string; name: string } | null
     finishedGoodsCallback?: () => void
@@ -161,7 +162,11 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
         findFirst: vi.fn().mockResolvedValue(locationValue),
       },
       transaction: {
-        create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+        create: vi.fn().mockResolvedValue({ id: 'transaction-123' }), // Initial create returns minimal object
+        findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots), // Re-fetch with includes
+      },
+      transactionLine: {
+        create: vi.fn().mockResolvedValue({ id: 'line-1' }), // Now called by consumeLotsForBuildTx
       },
       finishedGoodsLine: {
         create: vi.fn().mockImplementation(() => {
@@ -271,8 +276,10 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
+            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
+          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { locationId: string } }) => {
               capturedLocationId = args.data.locationId
@@ -314,8 +321,10 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
+            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
+          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { locationId: string } }) => {
               capturedLocationId = args.data.locationId
@@ -359,8 +368,10 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             findFirst: vi.fn().mockResolvedValue(null),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
+            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
+          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation(() => {
               finishedGoodsCreated = true
@@ -405,8 +416,10 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
+            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
+          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { quantityChange: Prisma.Decimal } }) => {
               capturedQuantity = args.data.quantityChange.toNumber()
@@ -449,8 +462,10 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
             }),
           },
           transaction: {
-            create: vi.fn().mockResolvedValue(mockTransactionWithLots),
+            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
+            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
           },
+          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
           finishedGoodsLine: {
             create: vi.fn().mockImplementation((args: { data: { quantityChange: Prisma.Decimal } }) => {
               capturedQuantity = args.data.quantityChange.toNumber()
@@ -547,7 +562,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
     it('existing calls with outputLocationId continue working', async () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = createMockTxClient({ locationResult: { id: mockOutputLocationId, name: 'FG Warehouse' } })
-        return callback(tx as unknown as Prisma.TransactionClient)
+        return callback(tx as never)
       })
 
       // Call like issue #72 implementation - explicit outputLocationId
