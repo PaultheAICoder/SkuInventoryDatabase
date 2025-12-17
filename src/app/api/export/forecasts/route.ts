@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
-import { unauthorized, serverError } from '@/lib/api-response'
+import { unauthorized, serverError, error } from '@/lib/api-response'
 import { getComponentForecasts } from '@/services/forecast'
 import {
   toCSV,
@@ -41,6 +41,9 @@ export async function GET(request: NextRequest) {
     }
 
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Parse optional query params for config override
     const { searchParams } = new URL(request.url)

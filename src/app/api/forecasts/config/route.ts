@@ -7,6 +7,7 @@ import {
   forbidden,
   serverError,
   parseBody,
+  error,
 } from '@/lib/api-response'
 import { getForecastConfig, upsertForecastConfig } from '@/services/forecast'
 import { updateForecastConfigSchema, ForecastConfigResponse } from '@/types/forecast'
@@ -45,7 +46,12 @@ export async function GET() {
       return unauthorized()
     }
 
-    const config = await getFullConfig(session.user.selectedCompanyId)
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
+
+    const config = await getFullConfig(selectedCompanyId)
     return success(config)
   } catch (error) {
     console.error('Error fetching forecast config:', error)
@@ -69,16 +75,21 @@ export async function PUT(request: NextRequest) {
       return forbidden()
     }
 
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
+
     const bodyResult = await parseBody(request, updateForecastConfigSchema)
     if (bodyResult.error) return bodyResult.error
 
     const data = bodyResult.data
 
     // Update config (creates if doesn't exist)
-    await upsertForecastConfig(session.user.selectedCompanyId, data)
+    await upsertForecastConfig(selectedCompanyId, data)
 
     // Fetch updated config with timestamps
-    const config = await getFullConfig(session.user.selectedCompanyId)
+    const config = await getFullConfig(selectedCompanyId)
 
     return success({ config, message: 'Forecast configuration updated' })
   } catch (error) {

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { paginated, unauthorized, serverError, parseQuery } from '@/lib/api-response'
+import { paginated, unauthorized, serverError, parseQuery, error } from '@/lib/api-response'
 import {
   forecastListQuerySchema,
   ComponentForecast,
@@ -48,6 +48,9 @@ export async function GET(request: NextRequest) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Build config override if query params provided
     const configOverride: { lookbackDays?: number; safetyDays?: number } = {}

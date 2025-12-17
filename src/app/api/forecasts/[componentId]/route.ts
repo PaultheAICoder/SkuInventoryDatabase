@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { success, unauthorized, notFound, serverError } from '@/lib/api-response'
+import { success, unauthorized, notFound, serverError, error } from '@/lib/api-response'
 import { getComponentForecastById } from '@/services/forecast'
 import { prisma } from '@/lib/db'
 import { ComponentForecast, ComponentForecastResponse } from '@/types/forecast'
@@ -42,6 +42,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
 
     // Verify component exists and belongs to user's selected company
     const component = await prisma.component.findFirst({

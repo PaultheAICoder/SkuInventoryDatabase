@@ -9,6 +9,7 @@ import {
   clearTestSession,
   TEST_SESSIONS,
   initializeTestSessions,
+  type TestUserSession,
 } from '../helpers/auth-mock'
 import {
   getIntegrationPrisma,
@@ -22,6 +23,24 @@ import { disconnectTestDb } from '../helpers/db'
 import { GET as getForecasts } from '@/app/api/forecasts/route'
 import { GET as getConfig, PUT as putConfig } from '@/app/api/forecasts/config/route'
 import { GET as exportForecasts } from '@/app/api/export/forecasts/route'
+import { GET as getComponentForecast } from '@/app/api/forecasts/[componentId]/route'
+
+/**
+ * Create a test session with missing selectedCompanyId for security testing
+ */
+function createSessionWithoutCompany(): TestUserSession {
+  return {
+    user: {
+      id: TEST_SESSIONS.admin!.user.id,
+      email: TEST_SESSIONS.admin!.user.email,
+      name: TEST_SESSIONS.admin!.user.name,
+      role: TEST_SESSIONS.admin!.user.role,
+      companyId: TEST_SESSIONS.admin!.user.companyId,
+      companyName: TEST_SESSIONS.admin!.user.companyName,
+      selectedCompanyId: undefined as unknown as string, // Simulate missing company
+    },
+  }
+}
 
 describe('Forecast API', () => {
   beforeAll(async () => {
@@ -105,6 +124,16 @@ describe('Forecast API', () => {
         expect(json.data[0].assumptions.lookbackDays).toBe(60)
       }
     })
+
+    it('returns 400 when selectedCompanyId is missing', async () => {
+      setTestSession(createSessionWithoutCompany())
+
+      const response = await getForecasts(createTestRequest('/api/forecasts'))
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.message).toContain('No company selected')
+    })
   })
 
   describe('GET /api/forecasts/config', () => {
@@ -138,6 +167,16 @@ describe('Forecast API', () => {
       const response = await getConfig()
 
       expect(response.status).toBe(401)
+    })
+
+    it('returns 400 when selectedCompanyId is missing', async () => {
+      setTestSession(createSessionWithoutCompany())
+
+      const response = await getConfig()
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.message).toContain('No company selected')
     })
   })
 
@@ -185,6 +224,22 @@ describe('Forecast API', () => {
       const response = await putConfig(putRequest as never)
 
       expect(response.status).toBe(400)
+    })
+
+    it('returns 400 when selectedCompanyId is missing', async () => {
+      setTestSession(createSessionWithoutCompany())
+
+      const putRequest = new Request('http://localhost/api/forecasts/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lookbackDays: 45 }),
+      })
+
+      const response = await putConfig(putRequest as never)
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.message).toContain('No company selected')
     })
   })
 
@@ -273,6 +328,60 @@ describe('Forecast API', () => {
 
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toBe('text/csv')
+    })
+
+    it('returns 400 when selectedCompanyId is missing', async () => {
+      setTestSession(createSessionWithoutCompany())
+
+      const response = await exportForecasts(createTestRequest('/api/export/forecasts'))
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.message).toContain('No company selected')
+    })
+  })
+
+  describe('GET /api/forecasts/[componentId]', () => {
+    it('returns 400 when selectedCompanyId is missing', async () => {
+      setTestSession(createSessionWithoutCompany())
+
+      // Create a component to get an ID
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest(`/api/forecasts/${component.id}`)
+      const params = { params: Promise.resolve({ componentId: component.id }) }
+
+      const response = await getComponentForecast(request, params)
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.message).toContain('No company selected')
+    })
+
+    it('returns forecast for valid component', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest(`/api/forecasts/${component.id}`)
+      const params = { params: Promise.resolve({ componentId: component.id }) }
+
+      const response = await getComponentForecast(request, params)
+      const json = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(json.data.componentId).toBe(component.id)
+    })
+
+    it('returns 401 for unauthenticated request', async () => {
+      clearTestSession()
+      const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+      const request = createTestRequest(`/api/forecasts/${component.id}`)
+      const params = { params: Promise.resolve({ componentId: component.id }) }
+
+      const response = await getComponentForecast(request, params)
+
+      expect(response.status).toBe(401)
     })
   })
 })
