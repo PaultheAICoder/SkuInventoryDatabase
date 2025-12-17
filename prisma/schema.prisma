@@ -306,6 +306,9 @@ model Transaction {
   reviewedBy   User?             @relation("TransactionReviewedBy", fields: [reviewedById], references: [id])
   rejectReason String?           @db.VarChar(500)
 
+  // BOM snapshot for draft build transactions (frozen at draft creation)
+  bomSnapshot  Json?
+
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
   defectAlerts       DefectAlert[]

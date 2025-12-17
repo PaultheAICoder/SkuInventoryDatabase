@@ -8,6 +8,32 @@ import { dateSchema } from './index'
 export type TransactionStatus = 'draft' | 'approved' | 'rejected'
 
 // =============================================================================
+// BOM Snapshot Types (for draft build transactions)
+// =============================================================================
+
+/**
+ * Snapshot of a BOM line at draft creation time
+ * Captures component info and quantity to ensure approval uses frozen data
+ */
+export interface BOMLineSnapshot {
+  componentId: string
+  componentName: string
+  componentSkuCode: string
+  quantityPerUnit: string // Stored as string for Decimal precision
+  costPerUnit: string // Stored as string for Decimal precision
+}
+
+/**
+ * Full BOM snapshot captured at draft creation
+ */
+export interface BOMSnapshot {
+  bomVersionId: string
+  bomVersionName: string
+  capturedAt: string // ISO timestamp
+  lines: BOMLineSnapshot[]
+}
+
+// =============================================================================
 // Draft Creation Schema
 // =============================================================================
 
@@ -125,6 +151,8 @@ export interface DraftTransactionResponse {
   reason: string | null
   notes: string | null
   rejectReason: string | null
+  // BOM snapshot for build drafts (captured at creation time)
+  bomSnapshot?: BOMSnapshot | null
   createdAt: string
   createdBy: { id: string; name: string }
   reviewedAt: string | null

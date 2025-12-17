@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { Prisma, TransactionStatus } from '@prisma/client'
-import type { CreateDraftInput, DraftTransactionResponse, BatchApproveResult } from '@/types/draft'
-import { checkInsufficientInventory } from './inventory'
+import type { CreateDraftInput, DraftTransactionResponse, BatchApproveResult, BOMSnapshot, BOMLineSnapshot } from '@/types/draft'
+import { checkInsufficientInventory, getComponentQuantities } from './inventory'
 import { getDefaultLocationId } from './location'
 
 // =============================================================================
@@ -47,6 +47,7 @@ function transformDraftTransaction(tx: Prisma.TransactionGetPayload<{
     reason: tx.reason,
     notes: tx.notes,
     rejectReason: tx.rejectReason,
+    bomSnapshot: tx.bomSnapshot as BOMSnapshot | null,
     createdAt: tx.createdAt.toISOString(),
     createdBy: tx.createdBy,
     reviewedAt: tx.reviewedAt?.toISOString() ?? null,
@@ -103,21 +104,56 @@ export async function createDraftTransaction(params: {
   // Resolve default location if not provided
   const locationIdToUse = input.locationId ?? await getDefaultLocationId(companyId)
 
-  // For builds, get the active BOM version
+  // For builds, get the active BOM version AND capture snapshot
   let bomVersionId: string | null = null
+  let bomSnapshot: BOMSnapshot | null = null
+
   if (input.type === 'build' && input.skuId) {
     const sku = await prisma.sKU.findUnique({
       where: { id: input.skuId },
       include: {
         bomVersions: {
           where: { isActive: true },
-          select: { id: true },
+          select: {
+            id: true,
+            versionName: true,
+            lines: {
+              include: {
+                component: {
+                  select: {
+                    id: true,
+                    name: true,
+                    skuCode: true,
+                    costPerUnit: true,
+                  },
+                },
+              },
+            },
+          },
           take: 1,
         },
       },
     })
+
     if (sku?.bomVersions[0]) {
-      bomVersionId = sku.bomVersions[0].id
+      const activeBom = sku.bomVersions[0]
+      bomVersionId = activeBom.id
+
+      // Capture BOM snapshot for approval-time integrity
+      const snapshotLines: BOMLineSnapshot[] = activeBom.lines.map((line) => ({
+        componentId: line.componentId,
+        componentName: line.component.name,
+        componentSkuCode: line.component.skuCode,
+        quantityPerUnit: line.quantityPerUnit.toString(),
+        costPerUnit: line.component.costPerUnit.toString(),
+      }))
+
+      bomSnapshot = {
+        bomVersionId: activeBom.id,
+        bomVersionName: activeBom.versionName,
+        capturedAt: new Date().toISOString(),
+        lines: snapshotLines,
+      }
     }
   }
 
@@ -140,6 +176,7 @@ export async function createDraftTransaction(params: {
       date: input.date,
       skuId: input.type === 'build' ? input.skuId : null,
       bomVersionId,
+      bomSnapshot: bomSnapshot ? JSON.parse(JSON.stringify(bomSnapshot)) : null, // Store BOM snapshot as JSON
       locationId: locationIdToUse,
       fromLocationId: input.type === 'transfer' ? input.fromLocationId : null,
       toLocationId: input.type === 'transfer' ? input.toLocationId : null,
@@ -385,20 +422,50 @@ export async function approveDraftTransaction(params: {
   try {
     // Use a Prisma transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
+      // Get BOM snapshot if available (for build transactions)
+      const bomSnapshot = draft.bomSnapshot as BOMSnapshot | null
+
       // For build transactions, re-validate inventory availability INSIDE transaction
       // This prevents race conditions where inventory could become insufficient after check but before approval
       if (draft.type === 'build' && draft.bomVersionId && draft.unitsBuild) {
-        const insufficientItems = await checkInsufficientInventory({
-          bomVersionId: draft.bomVersionId,
-          companyId,
-          unitsToBuild: draft.unitsBuild,
-          locationId: draft.locationId ?? undefined,
-        })
-
-        if (insufficientItems.length > 0) {
-          throw new Error(
-            `Insufficient inventory for: ${insufficientItems.map((i) => i.componentName).join(', ')}`
+        // Use snapshot component IDs if available, otherwise fall back to current BOM
+        if (bomSnapshot && bomSnapshot.lines.length > 0) {
+          // Check inventory for snapshot components
+          const componentIds = bomSnapshot.lines.map(l => l.componentId)
+          const quantities = await getComponentQuantities(
+            componentIds,
+            companyId,
+            draft.locationId ?? undefined
           )
+
+          const insufficientItems: Array<{ componentName: string }> = []
+          for (const line of bomSnapshot.lines) {
+            const available = quantities.get(line.componentId) ?? 0
+            const required = parseFloat(line.quantityPerUnit) * draft.unitsBuild
+            if (available < required) {
+              insufficientItems.push({ componentName: line.componentName })
+            }
+          }
+
+          if (insufficientItems.length > 0) {
+            throw new Error(
+              `Insufficient inventory for: ${insufficientItems.map((i) => i.componentName).join(', ')}`
+            )
+          }
+        } else {
+          // Fallback to existing checkInsufficientInventory for legacy drafts
+          const insufficientItems = await checkInsufficientInventory({
+            bomVersionId: draft.bomVersionId,
+            companyId,
+            unitsToBuild: draft.unitsBuild,
+            locationId: draft.locationId ?? undefined,
+          })
+
+          if (insufficientItems.length > 0) {
+            throw new Error(
+              `Insufficient inventory for: ${insufficientItems.map((i) => i.componentName).join(', ')}`
+            )
+          }
         }
       }
 
@@ -423,54 +490,95 @@ export async function approveDraftTransaction(params: {
           where: { transactionId: id },
         })
 
-        // Get BOM lines and create consumption
-        const bomLines = await tx.bOMLine.findMany({
-          where: { bomVersionId: draft.bomVersionId },
-          include: {
-            component: { select: { id: true, costPerUnit: true } },
-          },
-        })
-
-        for (const bomLine of bomLines) {
-          const requiredQty = bomLine.quantityPerUnit.toNumber() * draft.unitsBuild
-
-          // Create consumption line
-          await tx.transactionLine.create({
-            data: {
-              transactionId: id,
-              componentId: bomLine.componentId,
-              quantityChange: new Prisma.Decimal(-1 * requiredQty),
-              costPerUnit: bomLine.component.costPerUnit,
+        // Use the BOM snapshot captured at draft creation time
+        // This ensures we consume exactly what the draft creator/reviewer saw
+        if (!bomSnapshot || !bomSnapshot.lines || bomSnapshot.lines.length === 0) {
+          // Fallback to current BOM if no snapshot exists (legacy drafts)
+          // This maintains backward compatibility
+          console.warn(`Draft ${id} has no BOM snapshot, falling back to current BOM`)
+          const bomLines = await tx.bOMLine.findMany({
+            where: { bomVersionId: draft.bomVersionId },
+            include: {
+              component: { select: { id: true, costPerUnit: true } },
             },
           })
 
-          // TODO: Handle lot consumption with FEFO if needed
+          for (const bomLine of bomLines) {
+            const requiredQty = bomLine.quantityPerUnit.toNumber() * draft.unitsBuild
+
+            await tx.transactionLine.create({
+              data: {
+                transactionId: id,
+                componentId: bomLine.componentId,
+                quantityChange: new Prisma.Decimal(-1 * requiredQty),
+                costPerUnit: bomLine.component.costPerUnit,
+              },
+            })
+          }
+
+          const unitBomCost = bomLines.reduce((total, line) => {
+            return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
+          }, 0)
+
+          await tx.transaction.update({
+            where: { id },
+            data: {
+              unitBomCost: new Prisma.Decimal(unitBomCost),
+              totalBomCost: new Prisma.Decimal(unitBomCost * draft.unitsBuild),
+            },
+          })
+
+          // Create finished goods output
+          const defaultLocationId = await getDefaultLocationId(companyId)
+          await tx.finishedGoodsLine.create({
+            data: {
+              transactionId: id,
+              skuId: draft.skuId,
+              locationId: draft.locationId ?? defaultLocationId ?? '',
+              quantityChange: new Prisma.Decimal(draft.unitsBuild),
+              costPerUnit: new Prisma.Decimal(unitBomCost),
+            },
+          })
+        } else {
+          // Use snapshot data for consumption
+          for (const line of bomSnapshot.lines) {
+            const requiredQty = parseFloat(line.quantityPerUnit) * draft.unitsBuild
+
+            await tx.transactionLine.create({
+              data: {
+                transactionId: id,
+                componentId: line.componentId,
+                quantityChange: new Prisma.Decimal(-1 * requiredQty),
+                costPerUnit: new Prisma.Decimal(line.costPerUnit),
+              },
+            })
+          }
+
+          // Calculate costs from snapshot
+          const unitBomCost = bomSnapshot.lines.reduce((total, line) => {
+            return total + parseFloat(line.quantityPerUnit) * parseFloat(line.costPerUnit)
+          }, 0)
+
+          await tx.transaction.update({
+            where: { id },
+            data: {
+              unitBomCost: new Prisma.Decimal(unitBomCost),
+              totalBomCost: new Prisma.Decimal(unitBomCost * draft.unitsBuild),
+            },
+          })
+
+          // Create finished goods output (using snapshot cost)
+          const defaultLocationId = await getDefaultLocationId(companyId)
+          await tx.finishedGoodsLine.create({
+            data: {
+              transactionId: id,
+              skuId: draft.skuId,
+              locationId: draft.locationId ?? defaultLocationId ?? '',
+              quantityChange: new Prisma.Decimal(draft.unitsBuild),
+              costPerUnit: new Prisma.Decimal(unitBomCost),
+            },
+          })
         }
-
-        // Calculate and update BOM costs
-        const unitBomCost = bomLines.reduce((total, line) => {
-          return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
-        }, 0)
-
-        await tx.transaction.update({
-          where: { id },
-          data: {
-            unitBomCost: new Prisma.Decimal(unitBomCost),
-            totalBomCost: new Prisma.Decimal(unitBomCost * draft.unitsBuild),
-          },
-        })
-
-        // Create finished goods output
-        const defaultLocationId = await getDefaultLocationId(companyId)
-        await tx.finishedGoodsLine.create({
-          data: {
-            transactionId: id,
-            skuId: draft.skuId,
-            locationId: draft.locationId ?? defaultLocationId ?? '',
-            quantityChange: new Prisma.Decimal(draft.unitsBuild),
-            costPerUnit: new Prisma.Decimal(unitBomCost),
-          },
-        })
       } else if (draft.type === 'transfer' && draft.lines.length > 0) {
         // For transfers, create both outgoing and incoming lines
         const originalLine = draft.lines[0]
