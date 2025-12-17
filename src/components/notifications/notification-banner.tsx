@@ -7,7 +7,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Bell, X, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Bell, X, AlertCircle, CheckCircle, Info, AlertTriangle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -25,6 +26,45 @@ interface Notification {
   createdAt: string
   relatedType?: string
   relatedId?: string
+}
+
+/**
+ * Get the navigation link for a notification based on its related type and ID.
+ * Returns null if no link is available.
+ */
+function getNotificationLink(relatedType?: string, relatedId?: string): string | null {
+  if (!relatedType || !relatedId) return null
+
+  switch (relatedType) {
+    case 'sync_log':
+      // Navigate to integrations page which shows sync history
+      return '/integrations'
+    case 'credential':
+      // Navigate to integrations page where credentials are managed
+      return '/integrations'
+    default:
+      return null
+  }
+}
+
+/**
+ * Get severity-based background and border styles for notification items.
+ * Uses left border accent and subtle background colors with dark mode support.
+ */
+function getSeverityStyles(type: Notification['type']): string {
+  switch (type) {
+    case 'sync_failure':
+      return 'border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20'
+    case 'alert':
+      return 'border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20'
+    case 'warning':
+      return 'border-l-4 border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20'
+    case 'sync_success':
+      return 'border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
+    case 'info':
+    default:
+      return 'border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
+  }
 }
 
 export function NotificationBanner() {
@@ -188,17 +228,34 @@ export function NotificationBanner() {
               <div
                 key={notification.id}
                 className={`p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors ${
-                  !notification.isRead ? 'bg-muted/30' : ''
-                }`}
+                  getSeverityStyles(notification.type)
+                } ${!notification.isRead ? 'ring-1 ring-inset ring-primary/20' : 'opacity-75'}`}
                 onClick={() => !notification.isRead && handleMarkRead(notification.id)}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5">{getIcon(notification.type)}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm font-medium ${!notification.isRead ? 'font-semibold' : ''}`}>
-                        {notification.title}
-                      </p>
+                      {(() => {
+                        const link = getNotificationLink(notification.relatedType, notification.relatedId)
+                        return link ? (
+                          <Link
+                            href={link}
+                            className={`text-sm font-medium hover:underline flex items-center gap-1 ${!notification.isRead ? 'font-semibold' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setOpen(false)
+                            }}
+                          >
+                            {notification.title}
+                            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                          </Link>
+                        ) : (
+                          <p className={`text-sm font-medium ${!notification.isRead ? 'font-semibold' : ''}`}>
+                            {notification.title}
+                          </p>
+                        )
+                      })()}
                       <Button
                         variant="ghost"
                         size="icon"
