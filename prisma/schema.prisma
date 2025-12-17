@@ -149,6 +149,8 @@ model User {
   notifications       Notification[]
 }
 
+// Note: Partial unique index "one_primary_company_per_user" enforces one isPrimary=true per userId
+// Created via raw SQL migration (Prisma doesn't support partial unique indexes in schema)
 model UserCompany {
   id         String   @id @default(uuid())
   userId     String
@@ -156,9 +158,8 @@ model UserCompany {
   companyId  String
   company    Company  @relation("UserCompanies", fields: [companyId], references: [id], onDelete: Cascade)
   role       UserRole @default(ops)
-  isPrimary  Boolean  @default(false) // Designates user's default company
+  isPrimary  Boolean  @default(false) // Designates user's default company (enforced by DB constraint)
   assignedAt DateTime @default(now())
-  // Note: Application logic enforces one isPrimary=true per userId
 
   @@unique([userId, companyId])
   @@index([userId])
