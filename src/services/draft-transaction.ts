@@ -23,6 +23,7 @@ function transformDraftTransaction(tx: Prisma.TransactionGetPayload<{
     toLocation: { select: { id: true; name: true } }
     createdBy: { select: { id: true; name: true } }
     reviewedBy: { select: { id: true; name: true } }
+    deletedBy: { select: { id: true; name: true } }
     lines: {
       include: {
         component: { select: { id: true; name: true; skuCode: true } }
@@ -55,6 +56,8 @@ function transformDraftTransaction(tx: Prisma.TransactionGetPayload<{
     createdBy: tx.createdBy,
     reviewedAt: tx.reviewedAt?.toISOString() ?? null,
     reviewedBy: tx.reviewedBy,
+    deletedAt: tx.deletedAt?.toISOString() ?? null,
+    deletedBy: tx.deletedBy,
     lines: tx.lines.map((line) => ({
       id: line.id,
       component: line.component,
@@ -81,6 +84,7 @@ const draftInclude = {
   toLocation: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true } },
   reviewedBy: { select: { id: true, name: true } },
+  deletedBy: { select: { id: true, name: true } },
   lines: {
     include: {
       component: { select: { id: true, name: true, skuCode: true } },
@@ -245,6 +249,7 @@ export async function getDraftTransactions(params: {
   const where: Prisma.TransactionWhereInput = {
     companyId,
     status,
+    deletedAt: null,  // Exclude soft-deleted drafts
     ...(type && { type: type as Prisma.TransactionWhereInput['type'] }),
   }
 
@@ -278,6 +283,7 @@ export async function getDraftTransaction(params: {
     where: {
       id,
       companyId,
+      deletedAt: null,  // Exclude soft-deleted drafts
     },
     include: draftInclude,
   })
@@ -297,6 +303,7 @@ export async function getDraftCount(companyId: string): Promise<number> {
     where: {
       companyId,
       status: 'draft',
+      deletedAt: null,  // Exclude soft-deleted drafts
     },
   })
 }
@@ -358,20 +365,23 @@ export async function updateDraftTransaction(params: {
 // =============================================================================
 
 /**
- * Delete a draft transaction (only if still in draft status)
+ * Soft delete a draft transaction (only if still in draft status)
+ * Sets deletedAt timestamp and deletedById for audit trail
  */
 export async function deleteDraftTransaction(params: {
   id: string
   companyId: string
+  deletedById: string  // Required for audit trail
 }): Promise<void> {
-  const { id, companyId } = params
+  const { id, companyId, deletedById } = params
 
-  // Verify the draft exists and is still in draft status
+  // Verify the draft exists, is still in draft status, and not already soft-deleted
   const existing = await prisma.transaction.findFirst({
     where: {
       id,
       companyId,
       status: 'draft',
+      deletedAt: null,  // Ensure not already soft-deleted
     },
   })
 
@@ -379,9 +389,13 @@ export async function deleteDraftTransaction(params: {
     throw new Error('Draft transaction not found or already processed')
   }
 
-  // Delete the transaction (cascade will delete lines)
-  await prisma.transaction.delete({
+  // Soft delete: set deletedAt timestamp and deletedById for audit trail
+  await prisma.transaction.update({
     where: { id },
+    data: {
+      deletedAt: new Date(),
+      deletedById,
+    },
   })
 }
 

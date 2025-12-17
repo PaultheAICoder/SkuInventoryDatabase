@@ -264,4 +264,162 @@ describe('Draft Transactions API - selectedCompanyId Validation (Issue #287)', (
       expect(json.message).toContain('No company selected')
     })
   })
+
+  // ===========================================================================
+  // Soft Delete Tests (Issue #308)
+  // ===========================================================================
+
+  describe('Soft Delete - DELETE /api/transactions/drafts/[id]', () => {
+    it('soft deletes draft instead of hard deleting', async () => {
+    setTestSession(TEST_SESSIONS.admin!)
+    const prisma = getIntegrationPrisma()
+    const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+    // Create a draft
+    const createRequest = new Request('http://localhost/api/transactions/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'receipt',
+        date: toLocalDateString(new Date()),
+        componentId: component.id,
+        quantity: 100,
+        supplier: 'Test Supplier',
+      }),
+    })
+    const createResponse = await createDraft(createRequest as never)
+    expect(createResponse.status).toBe(201)
+    const { data: draft } = await createResponse.json()
+
+    // Delete the draft
+    const deleteRequest = createTestRequest(`/api/transactions/drafts/${draft.id}`)
+    const params = { params: Promise.resolve({ id: draft.id }) }
+    const deleteResponse = await deleteDraft(deleteRequest, params)
+
+    expect(deleteResponse.status).toBe(200)
+
+    // Verify soft delete: record still exists with deletedAt set
+    const deletedRecord = await prisma.transaction.findUnique({
+      where: { id: draft.id },
+    })
+    expect(deletedRecord).not.toBeNull()
+    expect(deletedRecord!.deletedAt).not.toBeNull()
+    expect(deletedRecord!.deletedById).toBe(TEST_SESSIONS.admin!.user.id)
+  })
+
+  it('excludes soft-deleted drafts from list', async () => {
+    setTestSession(TEST_SESSIONS.admin!)
+    const prisma = getIntegrationPrisma()
+    const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+    // Create a draft
+    const createRequest = new Request('http://localhost/api/transactions/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'receipt',
+        date: toLocalDateString(new Date()),
+        componentId: component.id,
+        quantity: 50,
+      }),
+    })
+    const createResponse = await createDraft(createRequest as never)
+    const { data: draft } = await createResponse.json()
+
+    // Soft delete it
+    await prisma.transaction.update({
+      where: { id: draft.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: TEST_SESSIONS.admin!.user.id,
+      },
+    })
+
+    // Fetch drafts list
+    const listResponse = await getDrafts(createTestRequest('/api/transactions/drafts'))
+    const { data: drafts } = await listResponse.json()
+
+    // Soft-deleted draft should NOT appear in list
+    expect(drafts.find((d: { id: string }) => d.id === draft.id)).toBeUndefined()
+  })
+
+  it('excludes soft-deleted drafts from count', async () => {
+    setTestSession(TEST_SESSIONS.admin!)
+    const prisma = getIntegrationPrisma()
+    const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+    // Get initial count
+    const initialCountResponse = await getDraftCount(createTestRequest('/api/transactions/drafts/count'))
+    const { count: initialCount } = await initialCountResponse.json()
+
+    // Create a draft
+    const createRequest = new Request('http://localhost/api/transactions/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'receipt',
+        date: toLocalDateString(new Date()),
+        componentId: component.id,
+        quantity: 25,
+      }),
+    })
+    const createResponse = await createDraft(createRequest as never)
+    const { data: draft } = await createResponse.json()
+
+    // Verify count increased
+    const afterCreateResponse = await getDraftCount(createTestRequest('/api/transactions/drafts/count'))
+    const { count: afterCreateCount } = await afterCreateResponse.json()
+    expect(afterCreateCount).toBe(initialCount + 1)
+
+    // Soft delete it
+    await prisma.transaction.update({
+      where: { id: draft.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: TEST_SESSIONS.admin!.user.id,
+      },
+    })
+
+    // Verify count decreased
+    const afterDeleteResponse = await getDraftCount(createTestRequest('/api/transactions/drafts/count'))
+    const { count: afterDeleteCount } = await afterDeleteResponse.json()
+    expect(afterDeleteCount).toBe(initialCount)
+  })
+
+  it('returns 404 when trying to get a soft-deleted draft', async () => {
+    setTestSession(TEST_SESSIONS.admin!)
+    const prisma = getIntegrationPrisma()
+    const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)
+
+    // Create and soft-delete a draft
+    const createRequest = new Request('http://localhost/api/transactions/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'receipt',
+        date: toLocalDateString(new Date()),
+        componentId: component.id,
+        quantity: 75,
+      }),
+    })
+    const createResponse = await createDraft(createRequest as never)
+    const { data: draft } = await createResponse.json()
+
+    // Soft delete it
+    await prisma.transaction.update({
+      where: { id: draft.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: TEST_SESSIONS.admin!.user.id,
+      },
+    })
+
+    // Try to fetch the soft-deleted draft
+    const getRequest = createTestRequest(`/api/transactions/drafts/${draft.id}`)
+    const params = { params: Promise.resolve({ id: draft.id }) }
+    const getResponse = await getDraft(getRequest, params)
+
+    expect(getResponse.status).toBe(404)
+    })
+  })
 })

@@ -133,6 +133,7 @@ export async function DELETE(
     await deleteDraftTransaction({
       id,
       companyId: selectedCompanyId,
+      deletedById: session.user.id,  // Pass user ID for audit trail
     })
 
     return NextResponse.json({ message: 'Draft deleted successfully' })
