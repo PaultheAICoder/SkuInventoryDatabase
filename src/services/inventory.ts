@@ -969,26 +969,6 @@ export async function createBuildTransaction(params: {
     )
   }
 
-  // Get BOM lines with component costs for snapshot
-  const bomLines = await prisma.bOMLine.findMany({
-    where: { bomVersionId },
-    include: {
-      component: {
-        select: {
-          id: true,
-          costPerUnit: true,
-        },
-      },
-    },
-  })
-
-  // Calculate unit BOM cost (snapshot at time of build)
-  const unitBomCost = bomLines.reduce((total, line) => {
-    return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
-  }, 0)
-
-  const totalBomCost = unitBomCost * unitsToBuild
-
   // Determine if we should output to finished goods (defaults to true)
   const shouldOutputFG = params.outputToFinishedGoods !== false
 
@@ -998,6 +978,27 @@ export async function createBuildTransaction(params: {
 
   // Use atomic transaction to create build transaction + finished goods line together
   const transactionResult = await prisma.$transaction(async (tx) => {
+    // Get BOM lines with component costs for snapshot - INSIDE transaction for atomicity
+    // This prevents race conditions where component costs could change between fetch and commit
+    const bomLines = await tx.bOMLine.findMany({
+      where: { bomVersionId },
+      include: {
+        component: {
+          select: {
+            id: true,
+            costPerUnit: true,
+          },
+        },
+      },
+    })
+
+    // Calculate unit BOM cost (snapshot at time of build)
+    const unitBomCost = bomLines.reduce((total, line) => {
+      return total + line.quantityPerUnit.toNumber() * line.component.costPerUnit.toNumber()
+    }, 0)
+
+    const totalBomCost = unitBomCost * unitsToBuild
+
     // Validate output location if we're outputting FG
     let outputLocation: { id: string; name: string } | null = null
     if (shouldOutputFG && outputLocationIdToUse) {

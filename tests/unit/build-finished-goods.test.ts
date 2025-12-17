@@ -135,6 +135,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
   }
 
   // Helper to create mock transaction client with lot support
+  // Now includes bOMLine since it's fetched inside the transaction for atomicity (Issue #296)
   function createMockTxClient(overrides: {
     locationResult?: { id: string; name: string } | null
     finishedGoodsCallback?: () => void
@@ -143,6 +144,9 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       ? null
       : overrides.locationResult ?? { id: mockLocationId, name: 'Main Warehouse' }
     return {
+      bOMLine: {
+        findMany: vi.fn().mockResolvedValue(mockBomLines), // BOM lines now fetched inside transaction
+      },
       location: {
         findFirst: vi.fn().mockResolvedValue(locationValue),
       },
@@ -243,6 +247,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
+          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
           location: {
             findFirst: vi.fn().mockResolvedValue({
               id: mockOutputLocationId,
@@ -283,6 +288,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
+          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
           location: {
             findFirst: vi.fn().mockResolvedValue({
               id: mockLocationId,
@@ -328,6 +334,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
+          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
           location: {
             findFirst: vi.fn().mockResolvedValue(null),
           },
@@ -368,6 +375,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
+          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
           location: {
             findFirst: vi.fn().mockResolvedValue({
               id: mockLocationId,
@@ -409,6 +417,7 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
 
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         const tx = {
+          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
           location: {
             findFirst: vi.fn().mockResolvedValue({
               id: mockLocationId,

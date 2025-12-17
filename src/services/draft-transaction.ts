@@ -383,25 +383,25 @@ export async function approveDraftTransaction(params: {
   }
 
   try {
-    // For build transactions, re-validate inventory availability
-    if (draft.type === 'build' && draft.bomVersionId && draft.unitsBuild) {
-      const insufficientItems = await checkInsufficientInventory({
-        bomVersionId: draft.bomVersionId,
-        companyId,
-        unitsToBuild: draft.unitsBuild,
-        locationId: draft.locationId ?? undefined,
-      })
-
-      if (insufficientItems.length > 0) {
-        return {
-          success: false,
-          error: `Insufficient inventory for: ${insufficientItems.map((i) => i.componentName).join(', ')}`,
-        }
-      }
-    }
-
     // Use a Prisma transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
+      // For build transactions, re-validate inventory availability INSIDE transaction
+      // This prevents race conditions where inventory could become insufficient after check but before approval
+      if (draft.type === 'build' && draft.bomVersionId && draft.unitsBuild) {
+        const insufficientItems = await checkInsufficientInventory({
+          bomVersionId: draft.bomVersionId,
+          companyId,
+          unitsToBuild: draft.unitsBuild,
+          locationId: draft.locationId ?? undefined,
+        })
+
+        if (insufficientItems.length > 0) {
+          throw new Error(
+            `Insufficient inventory for: ${insufficientItems.map((i) => i.componentName).join(', ')}`
+          )
+        }
+      }
+
       // Mark the draft as approved first
       const approvedDraft = await tx.transaction.update({
         where: { id },
