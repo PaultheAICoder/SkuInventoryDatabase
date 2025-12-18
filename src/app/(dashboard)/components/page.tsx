@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Button } from '@/components/ui/button'
 import { ComponentTable } from '@/components/features/ComponentTable'
@@ -149,7 +149,8 @@ export default async function ComponentsPage({ searchParams }: PageProps) {
     locationId: params.locationId,
   })
 
-  const canCreate = session.user.role !== 'viewer'
+  const companyRole = getSelectedCompanyRole(session)
+  const canCreate = companyRole !== 'viewer'
 
   return (
     <div className="space-y-6">

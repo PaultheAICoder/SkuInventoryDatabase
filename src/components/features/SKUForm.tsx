@@ -123,6 +123,11 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
         notes: formData.notes || null,
       }
 
+      // Include version for optimistic locking when editing
+      if (isEditing && sku.version !== undefined) {
+        body.version = sku.version
+      }
+
       // Include BOM lines only for new SKUs if any selected
       if (!isEditing && selectedBomLines.length > 0) {
         body.bomLines = selectedBomLines
@@ -137,6 +142,19 @@ export function SKUForm({ sku, onSuccess }: SKUFormProps) {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         const parsed = parseApiError(data)
+
+        // Check for version conflict error
+        if (data.error === 'VersionConflict') {
+          setError(parsed.message)
+          toast.error('Version conflict', {
+            description: 'This SKU has been modified by another user. Please refresh and try again.',
+            action: {
+              label: 'Refresh',
+              onClick: () => window.location.reload(),
+            },
+          })
+          return
+        }
 
         setFieldErrors(parsed.fieldErrors)
         setError(parsed.message)

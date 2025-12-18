@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpDown, Search, ChevronLeft, ChevronRight, Package } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
 import { LocationFilter } from './LocationFilter'
 import { LimitingComponentsPopover } from './LimitingComponentsPopover'
 import type { SKUResponse } from '@/types/sku'
@@ -165,8 +166,16 @@ export function SKUTable({ skus, total, page, pageSize, locationId }: SKUTablePr
           <TableBody>
             {skus.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  No SKUs found.
+                <TableCell colSpan={7} className="p-0">
+                  <EmptyState
+                    icon={Package}
+                    title="No SKUs found"
+                    description="Get started by creating your first SKU to track your sellable products."
+                    action={{
+                      label: "Create SKU",
+                      href: "/skus/new"
+                    }}
+                  />
                 </TableCell>
               </TableRow>
             ) : (

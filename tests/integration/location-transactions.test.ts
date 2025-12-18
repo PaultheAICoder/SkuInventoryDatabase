@@ -16,6 +16,7 @@ import {
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
 import { DEFAULT_SETTINGS } from '@/types/settings'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers
 import { POST as createReceipt } from '@/app/api/transactions/receipt/route'
@@ -68,7 +69,7 @@ describe('Location-Aware Transactions', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: secondLocation.id,
         },
       })
@@ -114,7 +115,7 @@ describe('Location-Aware Transactions', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           // No locationId specified
         },
       })
@@ -153,7 +154,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: loc1.id,
           },
         })
@@ -165,7 +166,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: loc2.id,
           },
         })
@@ -178,7 +179,7 @@ describe('Location-Aware Transactions', () => {
           componentId: component.id,
           quantity: -30,
           reason: 'Damaged goods',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: loc1.id,
         },
       })
@@ -225,7 +226,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: location.id,
           },
         })
@@ -259,7 +260,7 @@ describe('Location-Aware Transactions', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: location.id,
         },
       })
@@ -301,7 +302,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: consumeLocation.id,
           },
         })
@@ -335,7 +336,7 @@ describe('Location-Aware Transactions', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: consumeLocation.id,
           outputLocationId: outputLocation.id,
           outputQuantity: 10,
@@ -393,7 +394,7 @@ describe('Location-Aware Transactions', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: location.id,
         },
       })
@@ -410,7 +411,7 @@ describe('Location-Aware Transactions', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           locationId: location.id,
           allowInsufficientInventory: true,
         },
@@ -442,7 +443,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: sourceLocation.id,
           },
         })
@@ -456,7 +457,7 @@ describe('Location-Aware Transactions', () => {
           quantity: 30,
           fromLocationId: sourceLocation.id,
           toLocationId: destLocation.id,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -501,7 +502,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 50,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: sourceLocation.id,
           },
         })
@@ -515,7 +516,7 @@ describe('Location-Aware Transactions', () => {
           quantity: 100,
           fromLocationId: sourceLocation.id,
           toLocationId: destLocation.id,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -542,7 +543,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: location.id,
           },
         })
@@ -556,7 +557,7 @@ describe('Location-Aware Transactions', () => {
           quantity: 30,
           fromLocationId: location.id,
           toLocationId: location.id, // Same location
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -587,7 +588,7 @@ describe('Location-Aware Transactions', () => {
             componentId: component.id,
             quantity: 100,
             supplier: 'Test',
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             locationId: sourceLocation.id,
           },
         })
@@ -601,7 +602,7 @@ describe('Location-Aware Transactions', () => {
             quantity: 25,
             fromLocationId: sourceLocation.id,
             toLocationId: destLocation.id,
-            date: new Date().toISOString().split('T')[0],
+            date: toLocalDateString(new Date()),
             notes: 'Test transfer',
           },
         })

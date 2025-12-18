@@ -14,6 +14,7 @@ import { prisma } from '@/lib/db'
 import { createBuildTransaction, getCompanySettings, checkInsufficientInventory } from './inventory'
 import type { PostOrderResult, PostingError } from '@/types/order-posting'
 import type { InsufficientInventoryItem } from './inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Aggregated SKU line item from order
@@ -212,7 +213,7 @@ export async function postShopifyOrder(params: {
       preCheckErrors.push({
         skuId: sku.skuId,
         skuName: sku.skuName,
-        message: `No BOM version effective on ${order.orderDate.toISOString().split('T')[0]}`,
+        message: `No BOM version effective on ${toLocalDateString(order.orderDate)}`,
         code: 'NO_BOM',
       })
       continue

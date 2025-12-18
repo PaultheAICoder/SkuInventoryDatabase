@@ -7,6 +7,7 @@ import type {
   FuzzyMatchResult,
   RawClaudeParseResponse,
 } from '@/types/parser'
+import { toLocalDateString } from '@/lib/utils'
 
 // Initialize client lazily to handle missing API key gracefully
 let client: Anthropic | null = null
@@ -95,7 +96,7 @@ function parseClaudeResponse(response: string): RawClaudeParseResponse | null {
       item: parsed.item,
       quantity: parsed.quantity,
       channel: parsed.channel || null,
-      date: parsed.date || new Date().toISOString().split('T')[0],
+      date: parsed.date || toLocalDateString(new Date()),
       supplier: parsed.supplier || null,
       notes: parsed.notes || null,
     }
@@ -337,7 +338,7 @@ export async function parseTransactionText(
   }
 
   try {
-    const today = new Date().toISOString().split('T')[0]
+    const today = toLocalDateString(new Date())
     const systemPrompt = buildParsePrompt()
 
     const message = await anthropic.messages.create({

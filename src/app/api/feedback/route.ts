@@ -59,16 +59,26 @@ export async function POST(request: NextRequest) {
       return parseError
     }
 
-    const { type, description, answers } = data
-
-    // Use Claude Code to enhance the issue
+    // Use Claude Code to enhance the issue with all structured fields
     const enhanced = await enhanceIssueWithClaudeCode({
-      type,
-      description,
-      answers,
+      type: data.type,
+      pageUrl: data.pageUrl,
+      title: data.title,
+      // Bug fields
+      expectedBehavior: data.expectedBehavior,
+      actualBehavior: data.actualBehavior,
+      stepsToReproduce: data.stepsToReproduce,
+      screenshotUrl: data.screenshotUrl,
+      // Feature fields
+      whoBenefits: data.whoBenefits,
+      desiredAction: data.desiredAction,
+      businessValue: data.businessValue,
+      // Answers
+      answers: data.answers,
     })
 
-    const title = enhanced.title
+    // Use the user-provided title as fallback if Claude doesn't generate one
+    const title = enhanced.title || data.title
 
     // Add submitter information to the issue body
     const submitterInfo = `## Submitter Information
@@ -87,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Label based on type
-    const label = type === 'bug' ? 'bug' : 'enhancement'
+    const label = data.type === 'bug' ? 'bug' : 'enhancement'
 
     // Create GitHub issue using Octokit REST API
     // Note: We use GITHUB_API_TOKEN (not GITHUB_TOKEN) to avoid conflicts with gh CLI auth

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { AlertTriangle, Package } from 'lucide-react'
 import type { InsufficientInventoryItem } from '@/types/transaction'
+import { toLocalDateString } from '@/lib/utils'
 
 // Sentinel value for "no selection" in Select components
 // Radix UI Select requires non-empty string values
@@ -79,7 +80,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
   const [canOverrideExpired, setCanOverrideExpired] = useState(false)
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     skuId: preselectedSkuId || '',
     unitsToBuild: '',
     salesChannel: '',
@@ -235,7 +236,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           setCanOverrideExpired(data.canOverride === true)
           return
         }
-        throw new Error(data?.error || 'Failed to record build')
+        throw new Error(data?.message || data?.error || 'Failed to record build')
       }
 
       // Show warning if build succeeded with insufficient inventory
@@ -249,7 +250,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
 
       // Reset form
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: toLocalDateString(new Date()),
         skuId: '',
         unitsToBuild: '',
         salesChannel: '',

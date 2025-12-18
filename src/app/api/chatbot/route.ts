@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { chatRequestSchema } from '@/types/chatbot'
 import { sendChatMessage } from '@/lib/chatbot'
 
@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Admin-only access
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

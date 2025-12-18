@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import {
@@ -21,6 +21,7 @@ import {
   getCompanySettings,
 } from '@/services/inventory'
 import { calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -54,7 +55,7 @@ async function calculateComponentTrend(
   let runningTotal = 0
 
   for (const line of transactionLines) {
-    const dateStr = line.transaction.date.toISOString().split('T')[0]
+    const dateStr = toLocalDateString(line.transaction.date)
     runningTotal += line.quantityChange.toNumber()
     dailyTotals.set(dateStr, runningTotal)
   }
@@ -82,7 +83,7 @@ async function calculateComponentTrend(
   const currentDate = new Date(startDate)
 
   while (currentDate <= today) {
-    const dateStr = currentDate.toISOString().split('T')[0]
+    const dateStr = toLocalDateString(currentDate)
 
     // Check if we have data for this date
     if (dailyTotals.has(dateStr)) {
@@ -98,7 +99,7 @@ async function calculateComponentTrend(
   }
 
   // Ensure we include today if not already included
-  const todayStr = today.toISOString().split('T')[0]
+  const todayStr = toLocalDateString(today)
   const lastEntry = trend[trend.length - 1]
   if (lastEntry && lastEntry.date !== todayStr) {
     if (dailyTotals.has(todayStr)) {
@@ -261,6 +262,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return unauthorized()
     }
 
+    // Non-viewer role required for update operations
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
+      return unauthorized('Insufficient permissions')
+    }
+
     const { id } = await params
 
     // Use selected company for scoping
@@ -359,6 +366,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
+    }
+
+    // Non-viewer role required for delete operations
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
+      return unauthorized('Insufficient permissions')
     }
 
     const { id } = await params

@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
+import { toLocalDateString } from '@/lib/utils'
 
 vi.mock('@/lib/db', () => ({
   prisma: {
@@ -183,8 +184,8 @@ describe('calculateReorderRecommendation', () => {
     // Reorder date should be runoutDate - leadTimeDays (7 days before runout)
     const expectedReorderDate = new Date(runoutDate)
     expectedReorderDate.setDate(expectedReorderDate.getDate() - 7)
-    expect(result.recommendedReorderDate?.toISOString().split('T')[0]).toBe(
-      expectedReorderDate.toISOString().split('T')[0]
+    expect(result.recommendedReorderDate ? toLocalDateString(result.recommendedReorderDate) : null).toBe(
+      toLocalDateString(expectedReorderDate)
     )
   })
 

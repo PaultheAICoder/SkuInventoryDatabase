@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { DefectAnalyticsDashboard } from '@/components/features/DefectAnalyticsDashboard'
 
 export const metadata = {
@@ -14,5 +14,7 @@ export default async function DefectAnalyticsPage() {
     redirect('/login')
   }
 
-  return <DefectAnalyticsDashboard userRole={session.user.role} />
+  // Use company-specific role if available, fall back to legacy role
+  const companyRole = getSelectedCompanyRole(session) ?? session.user.role
+  return <DefectAnalyticsDashboard userRole={companyRole} />
 }

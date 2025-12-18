@@ -3,13 +3,33 @@ import { z } from 'zod'
 // Feedback type enum
 export type FeedbackType = 'bug' | 'feature'
 
-// Feedback dialog step enum
-export type FeedbackStep = 'select-type' | 'describe' | 'clarify' | 'submitting' | 'success' | 'error'
+// Feedback dialog step enum - updated to use structured-fields instead of describe
+export type FeedbackStep = 'select-type' | 'structured-fields' | 'clarify' | 'submitting' | 'success' | 'error'
 
-// Clarify request schema
+// Who Benefits options for feature requests
+export const WHO_BENEFITS_OPTIONS = [
+  'All Users',
+  'Administrators',
+  'Data Entry Staff',
+  'Analysts',
+  'Other'
+] as const
+export type WhoBenefitsOption = typeof WHO_BENEFITS_OPTIONS[number]
+
+// Clarify request schema - accepts structured fields instead of just description
 export const clarifyRequestSchema = z.object({
   type: z.enum(['bug', 'feature']),
-  description: z.string().min(10, 'Description must be at least 10 characters').max(2000),
+  pageUrl: z.string().url().optional(),
+  title: z.string().min(5, 'Title must be at least 5 characters').max(255),
+  // Bug-specific fields (all optional, validated based on type)
+  expectedBehavior: z.string().min(10).max(2000).optional(),
+  actualBehavior: z.string().min(10).max(2000).optional(),
+  stepsToReproduce: z.string().min(10).max(2000).optional(),
+  screenshotUrl: z.string().url().optional().or(z.literal('')),
+  // Feature-specific fields
+  whoBenefits: z.string().optional(),
+  desiredAction: z.string().min(10).max(2000).optional(),
+  businessValue: z.string().min(10).max(2000).optional(),
 })
 
 export type ClarifyRequestInput = z.infer<typeof clarifyRequestSchema>
@@ -19,11 +39,22 @@ export interface ClarifyResponse {
   questions: string[]
 }
 
-// Submit feedback request schema
+// Submit feedback request schema - includes structured fields and 2-3 answers
 export const submitFeedbackSchema = z.object({
   type: z.enum(['bug', 'feature']),
-  description: z.string().min(10).max(2000),
-  answers: z.array(z.string()).length(3, 'Must provide exactly 3 answers'),
+  pageUrl: z.string().url().optional(),
+  title: z.string().min(5).max(255),
+  // Bug fields
+  expectedBehavior: z.string().optional(),
+  actualBehavior: z.string().optional(),
+  stepsToReproduce: z.string().optional(),
+  screenshotUrl: z.string().optional(),
+  // Feature fields
+  whoBenefits: z.string().optional(),
+  desiredAction: z.string().optional(),
+  businessValue: z.string().optional(),
+  // AI clarification answers (2-3 questions)
+  answers: z.array(z.string()).min(2, 'Must provide at least 2 answers').max(3, 'Must provide at most 3 answers'),
 })
 
 export type SubmitFeedbackInput = z.infer<typeof submitFeedbackSchema>

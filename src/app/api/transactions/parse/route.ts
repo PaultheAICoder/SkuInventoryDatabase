@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, serverError, parseBody } from '@/lib/api-response'
 import {
@@ -22,7 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Check role - Viewer cannot create transactions
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return unauthorized('You do not have permission to create transactions')
     }
 

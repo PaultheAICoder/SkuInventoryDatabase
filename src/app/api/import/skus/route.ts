@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { success, unauthorized, serverError, error } from '@/lib/api-response'
 import { processSKUImport, type ImportSummary, type SKUImportWithLookups } from '@/services/import'
@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Only ops and admin can import
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return unauthorized('Viewers cannot import data')
     }
 

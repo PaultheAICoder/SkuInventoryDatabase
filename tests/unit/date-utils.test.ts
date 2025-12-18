@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseLocalDate, formatDateString } from '@/lib/utils'
+import { parseLocalDate, formatDateString, toLocalDateString } from '@/lib/utils'
 
 describe('parseLocalDate', () => {
   it('should parse date-only string as local midnight, not UTC', () => {
@@ -149,5 +149,57 @@ describe('formatDateString', () => {
 
     // The formatted string should always show day 8 in local time
     expect(result).toContain('8')
+  })
+})
+
+describe('toLocalDateString', () => {
+  it('should format date as YYYY-MM-DD in local timezone', () => {
+    // Create date explicitly in local timezone
+    const date = new Date(2025, 11, 8) // Dec 8, 2025, local midnight
+    const result = toLocalDateString(date)
+    expect(result).toBe('2025-12-08')
+  })
+
+  it('should NOT shift date to previous day like toISOString does', () => {
+    // This is the bug we're fixing
+    // new Date(2025, 11, 8) at local midnight
+    const date = new Date(2025, 11, 8, 0, 0, 0)
+    const localResult = toLocalDateString(date)
+
+    // Should always be Dec 8 regardless of timezone
+    expect(localResult).toBe('2025-12-08')
+
+    // Note: toISOString().split('T')[0] would give '2025-12-07' in PST
+    // because it converts to UTC first
+  })
+
+  it('should handle single-digit months and days with padding', () => {
+    const date = new Date(2025, 0, 5) // Jan 5, 2025
+    const result = toLocalDateString(date)
+    expect(result).toBe('2025-01-05')
+  })
+
+  it('should handle end of year', () => {
+    const date = new Date(2025, 11, 31) // Dec 31, 2025
+    const result = toLocalDateString(date)
+    expect(result).toBe('2025-12-31')
+  })
+
+  it('should handle start of year', () => {
+    const date = new Date(2025, 0, 1) // Jan 1, 2025
+    const result = toLocalDateString(date)
+    expect(result).toBe('2025-01-01')
+  })
+
+  it('should handle leap year Feb 29', () => {
+    const date = new Date(2024, 1, 29) // Feb 29, 2024
+    const result = toLocalDateString(date)
+    expect(result).toBe('2024-02-29')
+  })
+
+  it('should handle dates with non-zero time components', () => {
+    const date = new Date(2025, 11, 8, 23, 59, 59) // 11:59:59 PM
+    const result = toLocalDateString(date)
+    expect(result).toBe('2025-12-08') // Still Dec 8
   })
 })

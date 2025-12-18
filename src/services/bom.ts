@@ -4,6 +4,16 @@ import { getComponentQuantities } from './inventory'
 import type { LimitingComponent } from '@/types/sku'
 
 /**
+ * Custom error for version conflicts in optimistic locking
+ */
+export class VersionConflictError extends Error {
+  constructor(_resource: string = 'Record') {
+    super('VERSION_CONFLICT')
+    this.name = 'VersionConflictError'
+  }
+}
+
+/**
  * Calculate the unit cost of a BOM version by summing component costs * quantities
  */
 export async function calculateBOMUnitCost(bomVersionId: string, companyId: string): Promise<number> {
@@ -467,6 +477,9 @@ export async function activateBOMVersion(bomVersionId: string, companyId: string
 
 /**
  * Update a BOM version's details and optionally its lines
+ *
+ * @throws VersionConflictError if version mismatch detected
+ * @throws Error with 'BOM version not found' if BOM doesn't exist
  */
 export async function updateBOMVersion(params: {
   bomVersionId: string
@@ -481,8 +494,9 @@ export async function updateBOMVersion(params: {
     quantityPerUnit: number
     notes?: string | null
   }>
+  version?: number // Optimistic locking version
 }) {
-  const { bomVersionId, companyId, lines, ...updateData } = params
+  const { bomVersionId, companyId, lines, version: expectedVersion, ...updateData } = params
 
   return prisma.$transaction(async (tx) => {
     // Check if BOM version exists and belongs to company
@@ -491,10 +505,16 @@ export async function updateBOMVersion(params: {
         id: bomVersionId,
         sku: { companyId },
       },
+      select: { id: true, version: true },
     })
 
     if (!existing) {
       throw new Error('BOM version not found')
+    }
+
+    // Check version for optimistic locking
+    if (expectedVersion !== undefined && existing.version > expectedVersion) {
+      throw new VersionConflictError('BOM version')
     }
 
     // If lines are provided, delete existing and recreate
@@ -513,7 +533,7 @@ export async function updateBOMVersion(params: {
       })
     }
 
-    // Update BOM version metadata
+    // Update BOM version metadata with version increment
     const updated = await tx.bOMVersion.update({
       where: { id: bomVersionId },
       data: {
@@ -524,6 +544,7 @@ export async function updateBOMVersion(params: {
         ...(updateData.qualityMetadata !== undefined && {
           qualityMetadata: updateData.qualityMetadata as Prisma.InputJsonValue
         }),
+        version: { increment: 1 },
       },
       include: {
         lines: {

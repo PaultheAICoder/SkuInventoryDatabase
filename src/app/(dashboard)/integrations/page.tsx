@@ -16,6 +16,7 @@ import { SyncHistory } from '@/components/integrations/sync-history'
 import { CsvUpload } from '@/components/integrations/csv-upload'
 import { AsinMappingList } from '@/components/integrations/asin-mapping-list'
 import { AlertCircle, CheckCircle } from 'lucide-react'
+import { toLocalDateString } from '@/lib/utils'
 
 interface Brand {
   id: string
@@ -82,8 +83,8 @@ export default function IntegrationsPage() {
           credentialId,
           syncType: 'full',
           dateRange: {
-            startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            endDate: new Date().toISOString().split('T')[0],
+            startDate: toLocalDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+            endDate: toLocalDateString(new Date()),
           },
         }),
       })

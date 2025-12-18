@@ -14,6 +14,7 @@ import {
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
 import { DEFAULT_SETTINGS } from '@/types/settings'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { POST as createReceipt } from '@/app/api/transactions/receipt/route'
@@ -54,7 +55,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -83,7 +84,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           costPerUnit: 25.50,
           updateComponentCost: true,
         },
@@ -115,7 +116,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -137,7 +138,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 75,
           supplier: 'Ops Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -156,7 +157,7 @@ describe('Transaction Flows', () => {
           componentId: '00000000-0000-0000-0000-000000000000',
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -176,7 +177,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           lotNumber: 'LOT-001',
           expiryDate: '2025-12-31',
         },
@@ -196,7 +197,7 @@ describe('Transaction Flows', () => {
 
       expect(lot).toBeDefined()
       expect(lot?.lotNumber).toBe('LOT-001')
-      expect(lot?.expiryDate?.toISOString().split('T')[0]).toBe('2025-12-31')
+      expect(lot?.expiryDate ? toLocalDateString(lot.expiryDate) : null).toBe('2025-12-31')
       expect(Number(lot?.receivedQuantity)).toBe(50)
       expect(Number(lot?.balance?.quantity)).toBe(50)
     })
@@ -211,7 +212,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 25,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           // No lotNumber or expiryDate
         },
       })
@@ -241,7 +242,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Supplier A',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           lotNumber: 'LOT-MULTI',
           expiryDate: '2025-12-31',
         },
@@ -255,7 +256,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 30,
           supplier: 'Supplier B',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           lotNumber: 'LOT-MULTI',
           // Note: expiryDate not provided - should not update existing
         },
@@ -287,7 +288,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 25,
           reason: 'Found extra inventory',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -317,7 +318,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -329,7 +330,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: -30,
           reason: 'Damaged goods',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -358,7 +359,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: -10,
           reason: 'Cycle count correction',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -381,7 +382,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 10,
           reason: 'Test',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -408,7 +409,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -444,7 +445,7 @@ describe('Transaction Flows', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -501,7 +502,7 @@ describe('Transaction Flows', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -551,7 +552,7 @@ describe('Transaction Flows', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           allowInsufficientInventory: true,
         },
       })
@@ -606,7 +607,7 @@ describe('Transaction Flows', () => {
           skuId: sku.id,
           bomVersionId: bomVersion.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           allowInsufficientInventory: true,
         },
       })
@@ -631,7 +632,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -668,7 +669,7 @@ describe('Transaction Flows', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: today.toISOString().split('T')[0],
+          date: toLocalDateString(today),
         },
       })
 
@@ -693,7 +694,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -755,7 +756,7 @@ describe('Transaction Flows', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: twentyDaysAgo.toISOString().split('T')[0],
+          date: toLocalDateString(twentyDaysAgo),
         },
       })
 
@@ -817,7 +818,7 @@ describe('Transaction Flows', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           allowInsufficientInventory: true, // Bypass inventory check
         },
       })
@@ -843,7 +844,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -904,7 +905,7 @@ describe('Transaction Flows', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
 
@@ -937,7 +938,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -964,7 +965,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 25,
           supplier: 'Audit Test',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       const receiptResponse = await createReceipt(receiptRequest)
@@ -1014,7 +1015,7 @@ describe('Transaction Flows', () => {
           componentId: component.id,
           quantity: 100,
           supplier: 'Test',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createReceipt(receiptRequest)
@@ -1026,7 +1027,7 @@ describe('Transaction Flows', () => {
           skuId: sku.id,
           unitsToBuild: 5,
           salesChannel: 'Amazon',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       await createBuild(buildRequest)

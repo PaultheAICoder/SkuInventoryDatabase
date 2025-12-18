@@ -8,6 +8,7 @@ import type {
   DefectThresholdResponse,
   DefectAlertResponse,
 } from '@/types/alert'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Evaluate if a defect rate exceeds the configured threshold
@@ -144,7 +145,7 @@ export async function getDefectAlerts(
     createdAt: a.createdAt.toISOString(),
     transaction: {
       id: a.transaction.id,
-      date: a.transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(a.transaction.date),
       unitsBuild: a.transaction.unitsBuild ?? 0,
       defectCount: a.transaction.defectCount ?? 0,
     },
@@ -322,7 +323,7 @@ export async function getAlertById(
     createdAt: alert.createdAt.toISOString(),
     transaction: {
       id: alert.transaction.id,
-      date: alert.transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(alert.transaction.date),
       unitsBuild: alert.transaction.unitsBuild ?? 0,
       defectCount: alert.transaction.defectCount ?? 0,
     },

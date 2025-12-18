@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table'
 import { Plus, Trash2 } from 'lucide-react'
 import type { ComponentResponse } from '@/types/component'
-import { parseFractionOrNumber } from '@/lib/utils'
+import { parseFractionOrNumber, toLocalDateString } from '@/lib/utils'
 
 interface BOMLine {
   componentId: string
@@ -50,7 +50,7 @@ export function BOMVersionForm({ skuId, skuName, onSuccess }: BOMVersionFormProp
 
   const [formData, setFormData] = useState({
     versionName: '',
-    effectiveStartDate: new Date().toISOString().split('T')[0],
+    effectiveStartDate: toLocalDateString(new Date()),
     isActive: false,
     notes: '',
     defectNotes: '',

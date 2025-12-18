@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { getAuthUrl } from '@/services/shopify/client'
 import { storeOAuthState } from '@/services/shopify/oauth-state'
@@ -23,34 +23,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user's primary company
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
-    }
-
-    // Only admin can connect integrations
-    if (userCompany.role !== 'admin') {
+    // Admin only (using company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return NextResponse.json(
         { error: 'Only admins can connect integrations' },
         { status: 403 }
       )
     }
 
+    const companyId = session.user.selectedCompanyId
+
     // Check if already connected
     const existing = await prisma.shopifyConnection.findFirst({
       where: {
-        companyId: userCompany.companyId,
+        companyId,
         isActive: true,
       },
     })
@@ -79,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Store state with associated data
     storeOAuthState(state, {
       shop,
-      companyId: userCompany.companyId,
+      companyId,
       userId: session.user.id,
     })
 

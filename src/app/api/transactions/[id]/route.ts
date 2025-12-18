@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { updateTransaction, deleteTransaction } from '@/services/transaction-edit'
 import {
@@ -11,6 +11,7 @@ import {
   updateBuildSchema,
   updateOutboundSchema,
 } from '@/types/transaction-edit'
+import { toLocalDateString } from '@/lib/utils'
 
 export async function GET(
   request: NextRequest,
@@ -94,7 +95,7 @@ export async function GET(
       data: {
         id: transaction.id,
         type: transaction.type,
-        date: transaction.date.toISOString().split('T')[0],
+        date: toLocalDateString(transaction.date),
         company: transaction.company,
         sku: transaction.sku,
         bomVersion: transaction.bomVersion,
@@ -162,7 +163,8 @@ export async function PUT(
     }
 
     // Check role - Viewer cannot update transactions
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return NextResponse.json(
         { error: 'You do not have permission to update transactions' },
         { status: 403 }
@@ -300,7 +302,8 @@ export async function DELETE(
     }
 
     // Check role - Viewer cannot delete transactions
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return NextResponse.json(
         { error: 'You do not have permission to delete transactions' },
         { status: 403 }

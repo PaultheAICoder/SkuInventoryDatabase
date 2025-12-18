@@ -38,6 +38,13 @@ export interface TestUserSession {
     companyId: string
     companyName: string
     selectedCompanyId: string
+    selectedCompanyName: string
+    // Required for getSelectedCompanyRole() - must match session.user.companies structure
+    companies: Array<{ id: string; name: string; role?: string }>
+    companiesWithBrands: Array<{ id: string; name: string; role?: string; brands: Array<{ id: string; name: string }> }>
+    brands: Array<{ id: string; name: string }>
+    selectedBrandId: string | null
+    selectedBrandName: string | null
   }
 }
 
@@ -79,16 +86,20 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
     return
   }
 
-  const [admin, ops, viewer, company] = await Promise.all([
+  const [admin, ops, viewer, company, brand] = await Promise.all([
     prisma.user.findUnique({ where: { email: 'admin@tonsil.tech' } }),
     prisma.user.findUnique({ where: { email: 'ops@tonsil.tech' } }),
     prisma.user.findUnique({ where: { email: 'viewer@tonsil.tech' } }),
     prisma.company.findFirst({ where: { name: 'Tonsil Tech' } }),
+    prisma.brand.findFirst({ where: { company: { name: 'Tonsil Tech' }, isActive: true } }),
   ])
 
   if (!admin || !ops || !viewer || !company) {
     throw new Error('Test users or company not found. Run npm run db:seed first.')
   }
+
+  // Build brand arrays for session
+  const brandData = brand ? [{ id: brand.id, name: brand.name }] : []
 
   TEST_SESSIONS.admin = {
     user: {
@@ -99,6 +110,17 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       companyId: company.id,
       companyName: company.name,
       selectedCompanyId: company.id,
+      selectedCompanyName: company.name,
+      companies: [{ id: company.id, name: company.name, role: admin.role }],
+      companiesWithBrands: [{
+        id: company.id,
+        name: company.name,
+        role: admin.role,
+        brands: brandData,
+      }],
+      brands: brandData,
+      selectedBrandId: brand?.id ?? null,
+      selectedBrandName: brand?.name ?? null,
     },
   }
 
@@ -111,6 +133,17 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       companyId: company.id,
       companyName: company.name,
       selectedCompanyId: company.id,
+      selectedCompanyName: company.name,
+      companies: [{ id: company.id, name: company.name, role: ops.role }],
+      companiesWithBrands: [{
+        id: company.id,
+        name: company.name,
+        role: ops.role,
+        brands: brandData,
+      }],
+      brands: brandData,
+      selectedBrandId: brand?.id ?? null,
+      selectedBrandName: brand?.name ?? null,
     },
   }
 
@@ -123,6 +156,17 @@ export async function initializeTestSessions(prisma: PrismaClient): Promise<void
       companyId: company.id,
       companyName: company.name,
       selectedCompanyId: company.id,
+      selectedCompanyName: company.name,
+      companies: [{ id: company.id, name: company.name, role: viewer.role }],
+      companiesWithBrands: [{
+        id: company.id,
+        name: company.name,
+        role: viewer.role,
+        brands: brandData,
+      }],
+      brands: brandData,
+      selectedBrandId: brand?.id ?? null,
+      selectedBrandName: brand?.name ?? null,
     },
   }
 

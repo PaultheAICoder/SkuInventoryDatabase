@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { QuickEntryWrapper } from '@/components/features/QuickEntryWrapper'
 
 export default async function QuickEntryPage() {
@@ -11,7 +11,8 @@ export default async function QuickEntryPage() {
   }
 
   // Check role - Viewer cannot create transactions
-  if (session.user.role === 'viewer') {
+  const companyRole = getSelectedCompanyRole(session)
+  if (companyRole === 'viewer') {
     redirect('/transactions')
   }
 

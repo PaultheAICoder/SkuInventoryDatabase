@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, validateUserExists } from '@/lib/auth'
+import { authOptions, validateUserExists, getSelectedCompanyRole } from '@/lib/auth'
 import {
   created,
   paginated,
@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user) {
       return unauthorized()
+    }
+
+    // Non-viewer role required for create operations
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
+      return unauthorized('Insufficient permissions')
     }
 
     // Store session info for error logging

@@ -13,6 +13,7 @@ import type {
   ComponentInventoryDetails,
   TransactionHistoryResult,
 } from '@/types/chatbot'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Get SKU buildable details including limiting components and BOM lines
@@ -151,7 +152,7 @@ export async function getComponentInventoryDetails(
     })),
     recentTransactions: recentTx.map((tx) => ({
       type: tx.transaction.type,
-      date: tx.transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(tx.transaction.date),
       quantityChange: tx.quantityChange.toNumber(),
       notes: tx.transaction.notes,
     })),
@@ -204,7 +205,7 @@ export async function getTransactionHistory(
       transactions: transactions.map((tx) => ({
         id: tx.transaction.id,
         type: tx.transaction.type,
-        date: tx.transaction.date.toISOString().split('T')[0],
+        date: toLocalDateString(tx.transaction.date),
         quantityChange: tx.quantityChange.toNumber(),
         notes: tx.transaction.notes,
       })),
@@ -242,7 +243,7 @@ export async function getTransactionHistory(
       transactions: transactions.map((tx) => ({
         id: tx.id,
         type: tx.type,
-        date: tx.date.toISOString().split('T')[0],
+        date: toLocalDateString(tx.date),
         unitsBuild: tx.unitsBuild ?? undefined,
         notes: tx.notes,
       })),

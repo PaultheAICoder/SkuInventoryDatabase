@@ -10,6 +10,7 @@ import {
   generateExportFilename,
   type ForecastExportData,
 } from '@/services/export'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Determine forecast status from consumption and reorder date
@@ -88,9 +89,9 @@ export async function GET(request: NextRequest) {
       quantityOnHand: forecast.quantityOnHand,
       dailyConsumption: forecast.averageDailyConsumption.toFixed(4),
       daysUntilRunout: forecast.daysUntilRunout,
-      runoutDate: forecast.runoutDate?.toISOString().split('T')[0] ?? null,
+      runoutDate: forecast.runoutDate ? toLocalDateString(forecast.runoutDate) : null,
       recommendedReorderQty: forecast.recommendedReorderQty,
-      reorderByDate: forecast.recommendedReorderDate?.toISOString().split('T')[0] ?? null,
+      reorderByDate: forecast.recommendedReorderDate ? toLocalDateString(forecast.recommendedReorderDate) : null,
       leadTimeDays: forecast.leadTimeDays,
       status: getForecastStatusString(
         forecast.averageDailyConsumption,

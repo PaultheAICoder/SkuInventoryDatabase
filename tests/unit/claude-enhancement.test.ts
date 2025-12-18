@@ -16,14 +16,17 @@ describe('Claude Code Enhancement Types', () => {
       // TypeScript compile-time check that params are accepted
       const params = {
         type: 'bug' as const,
-        description: 'Test bug',
-        answers: ['a1', 'a2', 'a3'],
+        title: 'Test bug title',
+        expectedBehavior: 'Expected behavior',
+        actualBehavior: 'Actual behavior',
+        stepsToReproduce: 'Steps to reproduce',
+        answers: ['a1', 'a2'],
       }
 
       // We can't actually call it without mock, but type checking confirms structure
       expect(params.type).toBe('bug')
-      expect(params.description).toBeDefined()
-      expect(params.answers).toHaveLength(3)
+      expect(params.title).toBeDefined()
+      expect(params.answers).toHaveLength(2)
       expect(typeof enhanceIssueWithClaudeCode).toBe('function')
     })
 
@@ -32,13 +35,16 @@ describe('Claude Code Enhancement Types', () => {
 
       const params = {
         type: 'feature' as const,
-        description: 'Test feature',
-        answers: ['a1', 'a2', 'a3'],
+        title: 'Test feature title',
+        whoBenefits: 'All Users',
+        desiredAction: 'Desired action',
+        businessValue: 'Business value',
+        answers: ['a1', 'a2'],
       }
 
       expect(params.type).toBe('feature')
-      expect(params.description).toBeDefined()
-      expect(params.answers).toHaveLength(3)
+      expect(params.title).toBeDefined()
+      expect(params.answers).toHaveLength(2)
       expect(typeof enhanceIssueWithClaudeCode).toBe('function')
     })
   })
@@ -65,8 +71,11 @@ describe('Fallback Body Formatting', () => {
 
       const params = {
         type: 'bug' as const,
-        description: 'Test bug description for fallback',
-        answers: ['Step 1 to reproduce', 'Expected behavior', 'Noticed yesterday'],
+        title: 'Test bug description for fallback',
+        expectedBehavior: 'Expected behavior',
+        actualBehavior: 'Actual behavior',
+        stepsToReproduce: 'Step 1 to reproduce',
+        answers: ['Step 1 to reproduce', 'Expected behavior'],
       }
 
       // This will fail to spawn and use fallback
@@ -80,28 +89,32 @@ describe('Fallback Body Formatting', () => {
       expect(result.error).toBeDefined()
     })
 
-    it('includes answers in fallback bug body', async () => {
+    it('includes structured fields in fallback bug body', async () => {
       const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
 
       const params = {
         type: 'bug' as const,
-        description: 'Bug with specific answers',
-        answers: ['Reproduction step 1', 'I expected it to work', 'First noticed today'],
+        title: 'Bug with specific fields',
+        pageUrl: 'http://localhost:3000/test',
+        expectedBehavior: 'Expected behavior text',
+        actualBehavior: 'Actual behavior text',
+        stepsToReproduce: 'Steps to reproduce the issue',
+        answers: ['Reproduction step 1', 'I expected it to work'],
       }
 
       const result = await enhanceIssueWithClaudeCode(params)
 
-      expect(result.body).toContain('Reproduction step 1')
-      expect(result.body).toContain('I expected it to work')
-      expect(result.body).toContain('First noticed today')
+      expect(result.body).toContain('Expected behavior text')
+      expect(result.body).toContain('Actual behavior text')
+      expect(result.body).toContain('Steps to reproduce the issue')
     })
 
-    it('handles empty answers in bug fallback', async () => {
+    it('handles missing optional fields in bug fallback', async () => {
       const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
 
       const params = {
         type: 'bug' as const,
-        description: 'Bug with no answers',
+        title: 'Bug with no optional fields',
         answers: [],
       }
 
@@ -111,14 +124,17 @@ describe('Fallback Body Formatting', () => {
       expect(result.body).toContain('Not specified')
     })
 
-    it('truncates long descriptions in bug fallback title', async () => {
+    it('truncates long title in bug fallback title', async () => {
       const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
 
-      const longDescription = 'A'.repeat(100)
+      const longTitle = 'A'.repeat(100)
       const params = {
         type: 'bug' as const,
-        description: longDescription,
-        answers: ['step', 'expected', 'when'],
+        title: longTitle,
+        expectedBehavior: 'Expected behavior',
+        actualBehavior: 'Actual behavior',
+        stepsToReproduce: 'Steps',
+        answers: ['step', 'expected'],
       }
 
       const result = await enhanceIssueWithClaudeCode(params)
@@ -134,64 +150,53 @@ describe('Fallback Body Formatting', () => {
 
       const params = {
         type: 'feature' as const,
-        description: 'New feature for testing',
-        answers: ['Problem it solves', 'How I would use it', 'Very important'],
+        title: 'New feature for testing',
+        whoBenefits: 'All Users',
+        desiredAction: 'Desired action text',
+        businessValue: 'Business value text',
+        answers: ['Problem it solves', 'How I would use it'],
       }
 
       const result = await enhanceIssueWithClaudeCode(params)
 
       expect(result.success).toBe(false)
       expect(result.title).toBe('New feature for testing')
-      expect(result.body).toContain('Feature Description')
+      expect(result.body).toContain('Feature Request')
       expect(result.body).toContain('New feature for testing')
     })
 
-    it('includes answers in fallback feature body', async () => {
+    it('includes structured fields in fallback feature body', async () => {
       const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
 
       const params = {
         type: 'feature' as const,
-        description: 'Feature with specific answers',
-        answers: ['Solves my workflow issue', 'Click button to activate', 'Critical priority'],
+        title: 'Feature with specific fields',
+        whoBenefits: 'Data Entry Staff',
+        desiredAction: 'I want to export data to CSV',
+        businessValue: 'Improves data analysis workflow',
+        answers: ['Solves my workflow issue', 'Click button to activate'],
       }
 
       const result = await enhanceIssueWithClaudeCode(params)
 
-      expect(result.body).toContain('Solves my workflow issue')
-      expect(result.body).toContain('Click button to activate')
-      expect(result.body).toContain('Critical priority')
+      expect(result.body).toContain('Data Entry Staff')
+      expect(result.body).toContain('I want to export data to CSV')
+      expect(result.body).toContain('Improves data analysis workflow')
     })
 
-    it('handles empty answers in feature fallback', async () => {
+    it('handles missing optional fields in feature fallback', async () => {
       const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
 
       const params = {
         type: 'feature' as const,
-        description: 'Feature with no answers',
+        title: 'Feature with no optional fields',
         answers: [],
       }
 
       const result = await enhanceIssueWithClaudeCode(params)
 
       expect(result.body).toContain('Not provided')
-      expect(result.body).toContain('it improves my workflow')
-    })
-
-    it('includes user story in feature fallback', async () => {
-      const { enhanceIssueWithClaudeCode } = await import('@/lib/claude')
-
-      const params = {
-        type: 'feature' as const,
-        description: 'Add export to CSV',
-        answers: ['Need to analyze data', 'Export button', 'High'],
-      }
-
-      const result = await enhanceIssueWithClaudeCode(params)
-
-      expect(result.body).toContain('User Stories')
-      expect(result.body).toContain('As a')
-      expect(result.body).toContain('I want to')
-      expect(result.body).toContain('So that')
+      expect(result.body).toContain('Not specified')
     })
   })
 
@@ -201,13 +206,16 @@ describe('Fallback Body Formatting', () => {
 
       const result = await enhanceIssueWithClaudeCode({
         type: 'bug',
-        description: 'Test bug',
-        answers: ['a', 'b', 'c'],
+        title: 'Test bug title',
+        expectedBehavior: 'Expected behavior',
+        actualBehavior: 'Actual behavior',
+        stepsToReproduce: 'Steps',
+        answers: ['a', 'b'],
       })
 
       expect(result.body).toContain('## Reported Issue')
-      expect(result.body).toContain('## Error Details')
-      expect(result.body).toContain('## Clarifying Questions & Answers')
+      expect(result.body).toContain('## Steps to Reproduce')
+      expect(result.body).toContain('## Follow-up Questions & Answers')
       expect(result.body).toContain('## Next Steps')
     })
 
@@ -216,13 +224,16 @@ describe('Fallback Body Formatting', () => {
 
       const result = await enhanceIssueWithClaudeCode({
         type: 'feature',
-        description: 'Test feature',
-        answers: ['a', 'b', 'c'],
+        title: 'Test feature title',
+        whoBenefits: 'All Users',
+        desiredAction: 'Desired action',
+        businessValue: 'Business value',
+        answers: ['a', 'b'],
       })
 
-      expect(result.body).toContain('## Feature Description')
-      expect(result.body).toContain('## User Stories')
-      expect(result.body).toContain('## Clarifying Questions & Answers')
+      expect(result.body).toContain('## Feature Request')
+      expect(result.body).toContain('## Desired Action')
+      expect(result.body).toContain('## Business Value')
       expect(result.body).toContain('## Acceptance Criteria')
     })
   })
@@ -248,8 +259,11 @@ describe('Environment Configuration', () => {
 
     const result = await enhanceIssueWithClaudeCode({
       type: 'bug',
-      description: 'Test',
-      answers: ['a', 'b', 'c'],
+      title: 'Test title',
+      expectedBehavior: 'Expected behavior',
+      actualBehavior: 'Actual behavior',
+      stepsToReproduce: 'Steps',
+      answers: ['a', 'b'],
     })
 
     // Since path doesn't exist, we get fallback

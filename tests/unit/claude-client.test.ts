@@ -36,30 +36,34 @@ describe('Claude Client', () => {
       it('returns fallback questions for bug type', async () => {
         const params: GenerateQuestionsParams = {
           type: 'bug',
-          description: 'The button does not work when clicked',
+          title: 'Button not working',
+          expectedBehavior: 'The button should work when clicked',
+          actualBehavior: 'The button does not respond',
+          stepsToReproduce: '1. Click the button\n2. Nothing happens',
         }
 
         const result = await generateClarifyingQuestions(params)
 
-        expect(result.questions).toHaveLength(3)
-        expect(result.questions[0]).toBe('What steps can we follow to reproduce this issue?')
-        expect(result.questions[1]).toBe('What did you expect to happen instead?')
-        expect(result.questions[2]).toBe('When did you first notice this problem?')
+        expect(result.questions).toHaveLength(2)
+        expect(result.questions[0]).toBe('Does this issue happen every time, or only sometimes?')
+        expect(result.questions[1]).toBe('Did this work correctly before, or is this the first time you tried?')
         expect(result.error).toBeUndefined()
       })
 
       it('returns fallback questions for feature type', async () => {
         const params: GenerateQuestionsParams = {
           type: 'feature',
-          description: 'I want a dark mode for the application',
+          title: 'Dark mode for the application',
+          whoBenefits: 'All Users',
+          desiredAction: 'I want to toggle dark mode on/off',
+          businessValue: 'Reduces eye strain during night usage',
         }
 
         const result = await generateClarifyingQuestions(params)
 
-        expect(result.questions).toHaveLength(3)
-        expect(result.questions[0]).toBe('What problem would this feature solve for you?')
-        expect(result.questions[1]).toBe('How would you ideally use this feature?')
-        expect(result.questions[2]).toBe('How important is this feature to your workflow?')
+        expect(result.questions).toHaveLength(2)
+        expect(result.questions[0]).toBe('How often would you use this feature?')
+        expect(result.questions[1]).toBe('Would this integrate with any existing workflow?')
         expect(result.error).toBeUndefined()
       })
     })
@@ -69,28 +73,34 @@ describe('Claude Client', () => {
         delete process.env.ANTHROPIC_API_KEY
       })
 
-      it('bug fallback questions focus on reproduction and expected behavior', async () => {
+      it('bug fallback questions focus on frequency and history', async () => {
         const params: GenerateQuestionsParams = {
           type: 'bug',
-          description: 'Test description for bug',
+          title: 'Test bug title',
+          expectedBehavior: 'Expected behavior text',
+          actualBehavior: 'Actual behavior text',
+          stepsToReproduce: 'Steps to reproduce',
         }
 
         const result = await generateClarifyingQuestions(params)
 
-        expect(result.questions.some(q => q.toLowerCase().includes('reproduce'))).toBe(true)
-        expect(result.questions.some(q => q.toLowerCase().includes('expect'))).toBe(true)
+        expect(result.questions.some(q => q.toLowerCase().includes('every time'))).toBe(true)
+        expect(result.questions.some(q => q.toLowerCase().includes('before'))).toBe(true)
       })
 
-      it('feature fallback questions focus on use cases and importance', async () => {
+      it('feature fallback questions focus on frequency and workflow', async () => {
         const params: GenerateQuestionsParams = {
           type: 'feature',
-          description: 'Test description for feature',
+          title: 'Test feature title',
+          whoBenefits: 'Data Entry Staff',
+          desiredAction: 'Desired action description',
+          businessValue: 'Business value description',
         }
 
         const result = await generateClarifyingQuestions(params)
 
-        expect(result.questions.some(q => q.toLowerCase().includes('problem'))).toBe(true)
-        expect(result.questions.some(q => q.toLowerCase().includes('important'))).toBe(true)
+        expect(result.questions.some(q => q.toLowerCase().includes('often'))).toBe(true)
+        expect(result.questions.some(q => q.toLowerCase().includes('workflow'))).toBe(true)
       })
     })
 
@@ -99,21 +109,28 @@ describe('Claude Client', () => {
         delete process.env.ANTHROPIC_API_KEY
       })
 
-      it('always returns exactly 3 questions', async () => {
+      it('returns 2-3 questions (fallback returns 2)', async () => {
         const params: GenerateQuestionsParams = {
           type: 'bug',
-          description: 'Some bug description here',
+          title: 'Some bug description here',
+          expectedBehavior: 'Expected behavior',
+          actualBehavior: 'Actual behavior',
+          stepsToReproduce: 'Steps here',
         }
 
         const result = await generateClarifyingQuestions(params)
 
-        expect(result.questions).toHaveLength(3)
+        expect(result.questions.length).toBeGreaterThanOrEqual(2)
+        expect(result.questions.length).toBeLessThanOrEqual(3)
       })
 
       it('returns questions as an array of strings', async () => {
         const params: GenerateQuestionsParams = {
           type: 'feature',
-          description: 'Some feature description here',
+          title: 'Some feature description',
+          whoBenefits: 'Analysts',
+          desiredAction: 'Desired action here',
+          businessValue: 'Business value here',
         }
 
         const result = await generateClarifyingQuestions(params)
@@ -127,7 +144,10 @@ describe('Claude Client', () => {
       it('returns non-empty questions', async () => {
         const params: GenerateQuestionsParams = {
           type: 'bug',
-          description: 'Bug description for testing',
+          title: 'Bug description for testing',
+          expectedBehavior: 'Expected behavior',
+          actualBehavior: 'Actual behavior',
+          stepsToReproduce: 'Steps to reproduce',
         }
 
         const result = await generateClarifyingQuestions(params)

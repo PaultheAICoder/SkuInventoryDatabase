@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { unauthorized, forbidden, serverError, validationError, error } from '@/lib/api-response'
 import { batchApproveDraftsSchema } from '@/types/draft'
 import { batchApproveDrafts } from '@/services/draft-transaction'
@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Only admin and ops can approve drafts
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return forbidden()
     }
 

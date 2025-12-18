@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { ComponentForm } from '@/components/features/ComponentForm'
 
 export default async function NewComponentPage() {
@@ -10,7 +10,8 @@ export default async function NewComponentPage() {
   }
 
   // Check role - Viewer cannot create components
-  if (session.user.role === 'viewer') {
+  const companyRole = getSelectedCompanyRole(session)
+  if (companyRole === 'viewer') {
     redirect('/components')
   }
 

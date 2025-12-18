@@ -6,6 +6,7 @@ import { success, unauthorized, serverError } from '@/lib/api-response'
 import { getComponentQuantities, calculateReorderStatus, getCompanySettings } from '@/services/inventory'
 import { calculateMaxBuildableUnitsForSKUs, calculateBOMUnitCosts } from '@/services/bom'
 import type { ReorderStatus } from '@/types'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Calculate urgency score for reorder prioritization.
@@ -221,7 +222,7 @@ export async function GET(request: NextRequest) {
       recentTransactions: recentTransactions.map((tx) => ({
         id: tx.id,
         type: tx.type,
-        date: tx.date.toISOString().split('T')[0],
+        date: toLocalDateString(tx.date),
         createdAt: tx.createdAt.toISOString(),
         createdBy: tx.createdBy,
         lines: tx.lines.map((line) => ({

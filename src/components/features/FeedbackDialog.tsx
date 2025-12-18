@@ -12,9 +12,18 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Bug, Lightbulb, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 import type { FeedbackType, FeedbackStep } from '@/types/feedback'
+import { WHO_BENEFITS_OPTIONS } from '@/types/feedback'
 
 // Response validation helper
 function isValidApiResponse<T>(data: unknown, validator: (d: unknown) => d is T): data is { data: T } {
@@ -58,10 +67,29 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   const [error, setError] = useState<string | null>(null)
 
   const [feedbackType, setFeedbackType] = useState<FeedbackType | ''>('')
-  const [description, setDescription] = useState('')
   const [questions, setQuestions] = useState<string[]>([])
-  const [answers, setAnswers] = useState<string[]>(['', '', ''])
+  const [answers, setAnswers] = useState<string[]>([])
   const [issueUrl, setIssueUrl] = useState('')
+
+  // New structured fields
+  const [pageUrl, setPageUrl] = useState('')
+  const [title, setTitle] = useState('')
+  // Bug-specific fields
+  const [expectedBehavior, setExpectedBehavior] = useState('')
+  const [actualBehavior, setActualBehavior] = useState('')
+  const [stepsToReproduce, setStepsToReproduce] = useState('')
+  const [screenshotUrl, setScreenshotUrl] = useState('')
+  // Feature-specific fields
+  const [whoBenefits, setWhoBenefits] = useState('')
+  const [desiredAction, setDesiredAction] = useState('')
+  const [businessValue, setBusinessValue] = useState('')
+
+  // Capture page URL when dialog opens
+  useEffect(() => {
+    if (open) {
+      setPageUrl(window.location.href)
+    }
+  }, [open])
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -70,11 +98,20 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
       const timer = setTimeout(() => {
         setStep('select-type')
         setFeedbackType('')
-        setDescription('')
         setQuestions([])
-        setAnswers(['', '', ''])
+        setAnswers([])
         setIssueUrl('')
         setError(null)
+        // Reset structured fields
+        setPageUrl('')
+        setTitle('')
+        setExpectedBehavior('')
+        setActualBehavior('')
+        setStepsToReproduce('')
+        setScreenshotUrl('')
+        setWhoBenefits('')
+        setDesiredAction('')
+        setBusinessValue('')
       }, 200)
       return () => clearTimeout(timer)
     }
@@ -82,12 +119,27 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
 
   const handleTypeSelect = (type: FeedbackType) => {
     setFeedbackType(type)
-    setStep('describe')
+    setStep('structured-fields')
   }
 
-  const handleDescriptionSubmit = async () => {
-    if (description.length < 10) {
-      setError('Please provide more detail (at least 10 characters)')
+  // Validation function for structured fields
+  const isStructuredFieldsValid = () => {
+    if (title.length < 5) return false
+
+    if (feedbackType === 'bug') {
+      return expectedBehavior.length >= 10 &&
+             actualBehavior.length >= 10 &&
+             stepsToReproduce.length >= 10
+    } else {
+      return whoBenefits !== '' &&
+             desiredAction.length >= 10 &&
+             businessValue.length >= 10
+    }
+  }
+
+  const handleStructuredFieldsSubmit = async () => {
+    if (!isStructuredFieldsValid()) {
+      setError('Please fill in all required fields')
       return
     }
 
@@ -95,13 +147,27 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     setError(null)
 
     try {
+      const requestBody = {
+        type: feedbackType,
+        pageUrl,
+        title,
+        ...(feedbackType === 'bug' && {
+          expectedBehavior,
+          actualBehavior,
+          stepsToReproduce,
+          screenshotUrl: screenshotUrl || undefined,
+        }),
+        ...(feedbackType === 'feature' && {
+          whoBenefits,
+          desiredAction,
+          businessValue,
+        }),
+      }
+
       const res = await fetch('/api/feedback/clarify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: feedbackType,
-          description,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!res.ok) {
@@ -116,7 +182,9 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
         throw new Error('Invalid response from server. Please try again.')
       }
 
+      // Initialize answers array based on number of questions received
       setQuestions(data.data.questions)
+      setAnswers(new Array(data.data.questions.length).fill(''))
       setStep('clarify')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -137,14 +205,28 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
     setStep('submitting')
 
     try {
+      const requestBody = {
+        type: feedbackType,
+        pageUrl,
+        title,
+        ...(feedbackType === 'bug' && {
+          expectedBehavior,
+          actualBehavior,
+          stepsToReproduce,
+          screenshotUrl: screenshotUrl || undefined,
+        }),
+        ...(feedbackType === 'feature' && {
+          whoBenefits,
+          desiredAction,
+          businessValue,
+        }),
+        answers,
+      }
+
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: feedbackType,
-          description,
-          answers,
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!res.ok) {
@@ -176,11 +258,11 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
   }
 
   const handleBack = () => {
-    if (step === 'describe') {
+    if (step === 'structured-fields') {
       setStep('select-type')
       setFeedbackType('')
     } else if (step === 'clarify') {
-      setStep('describe')
+      setStep('structured-fields')
     } else if (step === 'error') {
       setStep('clarify')
     }
@@ -232,44 +314,172 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
           </>
         )}
 
-        {/* Step 2: Describe Issue */}
-        {step === 'describe' && (
+        {/* Step 2: Structured Fields */}
+        {step === 'structured-fields' && (
           <>
             <DialogHeader>
               <DialogTitle>
-                {feedbackType === 'bug' ? 'Describe the Bug' : 'Describe Your Feature Request'}
+                {feedbackType === 'bug' ? 'Report a Bug' : 'Request a Feature'}
               </DialogTitle>
               <DialogDescription>
-                {feedbackType === 'bug'
-                  ? 'Tell us what went wrong. Be as specific as possible.'
-                  : 'Tell us about the feature you\'d like to see.'}
+                Please provide details about your {feedbackType === 'bug' ? 'issue' : 'request'}.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[400px] overflow-y-auto">
               {error && (
                 <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
 
+              {/* Page URL (read-only) */}
               <div className="grid gap-2">
-                <Label htmlFor="description">Description *</Label>
-                <Textarea
-                  id="description"
-                  placeholder={
-                    feedbackType === 'bug'
-                      ? 'When I try to... the app shows... instead of...'
-                      : 'I would like to be able to...'
-                  }
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[120px]"
+                <Label htmlFor="pageUrl">Page URL</Label>
+                <Input
+                  id="pageUrl"
+                  value={pageUrl}
+                  disabled
+                  className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground">
-                  {description.length}/2000 characters (minimum 10)
+                  Auto-captured from current page
                 </p>
               </div>
+
+              {/* Title */}
+              <div className="grid gap-2">
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  placeholder="Brief summary of your feedback"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={255}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {title.length}/255 characters (minimum 5)
+                </p>
+              </div>
+
+              {/* Bug-specific fields */}
+              {feedbackType === 'bug' && (
+                <>
+                  {/* Expected Behavior */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="expectedBehavior">What should happen? *</Label>
+                    <Textarea
+                      id="expectedBehavior"
+                      placeholder="Describe the expected behavior..."
+                      value={expectedBehavior}
+                      onChange={(e) => setExpectedBehavior(e.target.value)}
+                      className="min-h-[80px]"
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {expectedBehavior.length}/2000 characters (minimum 10)
+                    </p>
+                  </div>
+
+                  {/* Actual Behavior */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="actualBehavior">What actually happens? *</Label>
+                    <Textarea
+                      id="actualBehavior"
+                      placeholder="Describe what's actually happening..."
+                      value={actualBehavior}
+                      onChange={(e) => setActualBehavior(e.target.value)}
+                      className="min-h-[80px]"
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {actualBehavior.length}/2000 characters (minimum 10)
+                    </p>
+                  </div>
+
+                  {/* Steps to Reproduce */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="stepsToReproduce">Steps to reproduce *</Label>
+                    <Textarea
+                      id="stepsToReproduce"
+                      placeholder={"1. Go to...\n2. Click on...\n3. See error..."}
+                      value={stepsToReproduce}
+                      onChange={(e) => setStepsToReproduce(e.target.value)}
+                      className="min-h-[100px]"
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {stepsToReproduce.length}/2000 characters (minimum 10)
+                    </p>
+                  </div>
+
+                  {/* Screenshot URL (optional) */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="screenshotUrl">Screenshot URL (optional)</Label>
+                    <Input
+                      id="screenshotUrl"
+                      type="url"
+                      placeholder="https://..."
+                      value={screenshotUrl}
+                      onChange={(e) => setScreenshotUrl(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Feature-specific fields */}
+              {feedbackType === 'feature' && (
+                <>
+                  {/* Who Benefits */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="whoBenefits">Who would benefit from this? *</Label>
+                    <Select value={whoBenefits} onValueChange={setWhoBenefits}>
+                      <SelectTrigger id="whoBenefits">
+                        <SelectValue placeholder="Select who benefits" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WHO_BENEFITS_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Desired Action */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="desiredAction">What action do you want to be able to do? *</Label>
+                    <Textarea
+                      id="desiredAction"
+                      placeholder="Describe what you'd like to be able to do..."
+                      value={desiredAction}
+                      onChange={(e) => setDesiredAction(e.target.value)}
+                      className="min-h-[100px]"
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {desiredAction.length}/2000 characters (minimum 10)
+                    </p>
+                  </div>
+
+                  {/* Business Value */}
+                  <div className="grid gap-2">
+                    <Label htmlFor="businessValue">Why does this matter? *</Label>
+                    <Textarea
+                      id="businessValue"
+                      placeholder="Explain the benefits and why this is important..."
+                      value={businessValue}
+                      onChange={(e) => setBusinessValue(e.target.value)}
+                      className="min-h-[100px]"
+                      maxLength={2000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {businessValue.length}/2000 characters (minimum 10)
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             <DialogFooter>
@@ -278,8 +488,8 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
               </Button>
               <Button
                 type="button"
-                onClick={handleDescriptionSubmit}
-                disabled={isLoading || description.length < 10}
+                onClick={handleStructuredFieldsSubmit}
+                disabled={isLoading || !isStructuredFieldsValid()}
               >
                 {isLoading ? (
                   <>
@@ -319,7 +529,7 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
                   <Textarea
                     id={`answer-${index}`}
                     placeholder="Your answer..."
-                    value={answers[index]}
+                    value={answers[index] || ''}
                     onChange={(e) => {
                       const newAnswers = [...answers]
                       newAnswers[index] = e.target.value

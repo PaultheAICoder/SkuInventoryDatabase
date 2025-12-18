@@ -1,17 +1,19 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import {
   success,
   unauthorized,
   notFound,
+  versionConflict,
   serverError,
   parseBody,
 } from '@/lib/api-response'
 import { updateBOMVersionSchema } from '@/types/bom'
 import { getComponentQuantities } from '@/services/inventory'
-import { calculateBOMUnitCost, updateBOMVersion } from '@/services/bom'
+import { calculateBOMUnitCost, updateBOMVersion, VersionConflictError } from '@/services/bom'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -82,13 +84,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       skuId: bomVersion.skuId,
       sku: bomVersion.sku,
       versionName: bomVersion.versionName,
-      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(bomVersion.effectiveStartDate),
+      effectiveEndDate: bomVersion.effectiveEndDate ? toLocalDateString(bomVersion.effectiveEndDate) : null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
       defectNotes: bomVersion.defectNotes,
       qualityMetadata: bomVersion.qualityMetadata as Record<string, unknown>,
       unitCost: unitCost.toFixed(4),
+      version: bomVersion.version,
       lines: bomVersion.lines.map((line) => ({
         id: line.id,
         component: {
@@ -120,6 +123,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return unauthorized()
     }
 
+    // Non-viewer role required for update operations
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
+      return unauthorized('Insufficient permissions')
+    }
+
     const { id } = await params
 
     // Parse optional locationId query parameter
@@ -133,20 +142,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Use selected company for scoping
     const selectedCompanyId = session.user.selectedCompanyId
-
-    // Verify BOM version exists and belongs to user's selected company
-    const existingBom = await prisma.bOMVersion.findFirst({
-      where: {
-        id,
-        sku: {
-          companyId: selectedCompanyId,
-        },
-      },
-    })
-
-    if (!existingBom) {
-      return notFound('BOM version')
-    }
 
     // If updating lines, verify all components exist and are active
     if (data.lines && data.lines.length > 0) {
@@ -164,11 +159,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    // Update BOM version
+    // Update BOM version (handles version check)
     const bomVersion = await updateBOMVersion({
       bomVersionId: id,
       companyId: selectedCompanyId!,
       ...data,
+      version: data.version, // Pass version for optimistic locking
     })
 
     // Calculate unit cost
@@ -182,13 +178,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       id: bomVersion.id,
       skuId: bomVersion.skuId,
       versionName: bomVersion.versionName,
-      effectiveStartDate: bomVersion.effectiveStartDate.toISOString().split('T')[0],
-      effectiveEndDate: bomVersion.effectiveEndDate?.toISOString().split('T')[0] ?? null,
+      effectiveStartDate: toLocalDateString(bomVersion.effectiveStartDate),
+      effectiveEndDate: bomVersion.effectiveEndDate ? toLocalDateString(bomVersion.effectiveEndDate) : null,
       isActive: bomVersion.isActive,
       notes: bomVersion.notes,
       defectNotes: bomVersion.defectNotes,
       qualityMetadata: bomVersion.qualityMetadata as Record<string, unknown>,
       unitCost: unitCost.toFixed(4),
+      version: bomVersion.version,
       lines: bomVersion.lines.map((line) => ({
         id: line.id,
         component: {
@@ -206,8 +203,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       createdAt: bomVersion.createdAt.toISOString(),
       createdBy: bomVersion.createdBy,
     })
-  } catch (error) {
-    console.error('Error updating BOM version:', error)
+  } catch (err) {
+    if (err instanceof VersionConflictError) {
+      return versionConflict('BOM version')
+    }
+    if (err instanceof Error && err.message === 'BOM version not found') {
+      return notFound('BOM version')
+    }
+    console.error('Error updating BOM version:', err)
     return serverError()
   }
 }

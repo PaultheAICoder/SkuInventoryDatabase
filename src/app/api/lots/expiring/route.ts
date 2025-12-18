@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth'
 import { success, unauthorized, serverError } from '@/lib/api-response'
 import { getExpiringLots, getExpiredLotCount } from '@/services/expiry'
 import { getCompanySettings } from '@/services/inventory'
+import { toLocalDateString } from '@/lib/utils'
 
 // GET /api/lots/expiring - Get lots expiring soon
 export async function GET() {
@@ -31,7 +32,7 @@ export async function GET() {
         componentId: lot.componentId,
         componentName: lot.componentName,
         componentSkuCode: lot.componentSkuCode,
-        expiryDate: lot.expiryDate.toISOString().split('T')[0],
+        expiryDate: toLocalDateString(lot.expiryDate),
         balance: lot.balance,
         daysUntilExpiry: lot.daysUntilExpiry,
       })),

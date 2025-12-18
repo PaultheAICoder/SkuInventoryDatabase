@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { unauthorized, forbidden, notFound, serverError, error } from '@/lib/api-response'
 import { updateDraftSchema } from '@/types/draft'
 import {
@@ -65,7 +65,8 @@ export async function PUT(
     }
 
     // Only admin and ops can update drafts
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return forbidden()
     }
 
@@ -120,7 +121,8 @@ export async function DELETE(
     }
 
     // Only admin and ops can delete drafts
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return forbidden()
     }
 
@@ -133,6 +135,7 @@ export async function DELETE(
     await deleteDraftTransaction({
       id,
       companyId: selectedCompanyId,
+      deletedById: session.user.id,  // Pass user ID for audit trail
     })
 
     return NextResponse.json({ message: 'Draft deleted successfully' })

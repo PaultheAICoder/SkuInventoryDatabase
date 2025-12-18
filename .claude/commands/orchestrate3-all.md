@@ -156,6 +156,34 @@ Task({
 1. ✅ **All issues processed** - Queue empty (no open issues remain)
 2. ⚠️ **Context limit warning** - Proactively warn at 80% usage, complete current issue, then stop
 3. 🛑 **Critical unrecoverable error** - Document and continue to next issue if possible
+4. 🗄️ **Migration detected** - `/orchestrate3` pauses for migration, batch processing MUST STOP
+
+## 🗄️ CRITICAL: Migration Detection Handling
+
+**When `/orchestrate3` detects a new database migration, it will pause and ask for user confirmation.**
+
+**Your Role when this happens:**
+
+1. **STOP batch processing immediately** - Do NOT continue to next issue
+2. **Report clearly to user**:
+   ```markdown
+   ⚠️ BATCH PROCESSING PAUSED - MIGRATION DETECTED
+
+   Issue #N created a database migration that requires manual review.
+
+   **You must:**
+   1. Review the migration SQL shown above
+   2. Apply migration to production manually
+   3. Verify app works at http://172.16.20.50:4545
+   4. Tell me to "continue" to resume batch processing
+
+   **Remaining issues**: #X, #Y, #Z
+   ```
+
+3. **Wait for user confirmation** before resuming
+4. **When user says "continue"**: Resume with `/orchestrate3 #N` (same issue) to complete Test-and-Cleanup, then proceed to remaining issues
+
+**This is the ONE exception to the "don't stop for permission" rule.** Database migrations require human oversight.
 
 ## Anti-Patterns (NEVER DO THESE)
 

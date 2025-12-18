@@ -3,6 +3,7 @@ import type { DefectAnalyticsExportRow } from '@/types/analytics'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import type { DefectAnalyticsQuery } from '@/types/analytics'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Column definitions for defect analytics export
@@ -77,7 +78,7 @@ export async function generateDefectAnalyticsExport(
     const defectRate = unitsBuilt > 0 ? (defectCount / unitsBuilt) * 100 : 0
 
     return {
-      date: tx.date.toISOString().split('T')[0],
+      date: toLocalDateString(tx.date),
       skuName: tx.sku?.name ?? 'N/A',
       skuCode: tx.sku?.internalCode ?? 'N/A',
       bomVersionName: tx.bomVersion?.versionName ?? 'N/A',
@@ -97,6 +98,6 @@ export async function generateDefectAnalyticsExport(
  * Generate filename for defect analytics export
  */
 export function generateDefectAnalyticsFilename(): string {
-  const date = new Date().toISOString().split('T')[0]
+  const date = toLocalDateString(new Date())
   return `defect-analytics-${date}.csv`
 }

@@ -7,6 +7,7 @@ import { paginated, unauthorized, serverError, parseQuery } from '@/lib/api-resp
 import { lotListQuerySchema } from '@/types/lot'
 import type { LotResponse } from '@/types/lot'
 import { calculateExpiryStatus } from '@/services/lot'
+import { toLocalDateString } from '@/lib/utils'
 
 // GET /api/lots - List lots with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
           componentId: lot.componentId,
           componentName: lot.component.name,
           componentSkuCode: lot.component.skuCode,
-          expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+          expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
           receivedQuantity: lot.receivedQuantity.toString(),
           balance: lot.balance?.quantity.toString() ?? '0',
           supplier: lot.supplier,
@@ -124,7 +125,7 @@ export async function GET(request: NextRequest) {
         componentId: lot.componentId,
         componentName: lot.component.name,
         componentSkuCode: lot.component.skuCode,
-        expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+        expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
         receivedQuantity: lot.receivedQuantity.toString(),
         balance: lot.balance?.quantity.toString() ?? '0',
         supplier: lot.supplier,

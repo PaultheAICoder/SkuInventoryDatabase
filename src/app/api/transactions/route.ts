@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { paginated, unauthorized, serverError, parseQuery } from '@/lib/api-response'
 import { transactionListQuerySchema, TransactionResponse } from '@/types/transaction'
+import { toLocalDateString } from '@/lib/utils'
 
 // GET /api/transactions - List transactions with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     const data: TransactionResponse[] = transactions.map((tx) => ({
       id: tx.id,
       type: tx.type as TransactionResponse['type'],
-      date: tx.date.toISOString().split('T')[0],
+      date: toLocalDateString(tx.date),
       sku: tx.sku,
       bomVersion: tx.bomVersion,
       locationId: tx.locationId,
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
           ? {
               id: line.lot.id,
               lotNumber: line.lot.lotNumber,
-              expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+              expiryDate: line.lot.expiryDate ? toLocalDateString(line.lot.expiryDate) : null,
             }
           : null,
       })),

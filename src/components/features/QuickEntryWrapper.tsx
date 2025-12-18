@@ -8,6 +8,7 @@ import { QuickEntryForm } from './QuickEntryForm'
 import { ConversationalInput } from './ConversationalInput'
 import { ParsedTransactionPreview } from './ParsedTransactionPreview'
 import type { ParseTransactionResponse, ParsedTransaction } from '@/types/parser'
+import { toLocalDateString } from '@/lib/utils'
 
 type EntryMode = 'form' | 'conversational' | 'preview'
 
@@ -64,8 +65,8 @@ export function QuickEntryWrapper() {
 
       const transactionType = parsed.transactionType.value
       const date = parsed.date.value instanceof Date
-        ? parsed.date.value.toISOString().split('T')[0]
-        : new Date(parsed.date.value).toISOString().split('T')[0]
+        ? toLocalDateString(parsed.date.value)
+        : toLocalDateString(new Date(parsed.date.value))
 
       if (transactionType === 'receipt') {
         endpoint = '/api/transactions/receipt'

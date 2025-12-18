@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { error } from '@/lib/api-response'
 
@@ -217,8 +217,9 @@ export async function POST(request: NextRequest) {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    // Only admin can create ASIN mappings (check via session role)
-    if (session.user.role !== 'admin') {
+    // Only admin can create ASIN mappings (check via company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return NextResponse.json(
         { error: 'Only admins can create ASIN mappings' },
         { status: 403 }

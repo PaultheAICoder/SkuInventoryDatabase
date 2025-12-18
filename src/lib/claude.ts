@@ -25,7 +25,17 @@ function getClient(): Anthropic | null {
 
 export interface GenerateQuestionsParams {
   type: 'bug' | 'feature'
-  description: string
+  pageUrl?: string
+  title: string
+  // Bug fields
+  expectedBehavior?: string
+  actualBehavior?: string
+  stepsToReproduce?: string
+  screenshotUrl?: string
+  // Feature fields
+  whoBenefits?: string
+  desiredAction?: string
+  businessValue?: string
 }
 
 export interface GenerateQuestionsResult {
@@ -34,27 +44,26 @@ export interface GenerateQuestionsResult {
 }
 
 /**
- * Generate 3 clarifying questions for a feedback submission using Claude API.
+ * Generate 2-3 context-specific clarifying questions for a feedback submission using Claude API.
+ * Uses structured data to generate highly targeted questions instead of generic ones.
  * Returns default questions if API is unavailable or errors.
  */
 export async function generateClarifyingQuestions(
   params: GenerateQuestionsParams
 ): Promise<GenerateQuestionsResult> {
-  const { type, description } = params
+  const { type } = params
 
   const anthropic = getClient()
 
-  // Fallback questions if API unavailable
+  // Fallback questions if API unavailable - more context-specific based on what was NOT provided
   const fallbackQuestions = type === 'bug'
     ? [
-        'What steps can we follow to reproduce this issue?',
-        'What did you expect to happen instead?',
-        'When did you first notice this problem?',
+        'Does this issue happen every time, or only sometimes?',
+        'Did this work correctly before, or is this the first time you tried?',
       ]
     : [
-        'What problem would this feature solve for you?',
-        'How would you ideally use this feature?',
-        'How important is this feature to your workflow?',
+        'How often would you use this feature?',
+        'Would this integrate with any existing workflow?',
       ]
 
   if (!anthropic) {
@@ -62,9 +71,46 @@ export async function generateClarifyingQuestions(
   }
 
   try {
-    const systemPrompt = type === 'bug'
-      ? `You are helping gather information about a software bug report. Based on the user's initial description, generate exactly 3 specific, targeted clarifying questions that would help developers understand and fix the issue. Focus on: reproduction steps, expected vs actual behavior, and environment/context. Each question should be concise (under 100 characters). Return ONLY the 3 questions, one per line, without numbering or bullets.`
-      : `You are helping gather information about a software feature request. Based on the user's initial description, generate exactly 3 specific, targeted clarifying questions that would help developers understand and implement the feature. Focus on: use cases, expected behavior, and priority/importance. Each question should be concise (under 100 characters). Return ONLY the 3 questions, one per line, without numbering or bullets.`
+    // Build context-specific system prompt based on type
+    let systemPrompt: string
+    let userContent: string
+
+    if (type === 'bug') {
+      systemPrompt = `You are helping gather additional information about a software bug report.
+
+CONTEXT PROVIDED:
+- Page URL: ${params.pageUrl || 'Not specified'}
+- Title: ${params.title}
+- Expected Behavior: ${params.expectedBehavior || 'Not specified'}
+- Actual Behavior: ${params.actualBehavior || 'Not specified'}
+- Steps to Reproduce: ${params.stepsToReproduce || 'Not specified'}
+${params.screenshotUrl ? `- Screenshot: ${params.screenshotUrl}` : ''}
+
+Based on this context, generate exactly 2-3 highly specific follow-up questions.
+Focus on gaps in the provided information - do NOT ask about things already well-described.
+Do NOT ask generic questions - be specific to this bug and the mentioned page/feature.
+Each question should be under 120 characters.
+Return ONLY the questions, one per line, without numbering or bullets.`
+
+      userContent = `Generate clarifying questions for this bug report: "${params.title}"`
+    } else {
+      systemPrompt = `You are helping gather additional information about a software feature request.
+
+CONTEXT PROVIDED:
+- Page URL: ${params.pageUrl || 'Not specified'}
+- Title: ${params.title}
+- Who Benefits: ${params.whoBenefits || 'Not specified'}
+- Desired Action: ${params.desiredAction || 'Not specified'}
+- Business Value: ${params.businessValue || 'Not specified'}
+
+Based on this context, generate exactly 2-3 highly specific follow-up questions.
+Focus on gaps in the provided information - do NOT ask about things already well-described.
+Do NOT ask generic questions - be specific to this feature request.
+Each question should be under 120 characters.
+Return ONLY the questions, one per line, without numbering or bullets.`
+
+      userContent = `Generate clarifying questions for this feature request: "${params.title}"`
+    }
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -72,7 +118,7 @@ export async function generateClarifyingQuestions(
       messages: [
         {
           role: 'user',
-          content: `${type === 'bug' ? 'Bug Report' : 'Feature Request'}: ${description}`,
+          content: userContent,
         },
       ],
       system: systemPrompt,
@@ -91,8 +137,8 @@ export async function generateClarifyingQuestions(
       .filter((q) => q.length > 0 && q.length < 150)
       .slice(0, 3)
 
-    // Ensure we have exactly 3 questions
-    if (questions.length < 3) {
+    // Ensure we have at least 2 questions (2-3 is acceptable now)
+    if (questions.length < 2) {
       return { questions: fallbackQuestions }
     }
 
@@ -112,7 +158,18 @@ export async function generateClarifyingQuestions(
 
 export interface EnhanceIssueParams {
   type: 'bug' | 'feature'
-  description: string
+  pageUrl?: string
+  title: string
+  // Bug fields
+  expectedBehavior?: string
+  actualBehavior?: string
+  stepsToReproduce?: string
+  screenshotUrl?: string
+  // Feature fields
+  whoBenefits?: string
+  desiredAction?: string
+  businessValue?: string
+  // Answers from clarifying questions
   answers: string[]
 }
 
@@ -130,46 +187,56 @@ export interface EnhanceIssueResult {
 export async function enhanceIssueWithClaudeCode(
   params: EnhanceIssueParams
 ): Promise<EnhanceIssueResult> {
-  const { type, description, answers } = params
+  const { type, title } = params
 
   const claudePath = process.env.CLAUDE_CODE_PATH || 'claude'
 
   // Build the prompt with user input
-  const userContext = buildUserContext(type, description, answers)
+  const userContext = buildUserContext(params)
   const systemPrompt = buildSystemPrompt(type)
 
   try {
     const result = await executeClaudeCode(claudePath, userContext, systemPrompt)
-    return parseClaudeCodeOutput(result, type, description, answers)
+    return parseClaudeCodeOutput(result, params)
   } catch (error) {
     console.error('Claude Code execution failed:', error)
     // Fall back to simple formatting
     return {
       success: false,
-      title: description.length > 80 ? description.substring(0, 77) + '...' : description,
+      title: title.length > 80 ? title.substring(0, 77) + '...' : title,
       body: type === 'bug'
-        ? formatFallbackBugBody(description, answers)
-        : formatFallbackFeatureBody(description, answers),
+        ? formatFallbackBugBody(params)
+        : formatFallbackFeatureBody(params),
       error: error instanceof Error ? error.message : 'Unknown error',
     }
   }
 }
 
-function buildUserContext(type: 'bug' | 'feature', description: string, answers: string[]): string {
-  const label = type === 'bug' ? 'Bug Report' : 'Feature Request'
-  return `${label}:
+function buildUserContext(params: EnhanceIssueParams): string {
+  const { type, pageUrl, title, answers } = params
 
-Description: ${description}
+  if (type === 'bug') {
+    return `Bug Report:
+Page URL: ${pageUrl || 'Not specified'}
+Title: ${title}
+Expected Behavior: ${params.expectedBehavior || 'Not provided'}
+Actual Behavior: ${params.actualBehavior || 'Not provided'}
+Steps to Reproduce: ${params.stepsToReproduce || 'Not provided'}
+Screenshot: ${params.screenshotUrl || 'None'}
 
-Clarifying Questions and Answers:
-Q1: ${type === 'bug' ? 'What steps can we follow to reproduce this issue?' : 'What problem would this feature solve for you?'}
-A1: ${answers[0] || 'Not provided'}
+Follow-up Questions and Answers:
+${answers.map((a, i) => `A${i + 1}: ${a}`).join('\n')}`
+  } else {
+    return `Feature Request:
+Page URL: ${pageUrl || 'Not specified'}
+Title: ${title}
+Who Benefits: ${params.whoBenefits || 'Not specified'}
+Desired Action: ${params.desiredAction || 'Not provided'}
+Business Value: ${params.businessValue || 'Not provided'}
 
-Q2: ${type === 'bug' ? 'What did you expect to happen instead?' : 'How would you ideally use this feature?'}
-A2: ${answers[1] || 'Not provided'}
-
-Q3: ${type === 'bug' ? 'When did you first notice this problem?' : 'How important is this feature to your workflow?'}
-A3: ${answers[2] || 'Not provided'}`
+Follow-up Questions and Answers:
+${answers.map((a, i) => `A${i + 1}: ${a}`).join('\n')}`
+  }
 }
 
 function buildSystemPrompt(type: 'bug' | 'feature'): string {
@@ -311,10 +378,9 @@ function executeClaudeCode(
 
 function parseClaudeCodeOutput(
   output: string,
-  type: 'bug' | 'feature',
-  originalDescription: string,
-  answers: string[]
+  params: EnhanceIssueParams
 ): EnhanceIssueResult {
+  const { type, title } = params
   try {
     // Parse JSON output from Claude Code
     const parsed = JSON.parse(output)
@@ -352,38 +418,32 @@ function parseClaudeCodeOutput(
     // Return fallback
     return {
       success: false,
-      title: originalDescription.length > 80
-        ? originalDescription.substring(0, 77) + '...'
-        : originalDescription,
+      title: title.length > 80
+        ? title.substring(0, 77) + '...'
+        : title,
       body: type === 'bug'
-        ? formatFallbackBugBody(originalDescription, answers)
-        : formatFallbackFeatureBody(originalDescription, answers),
+        ? formatFallbackBugBody(params)
+        : formatFallbackFeatureBody(params),
       error: 'Failed to parse Claude Code output',
     }
   }
 }
 
-function formatFallbackBugBody(description: string, answers: string[]): string {
+function formatFallbackBugBody(params: EnhanceIssueParams): string {
+  const { pageUrl, title, expectedBehavior, actualBehavior, stepsToReproduce, screenshotUrl, answers } = params
   return `## Reported Issue
-**What's broken**: ${description}
-**Expected behavior**: ${answers[1] || 'Not specified'}
+**Title**: ${title}
+**Page URL**: ${pageUrl || 'Not specified'}
+**Expected Behavior**: ${expectedBehavior || 'Not specified'}
+**Actual Behavior**: ${actualBehavior || 'Not specified'}
 **Severity**: Medium
 
-## Error Details
-**Error Type**: User-reported bug
-**Error Message**: See description above
-**Location**: User feedback submission
-**URL/Route**: N/A
+## Steps to Reproduce
+${stepsToReproduce || 'Not provided'}
 
-## Clarifying Questions & Answers
-**Q1**: What steps can we follow to reproduce this issue?
-**A1**: ${answers[0] || 'Not provided'}
-
-**Q2**: What did you expect to happen instead?
-**A2**: ${answers[1] || 'Not provided'}
-
-**Q3**: When did you first notice this problem?
-**A3**: ${answers[2] || 'Not provided'}
+${screenshotUrl ? `## Screenshot\n${screenshotUrl}\n` : ''}
+## Follow-up Questions & Answers
+${answers.map((a, i) => `**A${i + 1}**: ${a}`).join('\n\n')}
 
 ## Next Steps
 - Investigate root cause (not just symptom)
@@ -391,25 +451,21 @@ function formatFallbackBugBody(description: string, answers: string[]): string {
 - Ensure minimal, surgical fix`
 }
 
-function formatFallbackFeatureBody(description: string, answers: string[]): string {
-  return `## Feature Description
-${description}
+function formatFallbackFeatureBody(params: EnhanceIssueParams): string {
+  const { pageUrl, title, whoBenefits, desiredAction, businessValue, answers } = params
+  return `## Feature Request
+**Title**: ${title}
+**Page URL**: ${pageUrl || 'Not specified'}
+**Who Benefits**: ${whoBenefits || 'Not specified'}
 
-## User Stories
-### Primary User Story
-**As a** user
-**I want to** ${description.toLowerCase()}
-**So that** ${answers[0] || 'it improves my workflow'}
+## Desired Action
+${desiredAction || 'Not provided'}
 
-## Clarifying Questions & Answers
-**Q1**: What problem would this feature solve for you?
-**A1**: ${answers[0] || 'Not provided'}
+## Business Value
+${businessValue || 'Not provided'}
 
-**Q2**: How would you ideally use this feature?
-**A2**: ${answers[1] || 'Not provided'}
-
-**Q3**: How important is this feature to your workflow?
-**A3**: ${answers[2] || 'Not provided'}
+## Follow-up Questions & Answers
+${answers.map((a, i) => `**A${i + 1}**: ${a}`).join('\n\n')}
 
 ## Acceptance Criteria
 - [ ] Feature works as described

@@ -11,6 +11,7 @@ import {
   parseRouteResponse,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { GET as getComponents, POST as createComponent } from '@/app/api/components/route'
@@ -89,7 +90,7 @@ describe('API Authentication', () => {
           componentId: 'fake-id',
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       const response = await createReceipt(request)
@@ -109,7 +110,7 @@ describe('API Authentication', () => {
           componentId: 'fake-id',
           quantity: 50,
           supplier: 'Test Supplier',
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
         },
       })
       const response = await createReceipt(request)
@@ -145,12 +146,7 @@ describe('API Authentication', () => {
       // Create a session with empty selectedCompanyId to simulate edge case
       const incompleteSession = {
         user: {
-          id: TEST_SESSIONS.admin!.user.id,
-          email: TEST_SESSIONS.admin!.user.email,
-          name: TEST_SESSIONS.admin!.user.name,
-          role: 'admin' as const,
-          companyId: TEST_SESSIONS.admin!.user.companyId,
-          companyName: TEST_SESSIONS.admin!.user.companyName,
+          ...TEST_SESSIONS.admin!.user,
           selectedCompanyId: '', // Empty string simulates missing
         },
       }
@@ -168,12 +164,7 @@ describe('API Authentication', () => {
       // Create a session with empty selectedCompanyId to simulate edge case
       const incompleteSession = {
         user: {
-          id: TEST_SESSIONS.admin!.user.id,
-          email: TEST_SESSIONS.admin!.user.email,
-          name: TEST_SESSIONS.admin!.user.name,
-          role: 'admin' as const,
-          companyId: TEST_SESSIONS.admin!.user.companyId,
-          companyName: TEST_SESSIONS.admin!.user.companyName,
+          ...TEST_SESSIONS.admin!.user,
           selectedCompanyId: '', // Empty string simulates missing
         },
       }

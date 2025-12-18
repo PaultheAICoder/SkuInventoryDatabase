@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toLocalDateString } from '@/lib/utils'
 
 interface ReceiptDialogProps {
   open: boolean
@@ -43,7 +44,7 @@ export function ReceiptDialog({
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: toLocalDateString(new Date()),
     quantity: '',
     supplier: '',
     costPerUnit: currentCost,
@@ -108,7 +109,7 @@ export function ReceiptDialog({
 
       // Reset form
       setFormData({
-        date: new Date().toISOString().split('T')[0],
+        date: toLocalDateString(new Date()),
         quantity: '',
         supplier: '',
         costPerUnit: currentCost,

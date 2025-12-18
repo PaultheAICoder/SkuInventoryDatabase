@@ -8,7 +8,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/db'
 import { getConnectionStatus } from '@/services/shopify/client'
 
 export async function GET() {
@@ -21,23 +20,10 @@ export async function GET() {
       )
     }
 
-    // Get user's primary company
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true },
-    })
+    // Use selected company from session (not primary company)
+    const companyId = session.user.selectedCompanyId
 
-    if (!userCompany) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
-    }
-
-    const status = await getConnectionStatus(userCompany.companyId)
+    const status = await getConnectionStatus(companyId)
 
     return NextResponse.json(status)
   } catch (error) {

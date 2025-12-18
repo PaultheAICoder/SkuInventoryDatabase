@@ -8,6 +8,7 @@ import type {
   DefectRateBySKU,
   DefectAnalyticsSummary,
 } from '@/types/analytics'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Get defect analytics for a company
@@ -84,8 +85,8 @@ export async function getDefectAnalytics(
     byBOMVersion,
     bySKU,
     filters: {
-      dateFrom: dateFrom?.toISOString().split('T')[0] ?? null,
-      dateTo: dateTo?.toISOString().split('T')[0] ?? null,
+      dateFrom: dateFrom ? toLocalDateString(dateFrom) : null,
+      dateTo: dateTo ? toLocalDateString(dateTo) : null,
       skuId: skuId ?? null,
       bomVersionId: bomVersionId ?? null,
       salesChannel: salesChannel ?? null,
@@ -244,7 +245,7 @@ function calculateByBOMVersion(transactions: TransactionData[]): DefectRateByBOM
       skuId: tx.sku.id,
       skuName: tx.sku.name,
       skuCode: tx.sku.internalCode,
-      effectiveStartDate: tx.bomVersion.effectiveStartDate.toISOString().split('T')[0],
+      effectiveStartDate: toLocalDateString(tx.bomVersion.effectiveStartDate),
       totalBuilds: 0,
       totalUnits: 0,
       totalDefects: 0,

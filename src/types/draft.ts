@@ -157,6 +157,8 @@ export interface DraftTransactionResponse {
   createdBy: { id: string; name: string }
   reviewedAt: string | null
   reviewedBy: { id: string; name: string } | null
+  deletedAt: string | null
+  deletedBy: { id: string; name: string } | null
   lines: Array<{
     id: string
     component: { id: string; name: string; skuCode: string }

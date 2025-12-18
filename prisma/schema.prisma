@@ -137,6 +137,9 @@ model User {
   // Draft transaction review relation
   transactionsReviewed Transaction[] @relation("TransactionReviewedBy")
 
+  // Soft delete audit relation
+  transactionsDeleted Transaction[] @relation("TransactionDeletedBy")
+
   // Multi-company assignment (SINGLE SOURCE OF TRUTH)
   userCompanies UserCompany[]
 
@@ -326,6 +329,11 @@ model Transaction {
   // BOM snapshot for draft build transactions (frozen at draft creation)
   bomSnapshot Json?
 
+  // Soft delete fields for audit trail
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("TransactionDeletedBy", fields: [deletedById], references: [id])
+
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
   defectAlerts       DefectAlert[]
@@ -342,6 +350,7 @@ model Transaction {
   @@index([toLocationId])
   @@index([sourceType, sourceOrderId])
   @@index([companyId, status])
+  @@index([companyId, status, deletedAt])
 }
 
 model TransactionLine {
@@ -393,6 +402,7 @@ model SKU {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  version      Int      @default(1) // Optimistic locking version
   createdById  String
   createdBy    User     @relation("SKUCreatedBy", fields: [createdById], references: [id])
   updatedById  String
@@ -444,6 +454,7 @@ model BOMVersion {
   qualityMetadata    Json      @default("{}")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
+  version            Int       @default(1) // Optimistic locking version
   createdById        String
   createdBy          User      @relation(fields: [createdById], references: [id])
 

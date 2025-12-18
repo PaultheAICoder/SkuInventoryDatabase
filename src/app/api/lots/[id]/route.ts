@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db'
 import { success, unauthorized, notFound, serverError } from '@/lib/api-response'
 import type { LotDetailResponse } from '@/types/lot'
 import { calculateExpiryStatus, getLotBalance } from '@/services/lot'
+import { toLocalDateString } from '@/lib/utils'
 
 type RouteParams = { params: Promise<{ id: string }> }
 
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       componentId: lot.componentId,
       componentName: lot.component.name,
       componentSkuCode: lot.component.skuCode,
-      expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+      expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
       receivedQuantity: lot.receivedQuantity.toString(),
       balance: balance.toFixed(4),
       supplier: lot.supplier,

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { success, unauthorized, notFound, serverError, parseQuery } from '@/lib/api-response'
 import type { LotTraceResponse, LotTransactionResponse, AffectedSkuResponse } from '@/types/lot'
 import { getAffectedSkusForLot } from '@/services/lot'
+import { toLocalDateString } from '@/lib/utils'
 
 // Query schema for trace endpoint
 const traceQuerySchema = z.object({
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Transform transaction lines to response format
     const transactions: LotTransactionResponse[] = transactionLines.map((line) => ({
       id: line.transaction.id,
-      date: line.transaction.date.toISOString().split('T')[0],
+      date: toLocalDateString(line.transaction.date),
       type: line.transaction.type,
       quantityChange: line.quantityChange.toString(),
       skuId: line.transaction.sku?.id ?? null,

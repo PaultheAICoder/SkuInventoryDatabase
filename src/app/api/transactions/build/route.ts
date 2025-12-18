@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, error, serverError, parseBody } from '@/lib/api-response'
 import { createBuildSchema } from '@/types/transaction'
 import { createBuildTransaction, getCompanySettings, checkInsufficientInventory, checkExpiredLotsForBuild } from '@/services/inventory'
 import { validateLotOverrides } from '@/services/lot-selection'
+import { toLocalDateString } from '@/lib/utils'
 
 // POST /api/transactions/build - Create a build transaction
 export async function POST(request: NextRequest) {
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check role - Viewer cannot create transactions
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return unauthorized('You do not have permission to create transactions')
     }
 
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!sku.bomVersions[0]) {
-      const buildDateStr = data.date.toISOString().split('T')[0]
+      const buildDateStr = toLocalDateString(data.date)
       return error(`No BOM version effective on ${buildDateStr} for this SKU`, 400)
     }
 
@@ -168,7 +170,7 @@ export async function POST(request: NextRequest) {
         data: {
           id: result.transaction.id,
           type: result.transaction.type,
-          date: result.transaction.date.toISOString().split('T')[0],
+          date: toLocalDateString(result.transaction.date),
           sku: result.transaction.sku,
           bomVersion: result.transaction.bomVersion,
           locationId: result.transaction.locationId,
@@ -193,7 +195,7 @@ export async function POST(request: NextRequest) {
               ? {
                   id: line.lot.id,
                   lotNumber: line.lot.lotNumber,
-                  expiryDate: line.lot.expiryDate?.toISOString().split('T')[0] ?? null,
+                  expiryDate: line.lot.expiryDate ? toLocalDateString(line.lot.expiryDate) : null,
                 }
               : null,
           })),

@@ -10,6 +10,7 @@ import {
   generateExportFilename,
   type LotExportData,
 } from '@/services/export'
+import { toLocalDateString } from '@/lib/utils'
 
 // GET /api/export/lots - Export all lots to CSV
 export async function GET(_request: NextRequest) {
@@ -49,7 +50,7 @@ export async function GET(_request: NextRequest) {
         lotNumber: lot.lotNumber,
         componentName: lot.component.name,
         componentSkuCode: lot.component.skuCode,
-        expiryDate: lot.expiryDate?.toISOString().split('T')[0] ?? null,
+        expiryDate: lot.expiryDate ? toLocalDateString(lot.expiryDate) : null,
         receivedQuantity: lot.receivedQuantity.toString(),
         balance: lot.balance?.quantity.toString() ?? '0',
         supplier: lot.supplier,

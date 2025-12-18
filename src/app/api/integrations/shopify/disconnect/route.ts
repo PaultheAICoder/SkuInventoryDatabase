@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { logCredentialAudit } from '@/lib/encryption'
 
@@ -21,34 +21,21 @@ export async function POST() {
       )
     }
 
-    // Get user's primary company and verify admin role
-    const userCompany = await prisma.userCompany.findFirst({
-      where: {
-        userId: session.user.id,
-        isPrimary: true,
-      },
-      select: { companyId: true, role: true },
-    })
-
-    if (!userCompany) {
-      return NextResponse.json(
-        { error: 'User must belong to a company' },
-        { status: 400 }
-      )
-    }
-
-    // Only admin can disconnect
-    if (userCompany.role !== 'admin') {
+    // Admin only (using company-specific role)
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return NextResponse.json(
         { error: 'Only admins can disconnect integrations' },
         { status: 403 }
       )
     }
 
+    const companyId = session.user.selectedCompanyId
+
     // Find and deactivate connection
     const connection = await prisma.shopifyConnection.findFirst({
       where: {
-        companyId: userCompany.companyId,
+        companyId,
         isActive: true,
       },
     })
@@ -79,7 +66,7 @@ export async function POST() {
       success: true,
       metadata: {
         shopName: connection.shopName,
-        companyId: userCompany.companyId,
+        companyId,
       },
     })
 

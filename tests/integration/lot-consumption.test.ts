@@ -21,6 +21,7 @@ import {
   getOrCreateDefaultLocation,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
+import { toLocalDateString } from '@/lib/utils'
 
 // Import route handlers directly
 import { POST as createBuild } from '@/app/api/transactions/build/route'
@@ -42,6 +43,7 @@ describe('Lot Consumption Integration', () => {
 
   /**
    * Helper to create a lot with balance for a component
+   * Also creates/updates InventoryBalance for checkInsufficientInventory validation
    */
   async function createLotWithBalance(
     componentId: string,
@@ -50,6 +52,17 @@ describe('Lot Consumption Integration', () => {
     expiryDate?: Date
   ): Promise<{ lotId: string; lotNumber: string }> {
     const prisma = getIntegrationPrisma()
+
+    // Get component to find companyId for location lookup
+    const component = await prisma.component.findUnique({
+      where: { id: componentId },
+      select: { companyId: true },
+    })
+    if (!component) throw new Error('Component not found')
+
+    // Get default location for inventory balance
+    const location = await getOrCreateDefaultLocation(component.companyId)
+
     const lot = await prisma.lot.create({
       data: {
         componentId,
@@ -59,12 +72,34 @@ describe('Lot Consumption Integration', () => {
         supplier: 'Test Supplier',
       },
     })
+
     await prisma.lotBalance.create({
       data: {
         lotId: lot.id,
         quantity: new Prisma.Decimal(quantity),
       },
     })
+
+    // Create/update InventoryBalance for checkInsufficientInventory validation
+    await prisma.inventoryBalance.upsert({
+      where: {
+        componentId_locationId: {
+          componentId,
+          locationId: location.id,
+        },
+      },
+      create: {
+        componentId,
+        locationId: location.id,
+        quantity: new Prisma.Decimal(quantity),
+      },
+      update: {
+        quantity: {
+          increment: new Prisma.Decimal(quantity),
+        },
+      },
+    })
+
     return { lotId: lot.id, lotNumber: lot.lotNumber }
   }
 
@@ -97,6 +132,7 @@ describe('Lot Consumption Integration', () => {
 
   /**
    * Helper to add inventory to a component (pooled, no lot)
+   * Also updates InventoryBalance for checkInsufficientInventory validation
    */
   async function addPooledInventory(
     companyId: string,
@@ -119,6 +155,26 @@ describe('Lot Consumption Integration', () => {
             quantityChange: new Prisma.Decimal(quantity),
             costPerUnit: new Prisma.Decimal(10),
           },
+        },
+      },
+    })
+
+    // Update InventoryBalance for checkInsufficientInventory validation
+    await prisma.inventoryBalance.upsert({
+      where: {
+        componentId_locationId: {
+          componentId,
+          locationId: location.id,
+        },
+      },
+      create: {
+        componentId,
+        locationId: location.id,
+        quantity: new Prisma.Decimal(quantity),
+      },
+      update: {
+        quantity: {
+          increment: new Prisma.Decimal(quantity),
         },
       },
     })
@@ -157,7 +213,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -204,7 +260,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 10,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -246,7 +302,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 3,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -278,7 +334,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 5,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
         },
       })
@@ -289,11 +345,17 @@ describe('Lot Consumption Integration', () => {
       expect(result.status).toBe(201)
 
       // Verify lines were created with no lotId
+      // Note: created() wraps response in { data }, and route passes { data: {...} }, so lines are at data.data.lines
       interface TransactionLine {
         component: { id: string }
         lotId: string | null
       }
-      const lines = (result.data as { lines?: TransactionLine[] })?.lines ?? []
+      interface ResponseData {
+        data?: { lines?: TransactionLine[] }
+        lines?: TransactionLine[]
+      }
+      const responseData = result.data as ResponseData
+      const lines = responseData?.data?.lines ?? responseData?.lines ?? []
       expect(lines.length).toBeGreaterThan(0)
       const pooledLine = lines.find((l) => l.component.id === pooledComponent.id)
       expect(pooledLine).toBeDefined()
@@ -332,7 +394,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 2,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -495,6 +557,17 @@ describe('Lot Consumption Integration', () => {
           companyId: companyB.companyId,
           selectedCompanyId: companyB.companyId,
           companyName: 'Test Company',
+          selectedCompanyName: 'Test Company',
+          companies: [{ id: companyB.companyId, name: 'Test Company', role: 'admin' }],
+          companiesWithBrands: [{
+            id: companyB.companyId,
+            name: 'Test Company',
+            role: 'admin',
+            brands: [{ id: companyB.brandId, name: 'Test Brand' }],
+          }],
+          brands: [{ id: companyB.brandId, name: 'Test Brand' }],
+          selectedBrandId: companyB.brandId,
+          selectedBrandName: 'Test Brand',
         },
       })
 
@@ -504,7 +577,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: skuB.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -589,6 +662,17 @@ describe('Lot Consumption Integration', () => {
           companyId: companyB.companyId,
           selectedCompanyId: companyB.companyId,
           companyName: 'Test Company',
+          selectedCompanyName: 'Test Company',
+          companies: [{ id: companyB.companyId, name: 'Test Company', role: 'admin' }],
+          companiesWithBrands: [{
+            id: companyB.companyId,
+            name: 'Test Company',
+            role: 'admin',
+            brands: [{ id: companyB.brandId, name: 'Test Brand' }],
+          }],
+          brands: [{ id: companyB.brandId, name: 'Test Brand' }],
+          selectedBrandId: companyB.brandId,
+          selectedBrandName: 'Test Brand',
         },
       })
 
@@ -598,7 +682,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: skuB.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {
@@ -643,7 +727,7 @@ describe('Lot Consumption Integration', () => {
         body: {
           skuId: sku.id,
           unitsToBuild: 1,
-          date: new Date().toISOString().split('T')[0],
+          date: toLocalDateString(new Date()),
           outputToFinishedGoods: false,
           lotOverrides: [
             {

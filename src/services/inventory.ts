@@ -9,6 +9,7 @@ import {
 import { evaluateDefectThreshold } from './alert'
 import { getDefaultLocationId } from './location'
 import { getAvailableLotsForComponent, consumeLotsForBuildTx } from './lot-selection'
+import { toLocalDateString } from '@/lib/utils'
 
 /**
  * Update inventory balance atomically within a transaction
@@ -756,7 +757,7 @@ export async function checkExpiredLotsForBuild(params: {
           skuCode: line.component.skuCode,
           lotId: lot.lotId,
           lotNumber: lot.lotNumber,
-          expiryDate: lot.expiryDate!.toISOString().split('T')[0],
+          expiryDate: toLocalDateString(lot.expiryDate!),
           quantity: toConsume,
         })
       }

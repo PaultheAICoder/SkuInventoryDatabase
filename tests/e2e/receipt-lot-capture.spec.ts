@@ -1,6 +1,17 @@
 import { test, expect } from '@playwright/test'
 
 /**
+ * Format date to YYYY-MM-DD using local timezone (not UTC).
+ * Mirrors toLocalDateString from src/lib/utils.ts for E2E tests.
+ */
+function toLocalDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
  * E2E Tests for Receipt Dialog Lot Capture (Issue #81)
  *
  * Verifies that the ReceiptDialog displays lot number and expiry date fields
@@ -215,7 +226,7 @@ test.describe('Receipt API Lot Capture', () => {
         componentId,
         quantity: 5,
         supplier: 'E2E Test Supplier',
-        date: new Date().toISOString().split('T')[0],
+        date: toLocalDateString(new Date()),
         lotNumber: `E2E-LOT-${Date.now()}`,
         expiryDate: '2025-12-31',
       },

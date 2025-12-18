@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { success, unauthorized, serverError } from '@/lib/api-response'
 import { updateThresholdSchema } from '@/types/alert'
 import {
@@ -23,7 +23,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return unauthorized()
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return unauthorized('Insufficient permissions')
     }
 
@@ -37,7 +38,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     // Otherwise update threshold (admin only)
-    if (session.user.role !== 'admin') {
+    if (companyRole !== 'admin') {
       return unauthorized('Admin access required')
     }
 
@@ -62,7 +63,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) return unauthorized()
-    if (session.user.role !== 'admin') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
       return unauthorized('Admin access required')
     }
 

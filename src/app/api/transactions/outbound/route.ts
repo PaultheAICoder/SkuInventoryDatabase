@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { created, unauthorized, notFound, serverError, parseBody, error } from '@/lib/api-response'
 import { createOutboundSchema } from '@/types/transaction'
 import { createOutboundTransaction } from '@/services/finished-goods'
 import { getDefaultLocationId } from '@/services/location'
+import { toLocalDateString } from '@/lib/utils'
 
 // POST /api/transactions/outbound - Create an outbound transaction (ship SKUs)
 export async function POST(request: NextRequest) {
@@ -16,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check role - Viewer cannot create transactions
-    if (session.user.role === 'viewer') {
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole === 'viewer') {
       return unauthorized('You do not have permission to create transactions')
     }
 
@@ -91,7 +93,7 @@ export async function POST(request: NextRequest) {
       return created({
         id: result.id,
         type: 'outbound',
-        date: data.date.toISOString().split('T')[0],
+        date: toLocalDateString(data.date),
         skuId: data.skuId,
         sku: { id: sku.id, name: sku.name },
         salesChannel: data.salesChannel,

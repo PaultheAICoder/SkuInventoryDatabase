@@ -18,9 +18,20 @@ export async function POST(request: NextRequest) {
       return error
     }
 
+    // Pass all structured data to AI for context-aware question generation
     const result = await generateClarifyingQuestions({
       type: data.type,
-      description: data.description,
+      pageUrl: data.pageUrl,
+      title: data.title,
+      // Bug fields
+      expectedBehavior: data.expectedBehavior,
+      actualBehavior: data.actualBehavior,
+      stepsToReproduce: data.stepsToReproduce,
+      screenshotUrl: data.screenshotUrl,
+      // Feature fields
+      whoBenefits: data.whoBenefits,
+      desiredAction: data.desiredAction,
+      businessValue: data.businessValue,
     })
 
     const response: ClarifyResponse = {

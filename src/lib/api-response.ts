@@ -61,6 +61,14 @@ export function conflict(message: string): NextResponse<ApiError> {
   return error(message, 409, 'Conflict')
 }
 
+export function versionConflict(resource = 'Record'): NextResponse<ApiError> {
+  return error(
+    `${resource} has been modified by another user. Please refresh and try again.`,
+    409,
+    'VersionConflict'
+  )
+}
+
 export function validationError(zodError: ZodError): NextResponse<ApiError> {
   const details = zodError.issues.map((issue) => ({
     field: issue.path.join('.'),
