@@ -26,7 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Loader2, Link2, Unlink, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { Loader2, Link2, Unlink, Search, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import { AsinMappingModal } from './asin-mapping-modal'
 
 interface Brand {
@@ -74,6 +74,7 @@ export function AsinMappingList({ brands, isAdmin = false }: AsinMappingListProp
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedUnmapped, setSelectedUnmapped] = useState<UnmappedAsin | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [manualModalOpen, setManualModalOpen] = useState(false)
 
   const fetchMappings = useCallback(async () => {
     setLoading(true)
@@ -140,6 +141,11 @@ export function AsinMappingList({ brands, isAdmin = false }: AsinMappingListProp
     fetchMappings()
   }
 
+  const handleManualMappingCreated = () => {
+    setManualModalOpen(false)
+    fetchMappings()
+  }
+
   // Filter mappings by search term
   const filteredMappings = mappings.filter(m =>
     m.asin.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -181,6 +187,12 @@ export function AsinMappingList({ brands, isAdmin = false }: AsinMappingListProp
                 Map Amazon ASINs to your internal SKU codes for sales attribution.
               </CardDescription>
             </div>
+            {isAdmin && (
+              <Button onClick={() => setManualModalOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Mapping
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -348,9 +360,19 @@ export function AsinMappingList({ brands, isAdmin = false }: AsinMappingListProp
       <AsinMappingModal
         open={modalOpen}
         onOpenChange={setModalOpen}
+        mode="map-unmapped"
         unmappedAsin={selectedUnmapped}
         brands={brands}
         onSuccess={handleMappingCreated}
+      />
+
+      {/* Manual Entry Modal */}
+      <AsinMappingModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        mode="manual-entry"
+        brands={brands}
+        onSuccess={handleManualMappingCreated}
       />
     </>
   )

@@ -18,6 +18,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2, Search, Check } from 'lucide-react'
 
 interface Brand {
@@ -42,7 +49,8 @@ interface UnmappedAsin {
 interface AsinMappingModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  unmappedAsin: UnmappedAsin | null
+  mode: 'map-unmapped' | 'manual-entry'
+  unmappedAsin?: UnmappedAsin | null
   brands: Brand[]
   onSuccess: () => void
 }
@@ -50,8 +58,9 @@ interface AsinMappingModalProps {
 export function AsinMappingModal({
   open,
   onOpenChange,
+  mode,
   unmappedAsin,
-  brands: _brands,
+  brands,
   onSuccess,
 }: AsinMappingModalProps) {
   const [selectedSku, setSelectedSku] = useState<string>('')
@@ -60,6 +69,9 @@ export function AsinMappingModal({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [manualAsin, setManualAsin] = useState('')
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('')
+  const [asinError, setAsinError] = useState<string | null>(null)
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -67,9 +79,31 @@ export function AsinMappingModal({
       setSelectedSku('')
       setSearchTerm('')
       setError(null)
+      setManualAsin('')
+      setAsinError(null)
+      // Pre-select brand from unmappedAsin if in map-unmapped mode
+      if (mode === 'map-unmapped' && unmappedAsin) {
+        setSelectedBrandId(unmappedAsin.brandId)
+      } else {
+        setSelectedBrandId('')
+      }
       fetchSkus()
     }
-  }, [open])
+  }, [open, mode, unmappedAsin])
+
+  const validateAsin = (asin: string): string | null => {
+    if (!asin) return null // Don't show error for empty
+    if (!/^[A-Z0-9]{10}$/i.test(asin)) {
+      return 'ASIN must be 10 alphanumeric characters'
+    }
+    return null
+  }
+
+  const handleAsinChange = (value: string) => {
+    const upperValue = value.toUpperCase()
+    setManualAsin(upperValue)
+    setAsinError(validateAsin(upperValue))
+  }
 
   const fetchSkus = async () => {
     setLoading(true)
@@ -87,9 +121,28 @@ export function AsinMappingModal({
   }
 
   const handleSubmit = async () => {
-    if (!unmappedAsin || !selectedSku) {
-      setError('Please select a SKU')
+    // Determine ASIN and brandId based on mode
+    const asin = mode === 'manual-entry' ? manualAsin : unmappedAsin?.asin
+    const brandId = mode === 'manual-entry' ? selectedBrandId : unmappedAsin?.brandId
+
+    if (!asin || !brandId || !selectedSku) {
+      if (!asin) {
+        setError('Please enter an ASIN')
+      } else if (!brandId) {
+        setError('Please select a brand')
+      } else {
+        setError('Please select a SKU')
+      }
       return
+    }
+
+    // Validate ASIN format for manual entry
+    if (mode === 'manual-entry') {
+      const validationError = validateAsin(asin)
+      if (validationError) {
+        setError(validationError)
+        return
+      }
     }
 
     setSaving(true)
@@ -100,10 +153,10 @@ export function AsinMappingModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brandId: unmappedAsin.brandId,
-          asin: unmappedAsin.asin,
+          brandId,
+          asin,
           skuId: selectedSku,
-          productName: unmappedAsin.productName,
+          productName: mode === 'map-unmapped' ? unmappedAsin?.productName : null,
         }),
       })
 
@@ -137,9 +190,13 @@ export function AsinMappingModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Map ASIN to SKU</DialogTitle>
+          <DialogTitle>
+            {mode === 'manual-entry' ? 'Add ASIN Mapping' : 'Map ASIN to SKU'}
+          </DialogTitle>
           <DialogDescription>
-            Select an internal SKU to map to this Amazon ASIN.
+            {mode === 'manual-entry'
+              ? 'Enter an ASIN and select a brand and SKU to create a mapping.'
+              : 'Select an internal SKU to map to this Amazon ASIN.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -150,26 +207,60 @@ export function AsinMappingModal({
         )}
 
         <div className="space-y-4 py-4">
-          {/* ASIN Info */}
-          <div className="space-y-2">
-            <Label>ASIN</Label>
-            <div className="rounded-md bg-muted p-3">
-              <div className="font-mono font-medium">{unmappedAsin?.asin}</div>
-              {unmappedAsin?.productName && (
-                <div className="text-sm text-muted-foreground mt-1">
-                  {unmappedAsin.productName}
-                </div>
+          {/* ASIN Field */}
+          {mode === 'manual-entry' ? (
+            <div className="space-y-2">
+              <Label htmlFor="asin-input">ASIN</Label>
+              <Input
+                id="asin-input"
+                placeholder="e.g., B07XXXXXXXXX"
+                value={manualAsin}
+                onChange={(e) => handleAsinChange(e.target.value)}
+                maxLength={10}
+              />
+              {asinError && (
+                <p className="text-sm text-destructive">{asinError}</p>
               )}
             </div>
-          </div>
-
-          {/* Brand Info */}
-          <div className="space-y-2">
-            <Label>Brand</Label>
-            <div className="rounded-md bg-muted p-3">
-              {unmappedAsin?.brandName}
+          ) : (
+            <div className="space-y-2">
+              <Label>ASIN</Label>
+              <div className="rounded-md bg-muted p-3">
+                <div className="font-mono font-medium">{unmappedAsin?.asin}</div>
+                {unmappedAsin?.productName && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {unmappedAsin.productName}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Brand Field */}
+          {mode === 'manual-entry' ? (
+            <div className="space-y-2">
+              <Label>Brand</Label>
+              <Select value={selectedBrandId} onValueChange={setSelectedBrandId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map(brand => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Brand</Label>
+              <div className="rounded-md bg-muted p-3">
+                {unmappedAsin?.brandName}
+              </div>
+            </div>
+          )}
 
           {/* SKU Selection */}
           <div className="space-y-2">
@@ -236,7 +327,14 @@ export function AsinMappingModal({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || !selectedSku}>
+          <Button
+            onClick={handleSubmit}
+            disabled={
+              saving ||
+              !selectedSku ||
+              (mode === 'manual-entry' && (!manualAsin || !selectedBrandId || !!asinError))
+            }
+          >
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
