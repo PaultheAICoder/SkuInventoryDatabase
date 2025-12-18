@@ -70,15 +70,16 @@ export async function PUT(request: NextRequest) {
       return unauthorized()
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
+
     // Only admins can update config
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return forbidden()
-    }
-
-    const selectedCompanyId = session.user.selectedCompanyId
-    if (!selectedCompanyId) {
-      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
     const bodyResult = await parseBody(request, updateForecastConfigSchema)
