@@ -14,6 +14,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -30,9 +39,6 @@ export async function GET(request: NextRequest) {
     }
 
     const { page, pageSize, search, isActive, sortBy, sortOrder } = validation.data
-
-    // Use selected company for scoping
-    const selectedCompanyId = session.user.selectedCompanyId
 
     // Build where clause
     const where: Prisma.CategoryWhereInput = {
@@ -120,6 +126,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -136,9 +151,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { name } = validation.data
-
-    // Use selected company for scoping
-    const selectedCompanyId = session.user.selectedCompanyId
 
     // Check if name already exists for this company
     const existingCategory = await prisma.category.findFirst({

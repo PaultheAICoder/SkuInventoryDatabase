@@ -13,6 +13,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Admin-only access
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
@@ -30,8 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { message } = validation.data
-    const companyId = session.user.selectedCompanyId
-    const response = await sendChatMessage(message, [], companyId)
+    const response = await sendChatMessage(message, [], selectedCompanyId)
 
     return NextResponse.json({ data: response })
   } catch (error) {

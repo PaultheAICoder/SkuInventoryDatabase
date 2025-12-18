@@ -19,6 +19,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Admin or Ops only for viewing sync logs
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin' && companyRole !== 'ops') {
@@ -35,8 +44,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10)
     const offset = parseInt(searchParams.get('offset') || '0', 10)
 
-    const companyId = session.user.selectedCompanyId
-
     // Build where clause
     const where: Prisma.SyncLogWhereInput = {}
 
@@ -45,7 +52,7 @@ export async function GET(request: NextRequest) {
     } else {
       // Filter to only credentials belonging to user's company
       where.credential = {
-        companyId,
+        companyId: selectedCompanyId,
       }
     }
 
