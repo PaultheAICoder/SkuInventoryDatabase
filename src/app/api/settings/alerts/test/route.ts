@@ -6,6 +6,7 @@ import {
   unauthorized,
   forbidden,
   serverError,
+  error,
 } from '@/lib/api-response'
 import { getAlertConfig } from '@/services/lowstock-alert'
 import {
@@ -32,6 +33,12 @@ export async function POST(request: NextRequest) {
 
     if (!session?.user) {
       return unauthorized()
+    }
+
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
     const companyRole = getSelectedCompanyRole(session)
@@ -92,7 +99,7 @@ export async function POST(request: NextRequest) {
       if (body.webhookUrl) {
         webhookUrl = body.webhookUrl
       } else {
-        const config = await getAlertConfig(session.user.selectedCompanyId)
+        const config = await getAlertConfig(selectedCompanyId)
         webhookUrl = config?.slackWebhookUrl ?? null
       }
 

@@ -7,6 +7,7 @@ import {
   forbidden,
   serverError,
   validationError,
+  error,
 } from '@/lib/api-response'
 import {
   getAlertConfig,
@@ -25,12 +26,18 @@ export async function GET() {
       return unauthorized()
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return forbidden()
     }
 
-    const config = await getAlertConfig(session.user.selectedCompanyId)
+    const config = await getAlertConfig(selectedCompanyId)
 
     // Mask webhook URL for security (show only last 8 chars)
     const maskedConfig = config
@@ -61,6 +68,12 @@ export async function PATCH(request: NextRequest) {
       return unauthorized()
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return error('No company selected. Please select a company from the sidebar.', 400)
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return forbidden()
@@ -74,7 +87,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const config = await upsertAlertConfig(
-      session.user.selectedCompanyId,
+      selectedCompanyId,
       validation.data
     )
 

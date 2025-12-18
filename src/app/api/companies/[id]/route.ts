@@ -16,6 +16,15 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -90,6 +99,15 @@ export async function PATCH(
 
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
     }
 
     const companyRole = getSelectedCompanyRole(session)
@@ -292,6 +310,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -321,7 +348,7 @@ export async function DELETE(
     }
 
     // Prevent deletion of current company
-    if (id === session.user.selectedCompanyId) {
+    if (id === selectedCompanyId) {
       return NextResponse.json(
         { error: 'Cannot delete the company you are currently viewing' },
         { status: 400 }

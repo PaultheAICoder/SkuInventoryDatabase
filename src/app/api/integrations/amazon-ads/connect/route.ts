@@ -20,6 +20,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Admin only
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
@@ -38,7 +47,7 @@ export async function POST(request: NextRequest) {
       // Body is optional
     }
 
-    const companyId = session.user.selectedCompanyId
+    const companyId = selectedCompanyId
 
     // Generate secure state token for CSRF protection
     const state = randomBytes(32).toString('hex')

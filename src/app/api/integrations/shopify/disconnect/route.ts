@@ -21,6 +21,15 @@ export async function POST() {
       )
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     // Admin only (using company-specific role)
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
@@ -30,7 +39,7 @@ export async function POST() {
       )
     }
 
-    const companyId = session.user.selectedCompanyId
+    const companyId = selectedCompanyId
 
     // Find and deactivate connection
     const connection = await prisma.shopifyConnection.findFirst({

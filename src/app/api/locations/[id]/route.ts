@@ -17,15 +17,21 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params
-
-    // Use selected company for scoping
-    const selectedCompanyId = session.user.selectedCompanyId
 
     const location = await prisma.location.findUnique({
       where: {
@@ -73,6 +79,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -80,9 +95,6 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-
-    // Use selected company for scoping
-    const selectedCompanyId = session.user.selectedCompanyId
 
     const validation = updateLocationSchema.safeParse(body)
 
@@ -194,15 +206,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
     const companyRole = getSelectedCompanyRole(session)
     if (companyRole !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params
-
-    // Use selected company for scoping
-    const selectedCompanyId = session.user.selectedCompanyId
 
     // Check if location exists and belongs to the selected company
     const existingLocation = await prisma.location.findUnique({
