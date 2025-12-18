@@ -108,10 +108,12 @@ export function AsinMappingModal({
   const fetchSkus = async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/skus?limit=500')
+      const response = await fetch('/api/skus?pageSize=100')
       if (response.ok) {
         const data = await response.json()
-        setSkus(data.data || [])
+        const skuData = data.data
+        // Ensure we always have an array
+        setSkus(Array.isArray(skuData) ? skuData : [])
       }
     } catch {
       // SKUs are required for mapping
