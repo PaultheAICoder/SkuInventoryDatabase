@@ -9,10 +9,11 @@ import {
   cleanupBeforeTest,
   createTestRequest,
   createTestComponentInDb,
+  createTransactionWithBalance,
+  createBatchTransactionWithBalances,
 } from '../helpers/integration-context'
 import { disconnectTestDb } from '../helpers/db'
 import { getComponentsWithReorderStatus } from '@/services/inventory'
-import { Prisma } from '@prisma/client'
 
 // Import route handler for API testing
 import { GET as getComponents } from '@/app/api/components/route'
@@ -36,7 +37,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('returns critical status when quantity <= reorderPoint', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
 
       // Create component with reorderPoint=100
       const component = await createTestComponentInDb(companyId, {
@@ -46,26 +46,7 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Add initial transaction with quantity 50 (below reorderPoint)
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            create: {
-              componentId: component.id,
-              quantityChange: new Prisma.Decimal(50),
-              costPerUnit: new Prisma.Decimal(10),
-            },
-          },
-        },
-      })
+      await createTransactionWithBalance(companyId, component.id, 50)
 
       const result = await getComponentsWithReorderStatus({
         companyId,
@@ -87,7 +68,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('returns warning status when quantity > reorderPoint and <= reorderPoint * multiplier', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
 
       // Create component with reorderPoint=100
       const component = await createTestComponentInDb(companyId, {
@@ -97,26 +77,7 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Add initial transaction with quantity 120 (above 100, below 150 with 1.5x multiplier)
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            create: {
-              componentId: component.id,
-              quantityChange: new Prisma.Decimal(120),
-              costPerUnit: new Prisma.Decimal(10),
-            },
-          },
-        },
-      })
+      await createTransactionWithBalance(companyId, component.id, 120)
 
       const result = await getComponentsWithReorderStatus({
         companyId,
@@ -138,7 +99,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('returns ok status when quantity > reorderPoint * multiplier', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
 
       // Create component with reorderPoint=100
       const component = await createTestComponentInDb(companyId, {
@@ -148,26 +108,7 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Add initial transaction with quantity 200 (above 150 with 1.5x multiplier)
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            create: {
-              componentId: component.id,
-              quantityChange: new Prisma.Decimal(200),
-              costPerUnit: new Prisma.Decimal(10),
-            },
-          },
-        },
-      })
+      await createTransactionWithBalance(companyId, component.id, 200)
 
       const result = await getComponentsWithReorderStatus({
         companyId,
@@ -216,11 +157,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('filters correctly by reorderStatus - excludes non-matching', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
-
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
 
       // Create 3 components with different status levels
       const criticalComp = await createTestComponentInDb(companyId, {
@@ -240,25 +176,11 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Set quantities: critical=50, warning=120, ok=200
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            createMany: {
-              data: [
-                { componentId: criticalComp.id, quantityChange: new Prisma.Decimal(50), costPerUnit: new Prisma.Decimal(10) },
-                { componentId: warningComp.id, quantityChange: new Prisma.Decimal(120), costPerUnit: new Prisma.Decimal(10) },
-                { componentId: okComp.id, quantityChange: new Prisma.Decimal(200), costPerUnit: new Prisma.Decimal(10) },
-              ],
-            },
-          },
-        },
-      })
+      await createBatchTransactionWithBalances(companyId, [
+        { componentId: criticalComp.id, quantity: 50 },
+        { componentId: warningComp.id, quantity: 120 },
+        { componentId: okComp.id, quantity: 200 },
+      ])
 
       // Query for critical only
       const criticalResult = await getComponentsWithReorderStatus({
@@ -306,11 +228,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('returns correct total count for pagination', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
-
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
 
       // Create 5 critical components
       const components = []
@@ -323,25 +240,10 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       }
 
       // Set all to critical (quantity 50)
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            createMany: {
-              data: components.map(c => ({
-                componentId: c.id,
-                quantityChange: new Prisma.Decimal(50),
-                costPerUnit: new Prisma.Decimal(10),
-              })),
-            },
-          },
-        },
-      })
+      await createBatchTransactionWithBalances(
+        companyId,
+        components.map(c => ({ componentId: c.id, quantity: 50 }))
+      )
 
       // Query with pageSize=2
       const result = await getComponentsWithReorderStatus({
@@ -361,7 +263,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('respects custom reorderWarningMultiplier', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
 
       // Create component with reorderPoint=100
       const component = await createTestComponentInDb(companyId, {
@@ -371,26 +272,7 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Add initial transaction with quantity 180
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            create: {
-              componentId: component.id,
-              quantityChange: new Prisma.Decimal(180),
-              costPerUnit: new Prisma.Decimal(10),
-            },
-          },
-        },
-      })
+      await createTransactionWithBalance(companyId, component.id, 180)
 
       // With multiplier 1.5: threshold=150, quantity 180 -> 'ok'
       const result15 = await getComponentsWithReorderStatus({
@@ -420,11 +302,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('filters by search term', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
-
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
 
       // Create components
       const alpha = await createTestComponentInDb(companyId, {
@@ -439,24 +316,10 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
       })
 
       // Set both to critical
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            createMany: {
-              data: [
-                { componentId: alpha.id, quantityChange: new Prisma.Decimal(50), costPerUnit: new Prisma.Decimal(10) },
-                { componentId: beta.id, quantityChange: new Prisma.Decimal(50), costPerUnit: new Prisma.Decimal(10) },
-              ],
-            },
-          },
-        },
-      })
+      await createBatchTransactionWithBalances(companyId, [
+        { componentId: alpha.id, quantity: 50 },
+        { componentId: beta.id, quantity: 50 },
+      ])
 
       // Search for "Alpha"
       const result = await getComponentsWithReorderStatus({
@@ -479,11 +342,6 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
     it('uses DB-side filtering for reorderStatus parameter', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const companyId = TEST_SESSIONS.admin!.user.companyId
-      const prisma = getIntegrationPrisma()
-
-      const location = await prisma.location.findFirst({
-        where: { companyId, isDefault: true },
-      })
 
       // Create critical component
       const component = await createTestComponentInDb(companyId, {
@@ -492,23 +350,7 @@ describe('DB-side Reorder Status Filtering (Issue #292)', () => {
         reorderPoint: 100,
       })
 
-      await prisma.transaction.create({
-        data: {
-          companyId,
-          type: 'initial',
-          date: new Date(),
-          status: 'approved',
-          locationId: location!.id,
-          createdById: TEST_SESSIONS.admin!.user.id,
-          lines: {
-            create: {
-              componentId: component.id,
-              quantityChange: new Prisma.Decimal(50),
-              costPerUnit: new Prisma.Decimal(10),
-            },
-          },
-        },
-      })
+      await createTransactionWithBalance(companyId, component.id, 50)
 
       const request = createTestRequest('/api/components', {
         method: 'GET',
