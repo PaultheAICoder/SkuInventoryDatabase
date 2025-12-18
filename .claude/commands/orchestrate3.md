@@ -195,6 +195,20 @@ EOF
 
 2. Report to user: "⏱️ Timing metrics initialized for Issue #$ISSUE_NUMBER (3-agent workflow)"
 
+### Pre-Workflow: Migration Snapshot (MANDATORY)
+
+**Purpose**: Track if new database migrations are created during the workflow
+
+**Your Role**:
+1. Snapshot current migrations before Build agent:
+   ```bash
+   bash scripts/track-migration-changes.sh snapshot "$ISSUE_NUMBER"
+   ```
+
+2. Report to user: "📸 Migration snapshot captured"
+
+**Why**: If Build agent creates a migration, we need to detect it and STOP the workflow for manual review before applying to production.
+
 ### Phase 1: Scout-and-Plan Agent
 
 **Purpose**: Investigation, analysis, and detailed implementation planning (combined)
@@ -268,6 +282,64 @@ Execute subtasks in order, validate each subtask, fix all warnings.
 **Success**: All code created, build output file complete, ready for testing`
 })
 ```
+
+### Post-Build: Migration Check (MANDATORY - STOP POINT)
+
+**Purpose**: Detect if Build agent created any new database migrations
+
+**Your Role**:
+1. After Build agent completes, check for new migrations:
+   ```bash
+   MIGRATION_CHECK=$(bash scripts/track-migration-changes.sh check "$ISSUE_NUMBER" 2>&1)
+   MIGRATION_EXIT_CODE=$?
+   echo "$MIGRATION_CHECK"
+   ```
+
+2. **If exit code is 0**: No new migrations, continue to Test-and-Cleanup
+   ```
+   ✅ No new migrations created - continuing workflow
+   ```
+
+3. **If exit code is 2**: NEW MIGRATIONS DETECTED - STOP WORKFLOW IMMEDIATELY
+
+   ```markdown
+   ⚠️ ================================================================
+   ⚠️  MIGRATION DETECTED - WORKFLOW PAUSED
+   ⚠️ ================================================================
+
+   The Build agent created a new database migration for issue #[NUMBER].
+
+   **BEFORE CONTINUING, YOU MUST:**
+
+   1. Review the migration SQL shown above
+   2. Verify backup exists in .backups/
+   3. Apply migration to production MANUALLY:
+
+      cd /home/pbrown/SkuInventory
+      DATABASE_URL="postgresql://postgres:AIcodingi_FuN@172.16.20.50:4546/inventory?schema=public" npx prisma migrate deploy
+
+   4. If migration creates new tables, check if data backfill is needed
+   5. Verify app works at http://172.16.20.50:4545
+
+   **After applying migration**, tell me to continue and I will resume
+   with the Test-and-Cleanup agent.
+
+   ================================================================
+   WORKFLOW PAUSED - AWAITING YOUR CONFIRMATION
+   ================================================================
+   ```
+
+   **DO NOT proceed to Test-and-Cleanup until user confirms migration applied.**
+
+4. Post GitHub comment if processing an issue:
+   ```
+   ⚠️ **Migration Created - Manual Review Required**
+
+   This issue created database migration: [migration_name]
+
+   Workflow paused until migration is manually applied to production.
+   See workflow output for instructions.
+   ```
 
 ### Phase 3: Test-and-Cleanup Agent
 
@@ -421,6 +493,13 @@ When processing a GitHub issue (`/orchestrate3 gh issue #N`), post brief progres
 6. **VERIFY OUTPUTS**: Check each agent created its output file before proceeding
 
 7. **FINAL REPORT**: Always provide comprehensive summary at end
+
+8. **🚨 MIGRATION DETECTION - MANDATORY STOP 🚨**:
+   - ALWAYS run migration snapshot BEFORE Build agent
+   - ALWAYS run migration check AFTER Build agent
+   - If migrations detected, STOP WORKFLOW and wait for user confirmation
+   - NEVER proceed to Test-and-Cleanup if migrations are pending
+   - User MUST manually apply migration to production before continuing
 
 ## Success Criteria
 
