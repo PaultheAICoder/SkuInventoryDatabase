@@ -26,8 +26,12 @@ import {
   FolderTree,
   Plug,
   Activity,
+  ChevronDown,
+  ChevronRight,
+  ShoppingCart,
+  Store,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
 import { FeedbackDialog } from '@/components/features/FeedbackDialog'
 import { ChatbotButton } from '@/components/features/ChatbotButton'
@@ -35,7 +39,8 @@ import { ChatbotPanel } from '@/components/features/ChatbotPanel'
 import { CompanyBrandSelector } from '@/components/features/CompanyBrandSelector'
 import { NotificationBanner } from '@/components/notifications/notification-banner'
 
-const navigation = [
+// Main navigation items
+const mainNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Components', href: '/components', icon: Package },
   { name: 'SKUs', href: '/skus', icon: Boxes },
@@ -44,14 +49,20 @@ const navigation = [
   { name: 'Import', href: '/import', icon: Upload },
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Forecasts', href: '/forecasts', icon: TrendingDown },
-  { name: 'Integrations', href: '/integrations', icon: Plug, adminOnly: true },
-  { name: 'Users', href: '/settings/users', icon: Users, adminOnly: true },
-  { name: 'Locations', href: '/settings/locations', icon: MapPin, adminOnly: true },
-  { name: 'Brands', href: '/settings/brands', icon: Tag, adminOnly: true },
-  { name: 'Categories', href: '/settings/categories', icon: FolderTree, adminOnly: true },
-  { name: 'Companies', href: '/settings/companies', icon: Building2, adminOnly: true },
-  { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
-  { name: 'Docker Health', href: '/admin/docker-health', icon: Activity, adminOnly: true },
+  { name: 'Shopify', href: '/shopify/orders', icon: ShoppingCart, adminOnly: true },
+  { name: 'Amazon', href: '/amazon', icon: Store, adminOnly: true },
+]
+
+// Settings sub-navigation items
+const settingsNavigation = [
+  { name: 'General', href: '/settings', icon: Settings },
+  { name: 'Users', href: '/settings/users', icon: Users },
+  { name: 'Locations', href: '/settings/locations', icon: MapPin },
+  { name: 'Brands', href: '/settings/brands', icon: Tag },
+  { name: 'Categories', href: '/settings/categories', icon: FolderTree },
+  { name: 'Companies', href: '/settings/companies', icon: Building2 },
+  { name: 'Integrations', href: '/integrations', icon: Plug },
+  { name: 'Docker Health', href: '/admin/docker-health', icon: Activity },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -60,6 +71,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const isAdmin = session?.user?.role === 'admin'
+
+  // Auto-expand settings if current path is in settings
+  useEffect(() => {
+    const isSettingsPath = settingsNavigation.some(
+      (item) => pathname === item.href || pathname.startsWith(item.href + '/')
+    )
+    if (isSettingsPath) {
+      setSettingsOpen(true)
+    }
+  }, [pathname])
 
   // Show minimal layout while session is loading
   if (status === 'loading') {
@@ -72,8 +96,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     )
   }
 
-  const filteredNavigation = navigation.filter(
-    (item) => !item.adminOnly || session?.user?.role === 'admin'
+  const filteredMainNavigation = mainNavigation.filter(
+    (item) => !item.adminOnly || isAdmin
   )
 
   return (
@@ -109,8 +133,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <CompanyBrandSelector />
 
-        <nav className="flex flex-col gap-1 p-4">
-          {filteredNavigation.map((item) => {
+        <nav className="flex flex-col gap-1 p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+          {/* Main navigation items */}
+          {filteredMainNavigation.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (
               <Link
@@ -129,6 +154,55 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )
           })}
+
+          {/* Settings section (admin only) */}
+          {isAdmin && (
+            <>
+              <button
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors w-full text-left',
+                  settingsOpen
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5" />
+                  Settings
+                </div>
+                {settingsOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+
+              {settingsOpen && (
+                <div className="ml-4 flex flex-col gap-1 border-l pl-2">
+                  {settingsNavigation.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        )}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.name}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
         </nav>
 
         <div className="absolute bottom-0 left-0 right-0 border-t p-4">
