@@ -21,6 +21,8 @@ services:
     restart: unless-stopped
     ports:
       - '4545:4500'
+    env_file:
+      - ../.env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
