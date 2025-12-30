@@ -63,5 +63,24 @@ services:
       timeout: 5s
       retries: 5
 
+  monitor:
+    image: alpine:3.19
+    container_name: inventory-monitor
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./monitor/monitor.sh:/monitor.sh:ro
+    environment:
+      - WEBHOOK_URL=http://app:4500/api/webhooks/docker-health
+      - WEBHOOK_SECRET=${CRON_SECRET}
+      - POLL_INTERVAL=30
+      - CONTAINERS_TO_MONITOR=inventory-app,inventory-db-prod,inventory-nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["/bin/sh", "/monitor.sh"]
+    networks:
+      - default
+
 volumes:
   postgres_data_prod:

@@ -63,6 +63,25 @@ services:
     networks:
       - inventory-test-net
 
+  monitor-test:
+    image: alpine:3.19
+    container_name: inventory-monitor-test
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./monitor/monitor.sh:/monitor.sh:ro
+    environment:
+      - WEBHOOK_URL=http://app-test:4500/api/webhooks/docker-health
+      - WEBHOOK_SECRET=${CRON_SECRET}
+      - POLL_INTERVAL=30
+      - CONTAINERS_TO_MONITOR=inventory-app-test,inventory-db-test
+    depends_on:
+      app-test:
+        condition: service_healthy
+    command: ["/bin/sh", "/monitor.sh"]
+    networks:
+      - inventory-test-net
+
 volumes:
   postgres_data_test:
 

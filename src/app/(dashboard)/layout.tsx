@@ -25,6 +25,7 @@ import {
   Tag,
   FolderTree,
   Plug,
+  Activity,
 } from 'lucide-react'
 import { useState } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -50,6 +51,7 @@ const navigation = [
   { name: 'Categories', href: '/settings/categories', icon: FolderTree, adminOnly: true },
   { name: 'Companies', href: '/settings/companies', icon: Building2, adminOnly: true },
   { name: 'Settings', href: '/settings', icon: Settings, adminOnly: true },
+  { name: 'Docker Health', href: '/admin/docker-health', icon: Activity, adminOnly: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

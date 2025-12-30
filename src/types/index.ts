@@ -109,3 +109,6 @@ export interface SessionUser {
   selectedBrandName: string | null  // Currently selected brand name
   brands: SessionBrand[]  // Brands for the selected company
 }
+
+// Container health monitoring types
+export * from './container-health'

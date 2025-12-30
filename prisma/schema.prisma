@@ -998,3 +998,52 @@ model Notification {
   @@index([userId, read])
   @@index([userId, createdAt(sort: Desc)])
 }
+
+// ============================================
+// Docker Container Health Monitoring
+// ============================================
+
+model ContainerHealthLog {
+  id            String   @id @default(uuid())
+  containerName String   @db.VarChar(100)
+  containerId   String?  @db.VarChar(64) // Docker short ID
+  status        String   @db.VarChar(20) // "healthy", "unhealthy", "starting", "none", "unknown"
+  exitCode      Int?
+  cpuPercent    Decimal? @db.Decimal(5, 2)
+  memoryUsageMb Decimal? @db.Decimal(10, 2)
+  memoryLimitMb Decimal? @db.Decimal(10, 2)
+  healthOutput  String?  @db.Text // Output from health check command
+  createdAt     DateTime @default(now())
+
+  @@index([containerName, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model ContainerEvent {
+  id            String   @id @default(uuid())
+  containerName String   @db.VarChar(100)
+  containerId   String?  @db.VarChar(64)
+  eventType     String   @db.VarChar(50) // "start", "stop", "die", "restart", "health_status"
+  exitCode      Int?
+  details       Json     @default("{}") // Extra event data, error messages, etc.
+  logSnapshot   String?  @db.Text // Last N lines of container logs at event time
+  createdAt     DateTime @default(now())
+
+  @@index([containerName, createdAt(sort: Desc)])
+  @@index([eventType])
+  @@index([createdAt(sort: Desc)])
+}
+
+model ContainerMonitorConfig {
+  id                  String   @id @default("singleton")
+  enableMonitoring    Boolean  @default(true)
+  pollingIntervalSec  Int      @default(30)
+  maxRestartAttempts  Int      @default(5)
+  alertEmailAddresses String[] // PostgreSQL array
+  slackWebhookUrl     String?  @db.VarChar(500)
+  enableEmailAlerts   Boolean  @default(false)
+  enableSlackAlerts   Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
