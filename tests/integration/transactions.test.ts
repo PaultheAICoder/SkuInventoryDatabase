@@ -927,6 +927,115 @@ describe('Transaction Flows', () => {
   })
 
   describe('Transaction List', () => {
+    it('filters transactions by skuId including FG transactions', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create test SKU
+      const sku = await createTestSKUInDb(companyId, {
+        name: 'Test SKU for FG Filter',
+        internalCode: 'TEST-FG-FILTER-SKU',
+      })
+
+      // Get admin user and default location
+      const admin = await prisma.user.findFirst({
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
+      })
+
+      const location = await prisma.location.findFirst({
+        where: { companyId, isDefault: true },
+      })
+
+      // Create FG adjustment transaction directly in DB
+      // This sets BOTH Transaction.skuId AND finishedGoodsLines.skuId
+      const fgTransaction = await prisma.transaction.create({
+        data: {
+          companyId,
+          type: 'adjustment',
+          status: 'approved',
+          date: new Date(),
+          skuId: sku.id,
+          reason: 'Test FG adjustment',
+          createdById: admin!.id,
+          finishedGoodsLines: {
+            create: {
+              skuId: sku.id,
+              locationId: location!.id,
+              quantityChange: 10,
+            },
+          },
+        },
+      })
+
+      // Query transactions by skuId using the API
+      const request = createTestRequest('/api/transactions', {
+        searchParams: { skuId: sku.id },
+      })
+      const response = await getTransactions(request)
+      const result = await parseRouteResponse<Array<{ id: string; type: string }>>(response)
+
+      expect(result.status).toBe(200)
+      const dataArray = Array.isArray(result.data) ? result.data : []
+      expect(dataArray.length).toBeGreaterThanOrEqual(1)
+      expect(dataArray.some((tx) => tx.id === fgTransaction.id)).toBe(true)
+    })
+
+    it('filters transactions by skuId using finishedGoodsLines when Transaction.skuId is null', async () => {
+      setTestSession(TEST_SESSIONS.admin!)
+      const prisma = getIntegrationPrisma()
+      const companyId = TEST_SESSIONS.admin!.user.companyId
+
+      // Create test SKU
+      const sku = await createTestSKUInDb(companyId, {
+        name: 'Test SKU for FG Line Filter',
+        internalCode: 'TEST-FG-LINE-SKU',
+      })
+
+      // Get admin user and default location
+      const admin = await prisma.user.findFirst({
+        where: { userCompanies: { some: { companyId } }, role: 'admin' },
+      })
+
+      const location = await prisma.location.findFirst({
+        where: { companyId, isDefault: true },
+      })
+
+      // Create FG transaction with skuId ONLY on the finishedGoodsLines (not on Transaction)
+      // This tests the OR logic: Transaction.skuId OR finishedGoodsLines.some.skuId
+      const fgTransaction = await prisma.transaction.create({
+        data: {
+          companyId,
+          type: 'adjustment',
+          status: 'approved',
+          date: new Date(),
+          skuId: null, // Explicitly null on Transaction level
+          reason: 'Test FG line-only adjustment',
+          createdById: admin!.id,
+          finishedGoodsLines: {
+            create: {
+              skuId: sku.id, // SKU ID only on the FG line
+              locationId: location!.id,
+              quantityChange: 5,
+            },
+          },
+        },
+      })
+
+      // Query transactions by skuId using the API
+      const request = createTestRequest('/api/transactions', {
+        searchParams: { skuId: sku.id },
+      })
+      const response = await getTransactions(request)
+      const result = await parseRouteResponse<Array<{ id: string; type: string }>>(response)
+
+      expect(result.status).toBe(200)
+      const dataArray = Array.isArray(result.data) ? result.data : []
+      expect(dataArray.length).toBeGreaterThanOrEqual(1)
+      // The transaction should be found via finishedGoodsLines.skuId
+      expect(dataArray.some((tx) => tx.id === fgTransaction.id)).toBe(true)
+    })
+
     it('returns transactions for authenticated user', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const component = await createTestComponentInDb(TEST_SESSIONS.admin!.user.companyId)

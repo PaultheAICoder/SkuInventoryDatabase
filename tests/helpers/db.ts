@@ -42,6 +42,7 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   await prisma.inventoryBalance.deleteMany({}) // New balance table for components
   await prisma.bOMLine.deleteMany({})
   await prisma.bOMVersion.deleteMany({})
+  await prisma.asinSkuMapping.deleteMany({}) // Must delete before SKU (FK constraint)
   await prisma.sKU.deleteMany({})
   await prisma.component.deleteMany({})
   await prisma.location.deleteMany({})

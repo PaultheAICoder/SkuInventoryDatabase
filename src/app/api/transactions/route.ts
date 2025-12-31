@@ -31,7 +31,12 @@ export async function GET(request: NextRequest) {
       companyId: selectedCompanyId,
       status: 'approved', // Exclude drafts and rejected transactions
       ...(type && { type }),
-      ...(skuId && { skuId }),
+      ...(skuId && {
+        OR: [
+          { skuId },
+          { finishedGoodsLines: { some: { skuId } } },
+        ],
+      }),
       ...(salesChannel && { salesChannel }),
       ...(componentId && {
         lines: {

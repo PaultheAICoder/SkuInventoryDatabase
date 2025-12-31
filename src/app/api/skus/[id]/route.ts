@@ -60,6 +60,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           },
         },
         transactions: {
+          where: {
+            status: 'approved',
+            deletedAt: null,
+          },
           take: 10,
           orderBy: { createdAt: 'desc' },
           select: {
@@ -67,6 +71,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
             type: true,
             date: true,
             unitsBuild: true,
+            salesChannel: true,
             createdAt: true,
           },
         },
@@ -127,6 +132,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         type: tx.type,
         date: tx.date.toISOString(),
         unitsBuild: tx.unitsBuild,
+        salesChannel: tx.salesChannel,
         createdAt: tx.createdAt.toISOString(),
       })),
       finishedGoodsInventory,

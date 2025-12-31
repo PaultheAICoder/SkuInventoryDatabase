@@ -268,7 +268,7 @@ export default function SKUDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Last 10 build transactions for this SKU</CardDescription>
+            <CardDescription>Last 10 transactions for this SKU</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
