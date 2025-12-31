@@ -81,6 +81,23 @@ export async function GET(
             },
           },
         },
+        finishedGoodsLines: {
+          include: {
+            sku: {
+              select: {
+                id: true,
+                name: true,
+                internalCode: true,
+              },
+            },
+            location: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
         createdBy: {
           select: { id: true, name: true },
         },
@@ -132,6 +149,16 @@ export async function GET(
                 Math.abs(line.quantityChange.toNumber()) * line.costPerUnit.toNumber()
               ).toFixed(4)
             : null,
+        })),
+        finishedGoodsLines: transaction.finishedGoodsLines.map((fgLine) => ({
+          id: fgLine.id,
+          skuId: fgLine.skuId,
+          skuName: fgLine.sku.name,
+          skuInternalCode: fgLine.sku.internalCode,
+          quantityChange: fgLine.quantityChange.toString(),
+          costPerUnit: fgLine.costPerUnit?.toString() ?? null,
+          locationId: fgLine.locationId,
+          locationName: fgLine.location.name,
         })),
         // Calculated summary for build transactions
         summary:

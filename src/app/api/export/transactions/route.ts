@@ -83,6 +83,21 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        finishedGoodsLines: {
+          include: {
+            sku: {
+              select: {
+                name: true,
+                internalCode: true,
+              },
+            },
+            location: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         createdBy: {
           select: {
             name: true,
@@ -105,7 +120,7 @@ export async function GET(request: NextRequest) {
     const exportData: TransactionExportData[] = []
 
     for (const tx of transactions) {
-      // If transaction has lines, create one row per line
+      // If transaction has component lines, create one row per line
       if (tx.lines.length > 0) {
         for (const line of tx.lines) {
           exportData.push({
@@ -132,6 +147,35 @@ export async function GET(request: NextRequest) {
             componentSkuCode: line.component.skuCode,
             quantityChange: line.quantityChange.toString(),
             costPerUnit: line.costPerUnit?.toString() ?? null,
+          })
+        }
+      } else if (tx.finishedGoodsLines && tx.finishedGoodsLines.length > 0) {
+        // If transaction has finished goods lines, create one row per FG line
+        for (const fgLine of tx.finishedGoodsLines) {
+          exportData.push({
+            id: tx.id,
+            type: tx.type,
+            date: toLocalDateString(tx.date),
+            skuName: fgLine.sku.name,
+            skuCode: fgLine.sku.internalCode,
+            salesChannel: tx.salesChannel,
+            unitsBuild: tx.unitsBuild,
+            unitBomCost: tx.unitBomCost?.toString() ?? null,
+            totalBomCost: tx.totalBomCost?.toString() ?? null,
+            supplier: tx.supplier,
+            reason: tx.reason,
+            notes: tx.notes,
+            defectCount: tx.defectCount,
+            defectNotes: tx.defectNotes,
+            affectedUnits: tx.affectedUnits,
+            createdAt: tx.createdAt.toISOString(),
+            createdByName: tx.createdBy.name,
+            fromLocationName: fgLine.location.name,
+            toLocationName: tx.toLocation?.name ?? null,
+            componentName: '', // FG lines don't have components
+            componentSkuCode: '',
+            quantityChange: fgLine.quantityChange.toString(),
+            costPerUnit: fgLine.costPerUnit?.toString() ?? null,
           })
         }
       } else {

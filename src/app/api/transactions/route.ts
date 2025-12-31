@@ -78,6 +78,16 @@ export async function GET(request: NextRequest) {
             lot: { select: { id: true, lotNumber: true, expiryDate: true } },
           },
         },
+        finishedGoodsLines: {
+          include: {
+            sku: {
+              select: { id: true, name: true, internalCode: true },
+            },
+            location: {
+              select: { id: true, name: true },
+            },
+          },
+        },
       },
     })
 
@@ -120,6 +130,16 @@ export async function GET(request: NextRequest) {
             }
           : null,
       })),
+      finishedGoodsLines: tx.finishedGoodsLines?.map((fgLine) => ({
+        id: fgLine.id,
+        skuId: fgLine.skuId,
+        skuName: fgLine.sku.name,
+        skuInternalCode: fgLine.sku.internalCode,
+        quantityChange: fgLine.quantityChange.toString(),
+        costPerUnit: fgLine.costPerUnit?.toString() ?? null,
+        locationId: fgLine.locationId,
+        locationName: fgLine.location.name,
+      })) ?? [],
     }))
 
     return paginated(data, total, page, pageSize)

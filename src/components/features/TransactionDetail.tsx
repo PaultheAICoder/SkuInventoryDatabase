@@ -41,6 +41,17 @@ interface TransactionLine {
   lineCost?: string | null
 }
 
+interface FinishedGoodsLine {
+  id: string
+  skuId: string
+  skuName: string
+  skuInternalCode: string
+  quantityChange: string
+  costPerUnit: string | null
+  locationId: string
+  locationName: string
+}
+
 interface TransactionDetailProps {
   transaction: {
     id: string
@@ -65,6 +76,7 @@ interface TransactionDetailProps {
     createdAt: string
     createdBy: { id: string; name: string }
     lines: TransactionLine[]
+    finishedGoodsLines?: FinishedGoodsLine[]
     summary?: {
       componentsConsumed: number
       totalUnitsBuilt: number | null
@@ -439,6 +451,67 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Finished Goods Lines - for FG receipt, adjustment, transfer, outbound transactions */}
+      {transaction.finishedGoodsLines && transaction.finishedGoodsLines.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Finished Goods</CardTitle>
+            <CardDescription>
+              {transaction.finishedGoodsLines.length} SKU item(s) in this transaction
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead className="text-right">Quantity Change</TableHead>
+                  <TableHead className="text-right">Cost/Unit</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transaction.finishedGoodsLines.map((fgLine) => {
+                  const qtyChange = parseFloat(fgLine.quantityChange)
+                  const costPerUnit = fgLine.costPerUnit ? parseFloat(fgLine.costPerUnit) : null
+
+                  return (
+                    <TableRow key={fgLine.id}>
+                      <TableCell>
+                        <Link
+                          href={`/skus/${fgLine.skuId}`}
+                          className="font-medium hover:underline"
+                        >
+                          {fgLine.skuName}
+                        </Link>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {fgLine.skuInternalCode}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {fgLine.locationName}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={`font-mono ${qtyChange >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                          suppressHydrationWarning
+                        >
+                          {qtyChange >= 0 ? '+' : ''}
+                          {qtyChange.toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {costPerUnit != null ? `$${costPerUnit.toFixed(4)}` : '-'}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

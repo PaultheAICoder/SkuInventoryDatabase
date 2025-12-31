@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { dateSchema } from './index'
+import type { FinishedGoodsLineResponse } from './finished-goods'
 
 // Receipt transaction schema
 export const createReceiptSchema = z.object({
@@ -168,6 +169,7 @@ export interface TransactionResponse {
   createdAt: string
   createdBy: { id: string; name: string }
   lines: TransactionLineResponse[]
+  finishedGoodsLines?: FinishedGoodsLineResponse[]
 }
 
 export interface TransactionLineResponse {
