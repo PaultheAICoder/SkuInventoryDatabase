@@ -34,21 +34,44 @@ send_webhook() {
 get_container_health() {
     local container="$1"
 
-    # Get container inspect data
-    local inspect=$(docker inspect "$container" 2>/dev/null || echo "{}")
-
-    if [ "$inspect" = "{}" ] || [ "$inspect" = "[]" ]; then
-        echo "unknown"
+    # Check if container exists first
+    if ! docker inspect "$container" >/dev/null 2>&1; then
+        echo "not_found"
         return
     fi
 
-    # Extract health status
-    local health=$(echo "$inspect" | jq -r '.[0].State.Health.Status // "none"')
-    local running=$(echo "$inspect" | jq -r '.[0].State.Running')
+    # Get container inspect data
+    local inspect=$(docker inspect "$container" 2>/dev/null)
 
+    if [ -z "$inspect" ] || [ "$inspect" = "[]" ]; then
+        echo "not_found"
+        return
+    fi
+
+    # Extract state information
+    local running=$(echo "$inspect" | jq -r '.[0].State.Running // "false"')
+    local status=$(echo "$inspect" | jq -r '.[0].State.Status // "unknown"')
+    local health=$(echo "$inspect" | jq -r '.[0].State.Health.Status // "none"')
+
+    # Container not running
     if [ "$running" = "false" ]; then
+        if [ "$status" = "exited" ] || [ "$status" = "dead" ]; then
+            echo "stopped"
+        else
+            echo "unhealthy"
+        fi
+        return
+    fi
+
+    # Container is running - check health status
+    if [ "$health" = "healthy" ]; then
+        echo "healthy"
+    elif [ "$health" = "unhealthy" ]; then
         echo "unhealthy"
-    elif [ "$health" = "healthy" ] || [ "$health" = "none" ] && [ "$running" = "true" ]; then
+    elif [ "$health" = "starting" ]; then
+        echo "starting"
+    elif [ "$health" = "none" ]; then
+        # No health check configured but container is running
         echo "healthy"
     else
         echo "$health"

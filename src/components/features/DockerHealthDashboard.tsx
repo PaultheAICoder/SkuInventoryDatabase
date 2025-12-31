@@ -48,19 +48,29 @@ interface DockerHealthDashboardProps {
 }
 
 function ContainerStatusCard({ container }: { container: ContainerStatusSummary }) {
-  const statusIcon = container.currentStatus === 'healthy' ? (
-    <CheckCircle className="h-5 w-5 text-green-600" />
-  ) : container.currentStatus === 'unhealthy' ? (
-    <XCircle className="h-5 w-5 text-destructive" />
-  ) : (
-    <AlertCircle className="h-5 w-5 text-yellow-500" />
-  )
+  const statusIcon =
+    container.currentStatus === 'healthy' ? (
+      <CheckCircle className="h-5 w-5 text-green-600" />
+    ) : container.currentStatus === 'unhealthy' ? (
+      <XCircle className="h-5 w-5 text-destructive" />
+    ) : container.currentStatus === 'stopped' || container.currentStatus === 'not_found' ? (
+      <XCircle className="h-5 w-5 text-gray-500" />
+    ) : container.currentStatus === 'unknown' ? (
+      <AlertCircle className="h-5 w-5 text-gray-400" />
+    ) : (
+      <AlertCircle className="h-5 w-5 text-yellow-500" />
+    )
 
-  const statusColor = container.currentStatus === 'healthy'
-    ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-    : container.currentStatus === 'unhealthy'
-    ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+  const statusColor =
+    container.currentStatus === 'healthy'
+      ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+      : container.currentStatus === 'unhealthy'
+        ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+        : container.currentStatus === 'stopped' || container.currentStatus === 'not_found'
+          ? 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+          : container.currentStatus === 'unknown'
+            ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/20 dark:text-gray-500'
+            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
 
   return (
     <Card>
@@ -93,6 +103,18 @@ function ContainerStatusCard({ container }: { container: ContainerStatusSummary 
               {container.restartCount24h}
             </span>
           </div>
+          {container.statusReason && container.statusReason !== 'healthy' && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Info</span>
+              <span className="text-xs text-muted-foreground">
+                {container.statusReason === 'no_data' && 'Never checked'}
+                {container.statusReason === 'stale_data' && 'Data may be stale'}
+                {container.statusReason === 'container_stopped' && 'Container stopped'}
+                {container.statusReason === 'container_not_found' && 'Container not found'}
+                {container.statusReason === 'unhealthy' && 'Health check failing'}
+              </span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

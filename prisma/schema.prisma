@@ -1007,7 +1007,7 @@ model ContainerHealthLog {
   id            String   @id @default(uuid())
   containerName String   @db.VarChar(100)
   containerId   String?  @db.VarChar(64) // Docker short ID
-  status        String   @db.VarChar(20) // "healthy", "unhealthy", "starting", "none", "unknown"
+  status        String   @db.VarChar(20) // "healthy", "unhealthy", "starting", "none", "unknown", "stopped", "not_found"
   exitCode      Int?
   cpuPercent    Decimal? @db.Decimal(5, 2)
   memoryUsageMb Decimal? @db.Decimal(10, 2)

@@ -16,6 +16,7 @@ import type {
   ContainerEventEntry,
   ContainerMonitorConfigResponse,
   ContainerStatusSummary,
+  ContainerStatusReason,
 } from '@/types/container-health'
 
 /**
@@ -253,6 +254,27 @@ export async function getContainerStatusSummary(
       },
     })
 
+    // Determine status reason
+    let statusReason: ContainerStatusReason | undefined = undefined
+
+    if (!latestHealth) {
+      statusReason = 'no_data'
+    } else if (latestHealth.status === 'stopped') {
+      statusReason = 'container_stopped'
+    } else if (latestHealth.status === 'not_found') {
+      statusReason = 'container_not_found'
+    } else {
+      // Check if data is stale (older than 5 minutes)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000)
+      if (latestHealth.createdAt < fiveMinutesAgo) {
+        statusReason = 'stale_data'
+      } else if (latestHealth.status === 'healthy') {
+        statusReason = 'healthy'
+      } else {
+        statusReason = 'unhealthy'
+      }
+    }
+
     summaries.push({
       containerName,
       currentStatus: (latestHealth?.status as ContainerStatus) ?? 'unknown',
@@ -269,6 +291,7 @@ export async function getContainerStatusSummary(
       })),
       restartCount24h: restartCount,
       isRunning: latestHealth?.status === 'healthy' || latestHealth?.status === 'starting',
+      statusReason,
     })
   }
 

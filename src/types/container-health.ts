@@ -2,7 +2,7 @@
  * Container health monitoring types
  */
 
-export type ContainerStatus = 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown'
+export type ContainerStatus = 'healthy' | 'unhealthy' | 'starting' | 'none' | 'unknown' | 'stopped' | 'not_found'
 
 export type ContainerEventType =
   | 'start'
@@ -51,6 +51,8 @@ export interface ContainerMonitorConfigResponse {
   updatedAt: string
 }
 
+export type ContainerStatusReason = 'healthy' | 'unhealthy' | 'no_data' | 'stale_data' | 'container_stopped' | 'container_not_found'
+
 export interface ContainerStatusSummary {
   containerName: string
   currentStatus: ContainerStatus
@@ -58,6 +60,7 @@ export interface ContainerStatusSummary {
   recentEvents: ContainerEventEntry[]
   restartCount24h: number
   isRunning: boolean
+  statusReason?: ContainerStatusReason
 }
 
 export interface DockerHealthDashboardData {
