@@ -44,7 +44,7 @@ const STATUS_OPTIONS = [
 
 const UNMAPPED_OPTIONS = [
   { value: 'all', label: 'All Orders' },
-  { value: 'true', label: 'Has Unmapped' },
+  { value: 'true', label: 'Needs SKU Link' },
   { value: 'false', label: 'Fully Mapped' },
 ]
 
@@ -185,7 +185,7 @@ export function OrderReviewTable({ orders, total, page, pageSize }: OrderReviewT
                       {unmappedCount > 0 ? (
                         <div className="flex items-center gap-1 text-yellow-600">
                           <AlertCircle className="h-4 w-4" />
-                          <span className="text-sm">{unmappedCount} unmapped</span>
+                          <span className="text-sm">{unmappedCount} needs SKU link</span>
                         </div>
                       ) : (
                         <span className="text-sm text-green-600">All mapped</span>

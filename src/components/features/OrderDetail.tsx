@@ -104,7 +104,7 @@ export function OrderDetail({ order, onRefresh }: OrderDetailProps) {
       case 'mapped':
         return <Badge variant="success">Mapped</Badge>
       case 'unmapped':
-        return <Badge variant="warning">Unmapped</Badge>
+        return <Badge variant="warning">No SKU</Badge>
       case 'not_found':
         return <Badge variant="critical">Not Found</Badge>
       default:
@@ -188,7 +188,7 @@ export function OrderDetail({ order, onRefresh }: OrderDetailProps) {
             <div className="mt-4 flex items-center gap-2 rounded-md bg-yellow-50 border border-yellow-200 p-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
               <p className="text-sm text-yellow-800">
-                This order has unmapped line items. Map all items before approving.
+                Some products aren't linked to internal SKUs. Link all items before approving.
               </p>
             </div>
           )}
