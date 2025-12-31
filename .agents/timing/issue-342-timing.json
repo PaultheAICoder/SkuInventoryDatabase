@@ -1,0 +1,15 @@
+{
+  "issue": "342",
+  "workflow": "3-agent",
+  "workflow_start": "2025-12-31T20:58:29.000Z",
+  "plan_duration_minutes": 45,
+  "build_duration_minutes": 31,
+  "cleanup_start": "2025-12-31T21:43:00.000Z",
+  "cleanup_end": "2025-12-31T21:50:00.000Z",
+  "cleanup_duration_minutes": 7,
+  "total_duration_minutes": 83,
+  "status": "complete",
+  "tests_passed": 667,
+  "tests_skipped": 5,
+  "warnings_fixed": 0
+}

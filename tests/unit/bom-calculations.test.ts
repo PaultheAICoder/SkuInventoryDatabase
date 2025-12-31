@@ -350,6 +350,41 @@ describe('calculateMaxBuildableUnits', () => {
     // Should be 240, not 239 (the bug was rounding down due to floating-point error)
     expect(result).toBe(240)
   })
+
+  it('handles high-precision BOM quantities with 1/60 fraction (issue #342)', async () => {
+    // Issue #342: When quantityPerUnit is stored with only 4 decimal places,
+    // 1/60 (0.0166666...) becomes 0.0167, causing calculation errors.
+    // With Decimal(18, 10), we can store 0.0166666667 which is precise enough.
+    const oneOver60 = 1 / 60 // 0.016666666666666666
+
+    vi.mocked(prisma.bOMVersion.findFirst).mockResolvedValue({
+      id: 'bom-1',
+      skuId: 'sku-1',
+      versionName: 'v1',
+      isActive: true,
+      lines: [
+        {
+          componentId: 'comp-1',
+          quantityPerUnit: new Prisma.Decimal(oneOver60.toString()),
+          component: { id: 'comp-1' },
+        },
+      ],
+    } as never)
+
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+    ] as never)
+
+    // 4 / (1/60) = 240 exactly
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal('4') } },
+    ] as never)
+
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
+
+    // With proper precision, 4 / 0.016666... = 240, not 239
+    expect(result).toBe(240)
+  })
 })
 
 describe('calculateLineCosts', () => {

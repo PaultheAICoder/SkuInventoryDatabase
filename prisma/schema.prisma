@@ -470,7 +470,7 @@ model BOMLine {
   bomVersion      BOMVersion @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
   componentId     String
   component       Component  @relation(fields: [componentId], references: [id])
-  quantityPerUnit Decimal    @db.Decimal(10, 4)
+  quantityPerUnit Decimal    @db.Decimal(18, 10)
   notes           String?    @db.Text
 
   @@unique([bomVersionId, componentId])
