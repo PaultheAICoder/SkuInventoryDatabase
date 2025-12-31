@@ -89,6 +89,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // TODO: Future enhancement - resolve location name to locationId
+    // Similar to item resolution, use fuzzy matching to resolve location name
+    // to a locationId, then include in the payload for transactions
+
     // 8. Build suggestions for low-confidence fields
     const suggestions = buildSuggestions(finalParsed, { components, skus })
 

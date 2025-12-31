@@ -15,6 +15,8 @@ import {
   Check,
   Truck,
   X,
+  MapPin,
+  FileQuestion,
 } from 'lucide-react'
 import type { ConfidenceLevel, ParseTransactionResponse } from '@/types/parser'
 import { formatDateString, toLocalDateString } from '@/lib/utils'
@@ -85,6 +87,11 @@ export function ParsedTransactionPreview({
     !parsed.itemId.value ||
     parsed.itemId.confidence === 'low'
 
+  // Check for missing required fields that need user attention
+  const missingRequiredFields =
+    (parsed.transactionType.value === 'adjustment' && !parsed.reason?.value) ||
+    (parsed.transactionType.value === 'receipt' && !parsed.supplier?.value)
+
   const hasSuggestions = suggestions.length > 0
 
   return (
@@ -97,6 +104,11 @@ export function ParsedTransactionPreview({
         {hasLowConfidence && (
           <div className="rounded-md bg-yellow-50 border border-yellow-200 p-2 text-sm text-yellow-800 dark:bg-yellow-950 dark:border-yellow-900 dark:text-yellow-200">
             Some fields have low confidence. Please review carefully or switch to manual entry.
+          </div>
+        )}
+        {missingRequiredFields && !hasLowConfidence && (
+          <div className="rounded-md bg-orange-50 border border-orange-200 p-2 text-sm text-orange-800 dark:bg-orange-950 dark:border-orange-900 dark:text-orange-200">
+            Some fields will use default values. The form input would allow specifying these explicitly.
           </div>
         )}
       </CardHeader>
@@ -177,6 +189,36 @@ export function ParsedTransactionPreview({
             <div className="flex items-center gap-2">
               <span>{parsed.supplier.value}</span>
               <ConfidenceIcon level={parsed.supplier.confidence} />
+            </div>
+          </div>
+        )}
+
+        {/* Reason (for adjustments) */}
+        {parsed.transactionType.value === 'adjustment' && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileQuestion className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Reason</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={!parsed.reason?.value ? 'text-muted-foreground italic' : ''}>
+                {parsed.reason?.value || 'Adjustment (default)'}
+              </span>
+              <ConfidenceIcon level={parsed.reason?.confidence || 'low'} />
+            </div>
+          </div>
+        )}
+
+        {/* Location */}
+        {parsed.location && parsed.location.value && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Location</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>{parsed.location.value}</span>
+              <ConfidenceIcon level={parsed.location.confidence} />
             </div>
           </div>
         )}

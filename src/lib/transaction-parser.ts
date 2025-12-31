@@ -50,6 +50,8 @@ Extract the following:
 - channel: sales channel if mentioned (Amazon, Shopify, TikTok, Generic, or null)
 - date: transaction date in YYYY-MM-DD format (default to today if not specified)
 - supplier: supplier name if this is a receipt (or null)
+- reason: reason for adjustment if mentioned (damaged, lost, count correction, sample/testing, or null)
+- location: warehouse or location name if mentioned (or null)
 - notes: any additional context mentioned (or null)
 
 Interpret common patterns:
@@ -59,6 +61,12 @@ Interpret common patterns:
 - "built" or "made" or "assembled" -> build transaction
 - Relative dates: "today" = current date, "yesterday" = day before current date
 
+For adjustment reasons, map common phrases:
+- "damaged" or "broke" or "broken" -> reason: "Damaged goods"
+- "lost" or "missing" or "can't find" -> reason: "Lost/missing"
+- "count" or "recount" or "inventory count" or "cycle count" -> reason: "Inventory count correction"
+- "sample" or "testing" or "test" -> reason: "Sample/testing"
+
 IMPORTANT: Respond with ONLY valid JSON, no additional text:
 {
   "action": "ship|receive|adjust|build",
@@ -67,6 +75,8 @@ IMPORTANT: Respond with ONLY valid JSON, no additional text:
   "channel": "Amazon|Shopify|TikTok|Generic|null",
   "date": "YYYY-MM-DD",
   "supplier": "supplier name or null",
+  "reason": "adjustment reason or null",
+  "location": "location/warehouse name or null",
   "notes": "any additional context or null"
 }`
 }
@@ -98,6 +108,8 @@ function parseClaudeResponse(response: string): RawClaudeParseResponse | null {
       channel: parsed.channel || null,
       date: parsed.date || toLocalDateString(new Date()),
       supplier: parsed.supplier || null,
+      reason: parsed.reason || null,
+      location: parsed.location || null,
       notes: parsed.notes || null,
     }
   } catch (error) {
@@ -285,6 +297,15 @@ function createFallbackParse(text: string, _context: ParserContext): ParsedTrans
   else if (/shopify/i.test(text)) salesChannel = 'Shopify'
   else if (/tiktok/i.test(text)) salesChannel = 'TikTok'
 
+  // Detect adjustment reason
+  let reason: string | null = null
+  if (transactionType === 'adjustment') {
+    if (/damag|broke|broken/i.test(text)) reason = 'Damaged goods'
+    else if (/lost|missing|can'?t find/i.test(text)) reason = 'Lost/missing'
+    else if (/count|recount|cycle/i.test(text)) reason = 'Inventory count correction'
+    else if (/sample|test/i.test(text)) reason = 'Sample/testing'
+  }
+
   // Try to extract item name (words that might be product names)
   const itemType: 'sku' | 'component' = transactionType === 'receipt' ? 'component' : 'sku'
 
@@ -317,6 +338,12 @@ function createFallbackParse(text: string, _context: ParserContext): ParsedTrans
       value: new Date(),
       confidence: 'medium',
     },
+    ...(transactionType === 'adjustment' && {
+      reason: {
+        value: reason,
+        confidence: reason ? 'medium' : 'low',
+      },
+    }),
     overallConfidence: 'low',
     originalInput: text,
   }
@@ -430,6 +457,20 @@ export async function parseTransactionText(
       parsed.supplier = {
         value: rawParsed.supplier,
         confidence: rawParsed.supplier ? 'high' : 'low',
+      }
+    }
+
+    if (transactionType === 'adjustment') {
+      parsed.reason = {
+        value: rawParsed.reason,
+        confidence: rawParsed.reason ? 'high' : 'low',
+      }
+    }
+
+    if (rawParsed.location) {
+      parsed.location = {
+        value: rawParsed.location,
+        confidence: 'medium', // Fuzzy match could improve this
       }
     }
 

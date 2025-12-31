@@ -24,6 +24,7 @@ export interface ParsedTransaction {
   supplier?: ParsedField<string | null>
   date: ParsedField<Date>
   reason?: ParsedField<string | null>
+  location?: ParsedField<string | null>
   notes?: ParsedField<string | null>
   overallConfidence: ConfidenceLevel
   originalInput: string
@@ -85,5 +86,7 @@ export interface RawClaudeParseResponse {
   channel: string | null
   date: string
   supplier: string | null
+  reason: string | null
+  location: string | null
   notes: string | null
 }
