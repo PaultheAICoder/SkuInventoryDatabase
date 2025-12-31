@@ -47,7 +47,6 @@ const mainNavigation = [
   { name: 'SKUs', href: '/skus', icon: Boxes },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
   { name: 'Lots', href: '/lots', icon: Layers },
-  { name: 'Import', href: '/import', icon: Upload },
   { name: 'Analytics', href: '/analytics/defects', icon: BarChart3 },
   { name: 'Forecasts', href: '/forecasts', icon: TrendingDown },
   { name: 'Shopify', href: '/shopify/orders', icon: ShoppingCart, adminOnly: true },
@@ -58,6 +57,7 @@ const mainNavigation = [
 // Settings sub-navigation items
 const settingsNavigation = [
   { name: 'General', href: '/settings', icon: Settings },
+  { name: 'Import', href: '/import', icon: Upload },
   { name: 'Users', href: '/settings/users', icon: Users },
   { name: 'Locations', href: '/settings/locations', icon: MapPin },
   { name: 'Brands', href: '/settings/brands', icon: Tag },
