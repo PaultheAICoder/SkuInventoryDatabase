@@ -58,7 +58,7 @@ export interface LimitingComponent {
   skuCode: string
   quantityOnHand: number
   quantityPerUnit: number
-  maxBuildable: number // floor(quantityOnHand / quantityPerUnit)
+  maxBuildable: number // floor(quantityOnHand / quantityPerUnit) with floating-point tolerance
   rank: number // 1 = most limiting, 2 = second, etc.
 }
 

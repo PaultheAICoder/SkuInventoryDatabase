@@ -319,6 +319,37 @@ describe('calculateMaxBuildableUnits', () => {
     const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
     expect(result).toBe(3) // 10 / 3 = 3.33, floored to 3
   })
+
+  it('handles floating-point precision for fractional quantities (issue #330)', async () => {
+    // Scenario: 1/65th of a component per unit, with exactly 240 units worth on hand
+    // The division 3.692307... / 0.015384615... should equal exactly 240
+    // but floating-point math may produce 239.99999999997
+    vi.mocked(prisma.bOMVersion.findFirst).mockResolvedValue({
+      id: 'bom-1',
+      skuId: 'sku-1',
+      versionName: 'v1',
+      isActive: true,
+      lines: [
+        { componentId: 'comp-1', quantityPerUnit: new Prisma.Decimal('0.015384615384615385'), component: { id: 'comp-1' } },
+      ],
+    } as never)
+
+    // Mock component ownership verification for getComponentQuantities
+    vi.mocked(prisma.component.findMany).mockResolvedValue([
+      { id: 'comp-1' },
+    ] as never)
+
+    // Quantity that should produce exactly 240 buildable units
+    // 3.692307692307692 / 0.015384615384615385 = 240.0 (mathematically)
+    vi.mocked(prisma.inventoryBalance.groupBy).mockResolvedValue([
+      { componentId: 'comp-1', _sum: { quantity: new Prisma.Decimal('3.692307692307692') } },
+    ] as never)
+
+    const result = await calculateMaxBuildableUnits('sku-1', 'company-1')
+
+    // Should be 240, not 239 (the bug was rounding down due to floating-point error)
+    expect(result).toBe(240)
+  })
 })
 
 describe('calculateLineCosts', () => {

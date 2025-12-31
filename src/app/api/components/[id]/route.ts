@@ -23,6 +23,15 @@ import {
 import { calculateMaxBuildableUnitsForSKUs } from '@/services/bom'
 import { toLocalDateString } from '@/lib/utils'
 
+/**
+ * Calculate floor with epsilon tolerance for floating-point precision.
+ * Handles cases like 239.99999999997 which should floor to 240, not 239.
+ */
+function floorWithTolerance(value: number): number {
+  const EPSILON = 1e-9
+  return Math.floor(value + EPSILON)
+}
+
 type RouteParams = { params: Promise<{ id: string }> }
 
 /**
@@ -195,7 +204,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         const maxBuildable = buildableUnits.get(line.bomVersion.sku.id)
         if (maxBuildable == null) return false
         // This component constrains the SKU if buildable units is limited
-        const componentCanBuild = Math.floor(quantityOnHand / line.quantityPerUnit.toNumber())
+        const componentCanBuild = floorWithTolerance(quantityOnHand / line.quantityPerUnit.toNumber())
         return componentCanBuild <= maxBuildable
       })
       .map((line) => ({

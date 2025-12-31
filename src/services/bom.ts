@@ -4,6 +4,21 @@ import { getComponentQuantities } from './inventory'
 import type { LimitingComponent } from '@/types/sku'
 
 /**
+ * Small epsilon value to handle floating-point precision errors in division.
+ * When dividing inventory quantities by fractional BOM quantities,
+ * results like 239.99999999997 should be treated as 240.
+ */
+const BUILDABLE_EPSILON = 1e-9
+
+/**
+ * Calculate floor with epsilon tolerance for floating-point precision.
+ * Handles cases like 239.99999999997 which should floor to 240, not 239.
+ */
+function floorWithTolerance(value: number): number {
+  return Math.floor(value + BUILDABLE_EPSILON)
+}
+
+/**
  * Custom error for version conflicts in optimistic locking
  */
 export class VersionConflictError extends Error {
@@ -113,7 +128,7 @@ export async function calculateMaxBuildableUnits(
   for (const line of activeBom.lines) {
     const quantityOnHand = quantities.get(line.componentId) ?? 0
     const quantityPerUnit = line.quantityPerUnit.toNumber()
-    const buildable = Math.floor(quantityOnHand / quantityPerUnit)
+    const buildable = floorWithTolerance(quantityOnHand / quantityPerUnit)
     minBuildable = Math.min(minBuildable, buildable)
   }
 
@@ -179,7 +194,7 @@ export async function calculateMaxBuildableUnitsForSKUs(
     for (const line of bom.lines) {
       const quantityOnHand = quantities.get(line.componentId) ?? 0
       const quantityPerUnit = line.quantityPerUnit.toNumber()
-      const buildable = Math.floor(quantityOnHand / quantityPerUnit)
+      const buildable = floorWithTolerance(quantityOnHand / quantityPerUnit)
       minBuildable = Math.min(minBuildable, buildable)
     }
 
@@ -236,7 +251,7 @@ export async function calculateLimitingFactors(
   for (const line of activeBom.lines) {
     const quantityOnHand = quantities.get(line.componentId) ?? 0
     const quantityPerUnit = line.quantityPerUnit.toNumber()
-    const maxBuildable = Math.floor(quantityOnHand / quantityPerUnit)
+    const maxBuildable = floorWithTolerance(quantityOnHand / quantityPerUnit)
 
     factors.push({
       componentId: line.component.id,
