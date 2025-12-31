@@ -16,7 +16,7 @@ import { SyncHistory } from '@/components/integrations/sync-history'
 import { CsvUpload } from '@/components/integrations/csv-upload'
 import { AsinMappingList } from '@/components/integrations/asin-mapping-list'
 import { AlertCircle, CheckCircle } from 'lucide-react'
-import { toLocalDateString } from '@/lib/utils'
+import { toLocalDateString, getClientCompanyRole } from '@/lib/utils'
 
 interface Brand {
   id: string
@@ -118,7 +118,7 @@ export default function IntegrationsPage() {
     )
   }
 
-  const isAdmin = session?.user?.role === 'admin'
+  const isAdmin = getClientCompanyRole(session?.user) === 'admin'
 
   return (
     <div className="space-y-6">

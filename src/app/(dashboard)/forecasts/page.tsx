@@ -9,6 +9,7 @@ import { ForecastSettingsDialog } from '@/components/features/ForecastSettingsDi
 import { ForecastQuickSettings } from '@/components/features/ForecastQuickSettings'
 import { getForecastStatus } from '@/components/features/ForecastStatusBadge'
 import { AlertCircle, AlertTriangle, TrendingDown, Package } from 'lucide-react'
+import { getClientCompanyRole } from '@/lib/utils'
 import type { ComponentForecastResponse, ForecastConfigResponse } from '@/types/forecast'
 
 interface ForecastListResponse {
@@ -34,8 +35,8 @@ export default function ForecastsPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  // Check if user is admin
-  const canEdit = session?.user?.role === 'admin'
+  // Check if user is admin for selected company
+  const canEdit = getClientCompanyRole(session?.user) === 'admin'
 
   // Fetch config when company changes
   const fetchConfig = useCallback(async () => {

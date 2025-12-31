@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { DockerHealthDashboard } from '@/components/features/DockerHealthDashboard'
+import { getClientCompanyRole } from '@/lib/utils'
 import type { DockerHealthDashboardData } from '@/types/container-health'
 
 export default function DockerHealthPage() {
@@ -45,7 +46,7 @@ export default function DockerHealthPage() {
       return
     }
 
-    if (session.user.role !== 'admin') {
+    if (getClientCompanyRole(session.user) !== 'admin') {
       router.push('/')
       return
     }
@@ -53,13 +54,16 @@ export default function DockerHealthPage() {
     fetchData()
   }, [session, status, router, fetchData])
 
+  // Derive company role for useEffect dependency
+  const companyRole = getClientCompanyRole(session?.user)
+
   // Auto-refresh every 30 seconds
   useEffect(() => {
-    if (status !== 'authenticated' || session?.user?.role !== 'admin') return
+    if (status !== 'authenticated' || companyRole !== 'admin') return
 
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [status, session?.user?.role, fetchData])
+  }, [status, companyRole, fetchData])
 
   if (status === 'loading' || isLoading) {
     return (

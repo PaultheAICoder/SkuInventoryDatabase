@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { cn } from '@/lib/utils'
+import { cn, getClientCompanyRole } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { BuildFooter } from '@/components/ui/BuildFooter'
 import {
@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [chatbotOpen, setChatbotOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const isAdmin = session?.user?.role === 'admin'
+  const isAdmin = getClientCompanyRole(session?.user) === 'admin'
 
   // Auto-expand settings if current path is in settings
   useEffect(() => {
