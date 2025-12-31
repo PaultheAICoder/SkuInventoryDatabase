@@ -125,3 +125,120 @@ export interface SpApiConnectionStatus {
   lastError?: string | null
   createdAt: string
 }
+
+// ============================================
+// Orders API Types
+// ============================================
+
+/**
+ * Order status values from SP-API
+ */
+export type AmazonOrderStatus =
+  | 'Pending'           // Order placed, not yet authorized
+  | 'Unshipped'         // Payment authorized, awaiting shipment
+  | 'PartiallyShipped'  // Some items shipped
+  | 'Shipped'           // All items shipped
+  | 'Canceled'          // Order canceled
+  | 'Unfulfillable'     // FBA order cannot be fulfilled
+
+/**
+ * Order summary from getOrders
+ */
+export interface AmazonOrder {
+  AmazonOrderId: string
+  PurchaseDate: string        // ISO date
+  LastUpdateDate: string
+  OrderStatus: AmazonOrderStatus
+  FulfillmentChannel: 'AFN' | 'MFN'  // Amazon or Merchant
+  SalesChannel: string        // e.g., "Amazon.com"
+  OrderTotal?: {
+    CurrencyCode: string
+    Amount: string
+  }
+  NumberOfItemsShipped: number
+  NumberOfItemsUnshipped: number
+  MarketplaceId: string
+}
+
+/**
+ * Response from getOrders endpoint
+ */
+export interface GetOrdersResponse {
+  payload: {
+    Orders: AmazonOrder[]
+    NextToken?: string        // For pagination
+    LastUpdatedBefore?: string
+    CreatedBefore?: string
+  }
+}
+
+/**
+ * Order item from getOrderItems
+ */
+export interface AmazonOrderItem {
+  ASIN: string
+  SellerSKU?: string
+  OrderItemId: string
+  Title: string
+  QuantityOrdered: number
+  QuantityShipped: number
+  ItemPrice?: {
+    CurrencyCode: string
+    Amount: string
+  }
+  ItemTax?: {
+    CurrencyCode: string
+    Amount: string
+  }
+  ProductInfo?: {
+    NumberOfItems?: number
+  }
+}
+
+/**
+ * Response from getOrderItems endpoint
+ */
+export interface GetOrderItemsResponse {
+  payload: {
+    AmazonOrderId: string
+    OrderItems: AmazonOrderItem[]
+    NextToken?: string
+  }
+}
+
+/**
+ * Options for fetching orders
+ */
+export interface GetOrdersOptions {
+  createdAfter?: string      // ISO date
+  createdBefore?: string     // ISO date
+  lastUpdatedAfter?: string
+  lastUpdatedBefore?: string
+  orderStatuses?: AmazonOrderStatus[]
+  marketplaceIds?: string[]
+  maxResultsPerPage?: number  // 1-100, default 100
+  nextToken?: string
+}
+
+/**
+ * Aggregated order data for sync
+ */
+export interface OrderDailyAggregate {
+  date: Date
+  asin: string
+  totalSales: number
+  unitCount: number
+}
+
+/**
+ * Sync result for orders
+ */
+export interface OrderSyncResult {
+  syncLogId: string
+  status: 'completed' | 'partial' | 'failed'
+  ordersProcessed: number
+  orderItemsProcessed: number
+  salesDailyUpdated: number
+  errors: string[]
+  duration: number
+}
