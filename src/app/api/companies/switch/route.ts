@@ -10,6 +10,7 @@ import {
   parseBody,
   serverError,
 } from '@/lib/api-response'
+import { ensureDefaultLocation } from '@/services/location'
 
 // Request body schema
 const switchCompanySchema = z.object({
@@ -50,6 +51,9 @@ export async function POST(request: NextRequest) {
     }
 
     const company = userCompany.company
+
+    // Ensure target company has a default location
+    await ensureDefaultLocation(company.id)
 
     // Fetch brands for the new company
     const brands = await prisma.brand.findMany({

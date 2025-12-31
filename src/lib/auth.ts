@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { prisma } from './db'
+import { ensureDefaultLocation } from '@/services/location'
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -98,6 +99,11 @@ export const authOptions: NextAuthOptions = {
             },
           }),
         ])
+
+        // Ensure company has a default location
+        if (loginCompanyId) {
+          await ensureDefaultLocation(loginCompanyId)
+        }
 
         // Build companies list from userCompanies (single source of truth)
         const companies = user.userCompanies.map(uc => ({

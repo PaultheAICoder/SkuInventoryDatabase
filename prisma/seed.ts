@@ -23,6 +23,25 @@ async function main() {
   })
   console.log('Created company:', company.name)
 
+  // Create default location for company
+  const location = await prisma.location.upsert({
+    where: {
+      companyId_name: {
+        companyId: company.id,
+        name: 'Main Warehouse',
+      },
+    },
+    update: {},
+    create: {
+      companyId: company.id,
+      name: 'Main Warehouse',
+      type: 'warehouse',
+      isDefault: true,
+      isActive: true,
+    },
+  })
+  console.log('Created default location:', location.name)
+
   // Create brand
   const brand = await prisma.brand.upsert({
     where: {

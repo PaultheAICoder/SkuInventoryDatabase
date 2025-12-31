@@ -4,6 +4,7 @@ import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Prisma } from '@prisma/client'
 import { createCompanySchema, companyListQuerySchema } from '@/types/company'
+import { ensureDefaultLocation } from '@/services/location'
 
 // GET /api/companies - List all companies (admin only)
 export async function GET(request: NextRequest) {
@@ -153,6 +154,9 @@ export async function POST(request: NextRequest) {
         updatedAt: true,
       },
     })
+
+    // Create default location for new company
+    await ensureDefaultLocation(company.id)
 
     return NextResponse.json(
       {
