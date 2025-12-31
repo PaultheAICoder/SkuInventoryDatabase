@@ -126,12 +126,17 @@ export type ReportType =
   | 'sdSearchTerm'
 
 export interface ReportRequest {
-  reportType: ReportType
+  name?: string
   startDate: string // YYYY-MM-DD
-  endDate: string
-  columns?: string[]
-  groupBy?: string[]
-  filters?: ReportFilter[]
+  endDate: string // YYYY-MM-DD
+  configuration: {
+    adProduct: 'SPONSORED_PRODUCTS' | 'SPONSORED_BRANDS' | 'SPONSORED_DISPLAY'
+    groupBy: string[]
+    columns: string[]
+    reportTypeId: string
+    timeUnit: 'SUMMARY' | 'DAILY'
+    format: 'GZIP_JSON'
+  }
 }
 
 export interface ReportFilter {
@@ -207,4 +212,55 @@ export interface SyncResult {
   recordsFailed: number
   errors: string[]
   duration: number // milliseconds
+}
+
+// ============================================
+// Search Term Report Types
+// ============================================
+
+// Search Term Report Row (from Amazon Ads API)
+export interface SearchTermReportRow {
+  date: string // YYYY-MM-DD
+  campaignName: string
+  adGroupName: string
+  portfolioName?: string
+  keyword?: string
+  searchTerm: string
+  matchType: string // BROAD, PHRASE, EXACT, TARGETING_EXPRESSION
+  impressions: string // API returns as string
+  clicks: string
+  cost: string // in account currency
+  attributedOrders7d?: string
+  attributedSales7d?: string
+}
+
+// Parsed report data after decompression
+export interface ParsedReportData {
+  rows: SearchTermReportRow[]
+  totalRows: number
+}
+
+// Report sync options
+export interface ReportSyncOptions {
+  credentialId: string
+  profileId: string
+  dateRange: {
+    startDate: string // YYYY-MM-DD
+    endDate: string // YYYY-MM-DD
+  }
+  campaignType?: 'sponsoredProducts' | 'sponsoredBrands' | 'sponsoredDisplay'
+  triggeredById?: string
+}
+
+// Report sync result
+export interface ReportSyncResult {
+  syncLogId: string
+  reportId?: string
+  status: 'completed' | 'failed' | 'partial'
+  recordsProcessed: number
+  recordsCreated: number
+  recordsUpdated: number
+  recordsFailed: number
+  errors: string[]
+  duration: number
 }

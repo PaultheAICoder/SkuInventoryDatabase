@@ -19,6 +19,7 @@ import type {
   AmazonAdsAdGroup,
   SyncResult,
 } from './types'
+import { syncSearchTermReport } from './reports'
 
 export interface SyncOptions {
   credentialId: string
@@ -97,6 +98,29 @@ export async function syncAll(options: SyncOptions): Promise<SyncResult> {
     recordsFailed += adGroupResult.failed
     if (adGroupResult.errors.length > 0) {
       errors.push(...adGroupResult.errors)
+    }
+
+    // Sync reports if date range provided
+    if (options.dateRange) {
+      try {
+        const reportResult = await syncSearchTermReport({
+          credentialId: options.credentialId,
+          profileId,
+          dateRange: options.dateRange,
+          triggeredById: options.triggeredById,
+        })
+
+        recordsProcessed += reportResult.recordsProcessed
+        recordsCreated += reportResult.recordsCreated
+        recordsUpdated += reportResult.recordsUpdated
+        recordsFailed += reportResult.recordsFailed
+
+        if (reportResult.errors.length > 0) {
+          errors.push(...reportResult.errors.slice(0, 5))
+        }
+      } catch (error) {
+        errors.push(`Report sync error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
     }
 
     // Update sync log with success
