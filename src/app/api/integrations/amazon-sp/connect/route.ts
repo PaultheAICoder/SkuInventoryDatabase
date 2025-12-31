@@ -1,0 +1,72 @@
+/**
+ * POST /api/integrations/amazon-sp/connect
+ *
+ * Initiates OAuth flow for Amazon SP-API connection.
+ * Admin only.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
+import { randomBytes } from 'crypto'
+import { getAuthUrl } from '@/services/amazon-sp-api/client'
+import { storeOAuthState } from '@/services/amazon-sp-api/auth'
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check selectedCompanyId BEFORE role check to return proper 400 error
+    const selectedCompanyId = session.user.selectedCompanyId
+    if (!selectedCompanyId) {
+      return NextResponse.json(
+        { error: 'No company selected. Please refresh the page and try again.' },
+        { status: 400 }
+      )
+    }
+
+    // Admin only
+    const companyRole = getSelectedCompanyRole(session)
+    if (companyRole !== 'admin') {
+      return NextResponse.json(
+        { error: 'Admin permission required' },
+        { status: 403 }
+      )
+    }
+
+    // Parse request body
+    let brandId: string | undefined
+    try {
+      const body = await request.json()
+      brandId = body.brandId
+    } catch {
+      // Body is optional
+    }
+
+    const companyId = selectedCompanyId
+
+    // Generate secure state token for CSRF protection
+    const state = randomBytes(32).toString('hex')
+
+    // Store state with company/brand context (expires in 10 minutes)
+    storeOAuthState(state, { companyId, brandId })
+
+    // Generate authorization URL
+    const authUrl = getAuthUrl(state)
+
+    return NextResponse.json({
+      authUrl,
+      state,
+    })
+  } catch (error) {
+    console.error('Error initiating Amazon SP-API OAuth:', error)
+    return NextResponse.json(
+      { error: 'Failed to initiate connection' },
+      { status: 500 }
+    )
+  }
+}
