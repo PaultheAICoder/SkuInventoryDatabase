@@ -569,7 +569,15 @@ export async function approveDraftTransaction(params: {
 
         // Create finished goods output
         const defaultLocationId = await getDefaultLocationId(companyId)
-        const fgLocationId = draft.locationId ?? defaultLocationId ?? ''
+        const fgLocationId = draft.locationId ?? defaultLocationId
+
+        if (!fgLocationId) {
+          throw new Error(
+            'Cannot approve build draft: No output location specified and company has no default location. ' +
+            'Please set a default location in Company Settings.'
+          )
+        }
+
         await tx.finishedGoodsLine.create({
           data: {
             transactionId: id,

@@ -634,20 +634,25 @@ export async function updateBuildTransaction(params: {
 
     // 8. Create finished goods line (same location as build)
     const outputLocationId = locationIdToUse ?? await getDefaultLocationId(companyId)
-    if (outputLocationId) {
-      await tx.finishedGoodsLine.create({
-        data: {
-          transactionId,
-          skuId: existingTransaction.skuId,
-          locationId: outputLocationId,
-          quantityChange: new Prisma.Decimal(input.unitsToBuild),
-          costPerUnit: new Prisma.Decimal(unitBomCost),
-        },
-      })
-
-      // Update finished goods balance
-      await updateFinishedGoodsBalance(tx, existingTransaction.skuId, outputLocationId, input.unitsToBuild)
+    if (!outputLocationId) {
+      throw new Error(
+        'Cannot update build transaction: No output location available and company has no default location. ' +
+        'Please set a default location in Company Settings.'
+      )
     }
+
+    await tx.finishedGoodsLine.create({
+      data: {
+        transactionId,
+        skuId: existingTransaction.skuId,
+        locationId: outputLocationId,
+        quantityChange: new Prisma.Decimal(input.unitsToBuild),
+        costPerUnit: new Prisma.Decimal(unitBomCost),
+      },
+    })
+
+    // Update finished goods balance
+    await updateFinishedGoodsBalance(tx, existingTransaction.skuId, outputLocationId, input.unitsToBuild)
 
     // 9. Update transaction header
     const updatedTransaction = await tx.transaction.update({

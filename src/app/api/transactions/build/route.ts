@@ -207,9 +207,13 @@ export async function POST(request: NextRequest) {
           insufficientItems: result.insufficientItems,
         },
       })
-    } catch (error) {
+    } catch (err) {
+      // Handle missing output location error
+      if (err instanceof Error && err.message.includes('No output location')) {
+        return error(err.message, 400, 'BadRequest')
+      }
       // Handle insufficient inventory error
-      if (error instanceof Error && error.message.includes('Insufficient inventory')) {
+      if (err instanceof Error && err.message.includes('Insufficient inventory')) {
         // Return 400 with insufficient items so frontend can show warning
         const insufficientItems = await checkInsufficientInventory({
           bomVersionId: selectedBomVersionId,
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
-      throw error
+      throw err
     }
   } catch (error) {
     console.error('Error creating build transaction:', {

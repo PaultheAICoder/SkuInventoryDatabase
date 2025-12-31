@@ -877,6 +877,14 @@ export async function createBuildTransaction(params: {
   // Use explicit outputLocationId if provided, otherwise use default location when outputToFinishedGoods is enabled
   const outputLocationIdToUse = params.outputLocationId ?? (shouldOutputFG ? await getDefaultLocationId(companyId) : null)
 
+  // Validate that we have a location when outputting to finished goods
+  if (shouldOutputFG && !outputLocationIdToUse) {
+    throw new Error(
+      'Cannot create build transaction: No output location specified and company has no default location. ' +
+      'Please select an output location or set a default location in Company Settings.'
+    )
+  }
+
   // Use atomic transaction to create build transaction + finished goods line together
   const transactionResult = await prisma.$transaction(async (tx) => {
     // Get BOM lines with component costs for snapshot - INSIDE transaction for atomicity

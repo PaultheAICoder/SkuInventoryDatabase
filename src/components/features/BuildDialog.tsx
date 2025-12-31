@@ -98,6 +98,32 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
   const [lotAvailability, setLotAvailability] = useState<LotAvailabilityItem[]>([])
   const [showLotDetails, setShowLotDetails] = useState(false)
 
+  const fetchLocations = useCallback(async () => {
+    setIsLoadingLocations(true)
+    try {
+      const res = await fetch('/api/locations?isActive=true&pageSize=50')
+      if (res.ok) {
+        const data = await res.json()
+        const locationsList = data.data || []
+        setLocations(locationsList)
+
+        // Pre-select first location as output location if none selected
+        if (locationsList.length > 0) {
+          setFormData(prev => {
+            if (!prev.outputLocationId) {
+              return { ...prev, outputLocationId: locationsList[0].id }
+            }
+            return prev
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations:', err)
+    } finally {
+      setIsLoadingLocations(false)
+    }
+  }, [])
+
   // Fetch SKUs and locations when dialog opens
   useEffect(() => {
     if (open) {
@@ -108,22 +134,7 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         skuId: preselectedSkuId || '',
       }))
     }
-  }, [open, preselectedSkuId])
-
-  const fetchLocations = async () => {
-    setIsLoadingLocations(true)
-    try {
-      const res = await fetch('/api/locations?isActive=true&pageSize=50')
-      if (res.ok) {
-        const data = await res.json()
-        setLocations(data.data || [])
-      }
-    } catch (err) {
-      console.error('Failed to fetch locations:', err)
-    } finally {
-      setIsLoadingLocations(false)
-    }
-  }
+  }, [open, preselectedSkuId, fetchLocations])
 
   const fetchSkus = async () => {
     setIsLoadingSkus(true)
@@ -288,6 +299,8 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
       if (err instanceof Error) {
         if (err.message.includes('company')) {
           userMessage = 'Please select a company from the sidebar and try again'
+        } else if (err.message.includes('output location') || err.message.includes('default location')) {
+          userMessage = 'No default location is set for your company. Please select an Output Location above, or set a default location in Company Settings.'
         } else if (err.message.includes('network') || err.message.includes('fetch')) {
           userMessage = 'Network error. Please check your connection and try again'
         } else {
@@ -551,10 +564,10 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
                     disabled={isLoadingLocations}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'No finished goods output'} />
+                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Select output location'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={EMPTY_VALUE}>No finished goods output</SelectItem>
+                      <SelectItem value={EMPTY_VALUE}>No finished goods output (not recommended)</SelectItem>
                       {locations.map((loc) => (
                         <SelectItem key={loc.id} value={loc.id}>
                           {loc.name}

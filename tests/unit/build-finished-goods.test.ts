@@ -355,50 +355,24 @@ describe('Build Transaction with Finished Goods Output (Issue #79)', () => {
       expect(getDefaultLocationId).toHaveBeenCalledWith(mockCompanyId)
     })
 
-    it('skips FG output gracefully when no default location exists and none specified', async () => {
+    it('throws error when no default location exists and none specified (Issue #334 fix)', async () => {
       // Setup: No default location
       vi.mocked(getDefaultLocationId).mockResolvedValue(null)
 
-      let finishedGoodsCreated = false
-
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        const tx = {
-          bOMLine: { findMany: vi.fn().mockResolvedValue(mockBomLines) },
-          location: {
-            findFirst: vi.fn().mockResolvedValue(null),
-          },
-          transaction: {
-            create: vi.fn().mockResolvedValue({ id: 'transaction-123' }),
-            findUniqueOrThrow: vi.fn().mockResolvedValue(mockTransactionWithLots),
-          },
-          transactionLine: { create: vi.fn().mockResolvedValue({ id: 'line-1' }) },
-          finishedGoodsLine: {
-            create: vi.fn().mockImplementation(() => {
-              finishedGoodsCreated = true
-              return Promise.resolve({ id: 'fg-line-1' })
-            }),
-          },
-          lot: { findMany: vi.fn().mockResolvedValue([]) },
-          lotBalance: { update: vi.fn().mockResolvedValue({}) },
-          inventoryBalance: { upsert: vi.fn().mockResolvedValue({}) },
-          finishedGoodsBalance: { upsert: vi.fn().mockResolvedValue({}) },
-        }
-        return callback(tx as unknown as Prisma.TransactionClient)
-      })
-
-      const result = await createBuildTransaction({
-        companyId: mockCompanyId,
-        skuId: mockSkuId,
-        bomVersionId: mockBomVersionId,
-        unitsToBuild: 10,
-        date: new Date(),
-        createdById: mockUserId,
-        outputToFinishedGoods: true, // enabled, but no location available
-      })
-
-      // FG output should be skipped since no location
-      expect(finishedGoodsCreated).toBe(false)
-      expect(result.transaction.outputQuantity).toBeNull()
+      // Should throw error when outputToFinishedGoods is true but no location is available
+      // This is the fix for Issue #334 - previously it silently skipped FG output,
+      // causing FG quantities to show as 0 on the SKUs page
+      await expect(
+        createBuildTransaction({
+          companyId: mockCompanyId,
+          skuId: mockSkuId,
+          bomVersionId: mockBomVersionId,
+          unitsToBuild: 10,
+          date: new Date(),
+          createdById: mockUserId,
+          outputToFinishedGoods: true, // enabled, but no location available
+        })
+      ).rejects.toThrow('Cannot create build transaction: No output location specified and company has no default location')
     })
   })
 
