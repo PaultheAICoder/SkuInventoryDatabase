@@ -10,6 +10,9 @@ import {
   OrganicVsAdChart,
   KeywordPerformanceChart,
   DateRangeSelector,
+  KeywordMetricsTable,
+  CampaignTable,
+  DailySalesTable,
 } from '@/components/analytics'
 import type {
   DateRangePreset,
@@ -19,6 +22,8 @@ import type {
   KeywordPerformanceData,
   AmazonAnalyticsSummary,
   KeywordMetricsResponse,
+  CampaignPerformanceData,
+  DailySalesTableData,
 } from '@/types/amazon-analytics'
 import type { DailyAttribution, AttributionResponse } from '@/types/attribution'
 
@@ -131,9 +136,16 @@ export default function AmazonPage() {
   })
   const [keywordData, setKeywordData] = useState<KeywordPerformanceData[]>([])
 
+  // Table-specific data states
+  const [fullKeywordData, setFullKeywordData] = useState<KeywordPerformanceData[]>([])
+  const [campaignData, setCampaignData] = useState<CampaignPerformanceData[]>([])
+  const [dailySalesTableData, setDailySalesTableData] = useState<DailySalesTableData[]>([])
+
   // Loading states
   const [isLoadingSales, setIsLoadingSales] = useState(true)
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(true)
+  const [isLoadingFullKeywords, setIsLoadingFullKeywords] = useState(true)
+  const [isLoadingCampaigns, setIsLoadingCampaigns] = useState(true)
 
   // Error states
   const [salesError, setSalesError] = useState<string | null>(null)
@@ -196,6 +208,19 @@ export default function AmazonPage() {
         }))
         setSalesTrendData(trendData)
 
+        // Set daily sales table data
+        const tableData: DailySalesTableData[] = attr.daily.map((d: DailyAttribution) => ({
+          date: d.date,
+          totalSales: d.totalSales,
+          adAttributedSales: d.adAttributedSales,
+          organicSales: d.organicSales,
+          organicPercentage: d.totalSales > 0
+            ? (d.organicSales / d.totalSales) * 100
+            : 0,
+          orderCount: d.orderCount ?? 0,
+        }))
+        setDailySalesTableData(tableData)
+
         // Set organic/ad breakdown
         setOrganicAdBreakdown({
           organic: attr.summary.organicSales,
@@ -222,6 +247,17 @@ export default function AmazonPage() {
           organicSales: d.organicSales,
         }))
         setSalesTrendData(trendData)
+
+        // Set daily sales table data
+        const tableData: DailySalesTableData[] = data.daily.map((d) => ({
+          date: d.date,
+          totalSales: d.totalSales,
+          adAttributedSales: d.adAttributedSales,
+          organicSales: d.organicSales,
+          organicPercentage: d.organicPercentage,
+          orderCount: d.orderCount,
+        }))
+        setDailySalesTableData(tableData)
 
         const organicPct = data.summary.organicPercentage
         setOrganicAdBreakdown({
@@ -292,6 +328,64 @@ export default function AmazonPage() {
     }
   }, [dateRangePreset, customStartDate, customEndDate, selectedBrandId, salesTrendData])
 
+  // Fetch full keyword data for table (no limit)
+  const fetchFullKeywordData = useCallback(async () => {
+    setIsLoadingFullKeywords(true)
+
+    try {
+      const { startDate, endDate } = getDateRange(dateRangePreset, customStartDate, customEndDate)
+
+      const url = new URL('/api/analytics/amazon', window.location.origin)
+      url.searchParams.set('startDate', startDate)
+      url.searchParams.set('endDate', endDate)
+      url.searchParams.set('limit', '1000') // Get all keywords
+      if (selectedBrandId) {
+        url.searchParams.set('brandId', selectedBrandId)
+      }
+
+      const res = await fetch(url.toString())
+      if (!res.ok) {
+        throw new Error('Failed to fetch full keyword data')
+      }
+
+      const data = (await res.json()) as KeywordMetricsResponse
+      setFullKeywordData(data.keywords)
+    } catch (err) {
+      console.error('Failed to fetch full keyword data:', err)
+    } finally {
+      setIsLoadingFullKeywords(false)
+    }
+  }, [dateRangePreset, customStartDate, customEndDate, selectedBrandId])
+
+  // Fetch campaign data
+  const fetchCampaignData = useCallback(async () => {
+    setIsLoadingCampaigns(true)
+
+    try {
+      const { startDate, endDate } = getDateRange(dateRangePreset, customStartDate, customEndDate)
+
+      const url = new URL('/api/analytics/amazon', window.location.origin)
+      url.searchParams.set('startDate', startDate)
+      url.searchParams.set('endDate', endDate)
+      url.searchParams.set('include', 'campaigns')
+      if (selectedBrandId) {
+        url.searchParams.set('brandId', selectedBrandId)
+      }
+
+      const res = await fetch(url.toString())
+      if (!res.ok) {
+        throw new Error('Failed to fetch campaign data')
+      }
+
+      const data = (await res.json()) as KeywordMetricsResponse & { campaigns?: CampaignPerformanceData[] }
+      setCampaignData(data.campaigns || [])
+    } catch (err) {
+      console.error('Failed to fetch campaign data:', err)
+    } finally {
+      setIsLoadingCampaigns(false)
+    }
+  }, [dateRangePreset, customStartDate, customEndDate, selectedBrandId])
+
   // Initial data fetch
   useEffect(() => {
     fetchSalesData()
@@ -303,6 +397,14 @@ export default function AmazonPage() {
       fetchKeywordData()
     }
   }, [isLoadingSales, salesTrendData.length, fetchKeywordData])
+
+  // Fetch table data after sales data is loaded
+  useEffect(() => {
+    if (!isLoadingSales && salesTrendData.length > 0) {
+      fetchFullKeywordData()
+      fetchCampaignData()
+    }
+  }, [isLoadingSales, salesTrendData.length, fetchFullKeywordData, fetchCampaignData])
 
   // Handle date range change
   const handleDateRangeChange = (
@@ -427,6 +529,22 @@ export default function AmazonPage() {
 
       {/* Top Keywords Chart (full width) */}
       <KeywordPerformanceChart data={keywordData} isLoading={isLoadingKeywords} />
+
+      {/* Data Tables Section */}
+      {salesTrendData.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-xl font-semibold">Data Tables</h2>
+
+          {/* Keyword Metrics Table - Full Width */}
+          <KeywordMetricsTable data={fullKeywordData} isLoading={isLoadingFullKeywords} />
+
+          {/* Campaign and Daily Sales Tables - Side by Side on large screens */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <CampaignTable data={campaignData} isLoading={isLoadingCampaigns} />
+            <DailySalesTable data={dailySalesTableData} isLoading={isLoadingSales} />
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {!isLoading && !hasError && salesTrendData.length === 0 && (

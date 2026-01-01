@@ -41,6 +41,48 @@ export interface KeywordPerformanceData {
   acos: number
   roas: number
   orders: number
+  matchType?: string // exact, phrase, broad, auto
+  ctr?: number // click-through rate percentage
+}
+
+// Campaign performance data for table display
+export interface CampaignPerformanceData {
+  campaignId: string
+  name: string
+  campaignType: string // sponsoredProducts, sponsoredBrands, sponsoredDisplay
+  state: string // enabled, paused, archived
+  dailyBudget: number | null
+  spend: number
+  sales: number
+  impressions: number
+  clicks: number
+  orders: number
+  acos: number
+  roas: number
+}
+
+// Daily sales table data
+export interface DailySalesTableData {
+  date: string
+  totalSales: number
+  adAttributedSales: number
+  organicSales: number
+  organicPercentage: number
+  orderCount: number
+}
+
+// Campaign metrics API response
+export interface CampaignMetricsResponse {
+  campaigns: CampaignPerformanceData[]
+  dateRange: {
+    startDate: string
+    endDate: string
+  }
+  totals: {
+    totalSpend: number
+    totalSales: number
+    campaignCount: number
+  }
 }
 
 // Summary stats for dashboard

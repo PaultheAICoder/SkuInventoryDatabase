@@ -246,7 +246,7 @@ export const forecastExportColumns: CSVColumn<ForecastExportData>[] = [
  * Generate a filename for export
  */
 export function generateExportFilename(
-  type: 'components' | 'skus' | 'transactions' | 'lots' | 'forecasts'
+  type: 'components' | 'skus' | 'transactions' | 'lots' | 'forecasts' | 'keywords' | 'campaigns' | 'daily-sales'
 ): string {
   const date = toLocalDateString(new Date())
   return `${type}-export-${date}.csv`

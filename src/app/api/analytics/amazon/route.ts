@@ -9,7 +9,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { format, subDays, parseISO } from 'date-fns'
-import type { KeywordPerformanceData, KeywordMetricsResponse } from '@/types/amazon-analytics'
+import type {
+  KeywordPerformanceData,
+  KeywordMetricsResponse,
+  CampaignPerformanceData,
+  CampaignMetricsResponse,
+} from '@/types/amazon-analytics'
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +37,7 @@ export async function GET(request: NextRequest) {
     const endDateParam = searchParams.get('endDate')
     const limitParam = searchParams.get('limit')
     const limit = limitParam ? parseInt(limitParam, 10) : 10
+    const includeParam = searchParams.get('include')
 
     // Get brands for this company
     const brands = await prisma.brand.findMany({
@@ -62,7 +68,13 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        campaignType: true,
+        state: true,
+        dailyBudget: true,
+      },
     })
     const campaignIds = campaigns.map((c) => c.id)
 
@@ -140,7 +152,8 @@ export async function GET(request: NextRequest) {
     const overallAcos = totalSales > 0 ? (totalSpend / totalSales) * 100 : 0
     const overallRoas = totalSpend > 0 ? totalSales / totalSpend : 0
 
-    const response: KeywordMetricsResponse = {
+    // Build keyword response
+    const keywordResponse: KeywordMetricsResponse = {
       keywords,
       dateRange: {
         startDate: format(startDate, 'yyyy-MM-dd'),
@@ -156,7 +169,84 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    return NextResponse.json(response)
+    // If campaigns are requested, aggregate campaign-level metrics
+    if (includeParam === 'campaigns') {
+      // Query keyword metrics grouped by campaign
+      const campaignMetrics = await prisma.keywordMetric.groupBy({
+        by: ['campaignId'],
+        where: {
+          date: { gte: startDate, lte: endDate },
+          campaignId: { in: campaignIds },
+        },
+        _sum: {
+          spend: true,
+          sales: true,
+          impressions: true,
+          clicks: true,
+          orders: true,
+        },
+      })
+
+      // Create a map for quick lookup of campaign details
+      const campaignMap = new Map(campaigns.map((c) => [c.id, c]))
+
+      // Transform to CampaignPerformanceData format
+      const campaignData: CampaignPerformanceData[] = campaignMetrics
+        .filter((cm) => cm.campaignId !== null)
+        .map((cm) => {
+          const campaign = campaignMap.get(cm.campaignId!)
+          const spend = Number(cm._sum.spend) || 0
+          const sales = Number(cm._sum.sales) || 0
+          const impressions = cm._sum.impressions || 0
+          const clicks = cm._sum.clicks || 0
+          const orders = cm._sum.orders || 0
+
+          // Calculate ACOS and ROAS
+          const acos = sales > 0 ? (spend / sales) * 100 : 0
+          const roas = spend > 0 ? sales / spend : 0
+
+          return {
+            campaignId: cm.campaignId!,
+            name: campaign?.name || 'Unknown Campaign',
+            campaignType: campaign?.campaignType || 'unknown',
+            state: campaign?.state || 'unknown',
+            dailyBudget: campaign?.dailyBudget ? Number(campaign.dailyBudget) : null,
+            spend,
+            sales,
+            impressions,
+            clicks,
+            orders,
+            acos: Math.round(acos * 100) / 100,
+            roas: Math.round(roas * 100) / 100,
+          }
+        })
+        .sort((a, b) => b.spend - a.spend) // Sort by spend descending
+
+      // Calculate campaign totals
+      const campaignTotalSpend = campaignData.reduce((sum, c) => sum + c.spend, 0)
+      const campaignTotalSales = campaignData.reduce((sum, c) => sum + c.sales, 0)
+
+      const campaignResponse: CampaignMetricsResponse = {
+        campaigns: campaignData,
+        dateRange: {
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+        },
+        totals: {
+          totalSpend: Math.round(campaignTotalSpend * 100) / 100,
+          totalSales: Math.round(campaignTotalSales * 100) / 100,
+          campaignCount: campaignData.length,
+        },
+      }
+
+      // Return combined response with both keywords and campaigns
+      return NextResponse.json({
+        ...keywordResponse,
+        ...campaignResponse,
+      })
+    }
+
+    return NextResponse.json(keywordResponse)
   } catch (error) {
     console.error('Amazon analytics query error:', error)
     return NextResponse.json(
