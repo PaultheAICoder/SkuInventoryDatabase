@@ -1,12 +1,28 @@
 /**
  * POST /api/cron/ads-sync
  *
- * Scheduled endpoint for daily Amazon Ads sync.
+ * Scheduled endpoint for daily Amazon data sync (Ads + Orders).
  * Authenticated via CRON_SECRET header.
+ *
+ * Syncs:
+ * - All active amazon_ads credentials (portfolios, campaigns, reports)
+ * - All active amazon_sp credentials (orders to SalesDaily)
+ *
+ * Configuration (via environment variables):
+ * - DISABLE_AMAZON_SYNC: Set to 'true' to disable
+ * - SKIP_WEEKENDS: Set to 'true' to skip Saturday/Sunday
+ * - SYNC_STAGGER_MS: Delay between credentials (default 5000)
+ * - SYNC_MAX_RETRIES: Max retry attempts (default 3)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAllActiveCredentials } from '@/services/amazon-ads/sync'
+import { runScheduledAmazonSync } from '@/services/amazon-sync/scheduler'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
+// Maximum execution time (10 minutes for large syncs)
+export const maxDuration = 600
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +31,7 @@ export async function POST(request: NextRequest) {
     const providedSecret = request.headers.get('X-Cron-Secret')
 
     if (!cronSecret || cronSecret.length < 16) {
-      console.error('CRON_SECRET not properly configured')
+      console.error('[Amazon Sync Cron] CRON_SECRET not properly configured')
       return NextResponse.json(
         { error: 'Server configuration error' },
         { status: 500 }
@@ -29,18 +45,50 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Trigger sync for all active credentials
-    const result = await syncAllActiveCredentials()
+    // Run scheduled sync
+    const result = await runScheduledAmazonSync()
+
+    // Check if skipped
+    if (result.skipped) {
+      return NextResponse.json({
+        success: true,
+        skipped: result.skipped,
+        message: result.skipped === 'disabled'
+          ? 'Amazon sync is disabled via DISABLE_AMAZON_SYNC'
+          : 'Amazon sync skipped on weekend (SKIP_WEEKENDS=true)',
+        duration: result.duration,
+      })
+    }
 
     return NextResponse.json({
+      success: true,
+      totalCredentials: result.totalCredentials,
       syncsTriggered: result.syncsTriggered,
-      credentials: result.credentials,
-      errors: result.errors.length > 0 ? result.errors : undefined,
+      syncsCompleted: result.syncsCompleted,
+      syncsFailed: result.syncsFailed,
+      amazonAdsResults: result.amazonAdsResults.map(r => ({
+        credentialId: r.credentialId,
+        status: r.status,
+        syncLogId: r.syncLogId,
+        error: r.error,
+        retries: r.retryCount,
+      })),
+      amazonSpResults: result.amazonSpResults.map(r => ({
+        credentialId: r.credentialId,
+        status: r.status,
+        syncLogId: r.syncLogId,
+        error: r.error,
+        retries: r.retryCount,
+      })),
+      duration: result.duration,
     })
   } catch (error) {
-    console.error('Error in cron ads-sync:', error)
+    console.error('[Amazon Sync Cron] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to trigger syncs' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to run Amazon sync',
+      },
       { status: 500 }
     )
   }

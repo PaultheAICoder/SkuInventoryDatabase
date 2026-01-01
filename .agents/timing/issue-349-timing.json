@@ -1,0 +1,8 @@
+{
+  "issue": "349",
+  "workflow": "3-agent",
+  "workflow_start": "2026-01-01T00:10:27.000Z",
+  "build_complete": "2026-01-01T00:27:00.000Z",
+  "cleanup_complete": "2026-01-01T00:35:00.000Z",
+  "total_duration_minutes": 25
+}

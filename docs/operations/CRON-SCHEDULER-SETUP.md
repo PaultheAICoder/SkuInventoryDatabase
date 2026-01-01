@@ -10,7 +10,7 @@ This document describes how to configure external schedulers (cron, systemd time
 |----------|--------|----------|---------|
 | `/api/cron/alerts` | GET | Every 15 min | Low-stock alert evaluation |
 | `/api/cron/email-monitor` | GET | Every 5 min | Poll feedback inbox for replies |
-| `/api/cron/ads-sync` | POST | Daily 3:00 AM | Sync Amazon Ads data |
+| `/api/cron/ads-sync` | POST | Daily 5:00 AM | Sync Amazon Ads + Orders data |
 | `/api/cron/retention-cleanup` | POST | Daily 4:00 AM | Delete old records per retention policy |
 
 ## Authentication
@@ -33,14 +33,59 @@ All cron endpoints require authentication via the `CRON_SECRET` environment vari
    - Docker: `docker/.env`
    - systemd: Service file `Environment=` directive
 
+## Amazon Sync Configuration
+
+The `/api/cron/ads-sync` endpoint can be configured with these environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DISABLE_AMAZON_SYNC` | `false` | Set to `true` to disable all Amazon syncs |
+| `SKIP_WEEKENDS` | `false` | Set to `true` to skip sync on Saturday/Sunday |
+| `SYNC_TIMEZONE` | `America/New_York` | Timezone for scheduling (informational) |
+| `SYNC_STAGGER_MS` | `5000` | Delay (ms) between syncing credentials |
+| `SYNC_MAX_RETRIES` | `3` | Maximum retry attempts for failed syncs |
+
+### What Gets Synced
+
+1. **Amazon Ads** (`amazon_ads` credentials):
+   - Advertising profiles
+   - Portfolios
+   - Campaigns
+   - Ad groups
+   - Search term reports (yesterday's data)
+
+2. **Amazon SP-API** (`amazon_sp` credentials):
+   - Orders from yesterday
+   - Aggregated to SalesDaily records by ASIN
+
+### Sync Results
+
+The endpoint returns detailed results for each credential:
+
+```json
+{
+  "success": true,
+  "totalCredentials": 3,
+  "syncsCompleted": 2,
+  "syncsFailed": 1,
+  "amazonAdsResults": [
+    { "credentialId": "...", "status": "completed", "syncLogId": "...", "retries": 0 }
+  ],
+  "amazonSpResults": [
+    { "credentialId": "...", "status": "completed", "syncLogId": "...", "retries": 0 }
+  ],
+  "duration": 45000
+}
+```
+
 ## Recommended Schedules
 
 | Endpoint | Schedule | Cron Expression | Rationale |
 |----------|----------|-----------------|-----------|
 | alerts | Every 15 min | `*/15 * * * *` | Frequent checks for low-stock |
 | email-monitor | Every 5 min | `*/5 * * * *` | Quick response to feedback |
-| ads-sync | Daily 3:00 AM | `0 3 * * *` | Off-peak hours, daily data |
-| retention-cleanup | Daily 4:00 AM | `0 4 * * *` | After ads-sync, minimal load |
+| ads-sync | Daily 5:00 AM | `0 5 * * *` | Off-peak hours, daily data |
+| retention-cleanup | Daily 6:00 AM | `0 6 * * *` | After ads-sync, minimal load |
 
 ## systemd Timer Configuration
 
@@ -101,10 +146,10 @@ Create `/etc/systemd/system/inventory-ads-sync.timer`:
 
 ```ini
 [Unit]
-Description=Run Inventory Ads Sync daily at 3 AM
+Description=Run Inventory Ads Sync daily at 5 AM
 
 [Timer]
-OnCalendar=*-*-* 03:00:00
+OnCalendar=*-*-* 05:00:00
 AccuracySec=5min
 Persistent=true
 
@@ -116,7 +161,7 @@ Create `/etc/systemd/system/inventory-ads-sync.service`:
 
 ```ini
 [Unit]
-Description=Inventory Ads Sync - Sync Amazon Ads data
+Description=Inventory Ads Sync - Sync Amazon Ads + Orders data
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
@@ -153,11 +198,11 @@ INVENTORY_URL=http://172.16.20.50:4545
 # Email monitor - every 5 minutes
 */5 * * * * root curl -s -X GET "${INVENTORY_URL}/api/cron/email-monitor" -H "Authorization: Bearer ${CRON_SECRET}" >> /var/log/inventory/email-monitor.log 2>&1
 
-# Ads sync - daily at 3 AM
-0 3 * * * root curl -s -X POST "${INVENTORY_URL}/api/cron/ads-sync" -H "X-Cron-Secret: ${CRON_SECRET}" >> /var/log/inventory/ads-sync.log 2>&1
+# Amazon sync (Ads + Orders) - daily at 5 AM
+0 5 * * * root curl -s -X POST "${INVENTORY_URL}/api/cron/ads-sync" -H "X-Cron-Secret: ${CRON_SECRET}" >> /var/log/inventory/ads-sync.log 2>&1
 
-# Retention cleanup - daily at 4 AM
-0 4 * * * root curl -s -X POST "${INVENTORY_URL}/api/cron/retention-cleanup" -H "X-Cron-Secret: ${CRON_SECRET}" >> /var/log/inventory/retention-cleanup.log 2>&1
+# Retention cleanup - daily at 6 AM (after ads sync)
+0 6 * * * root curl -s -X POST "${INVENTORY_URL}/api/cron/retention-cleanup" -H "X-Cron-Secret: ${CRON_SECRET}" >> /var/log/inventory/retention-cleanup.log 2>&1
 ```
 
 ## Cloud Scheduler (Vercel/Railway/etc.)
@@ -177,11 +222,11 @@ Add to `vercel.json`:
     },
     {
       "path": "/api/cron/ads-sync",
-      "schedule": "0 3 * * *"
+      "schedule": "0 5 * * *"
     },
     {
       "path": "/api/cron/retention-cleanup",
-      "schedule": "0 4 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }

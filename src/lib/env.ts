@@ -11,6 +11,12 @@ const envSchema = z.object({
   // SHOPIFY_ENCRYPTION_KEY: z.string().min(32).optional(),
   // Cron job secret - required for /api/cron/alerts endpoint authentication
   CRON_SECRET: z.string().min(16).optional(),
+  // Amazon sync configuration
+  SYNC_TIMEZONE: z.string().default('America/New_York'),
+  DISABLE_AMAZON_SYNC: z.enum(['true', 'false']).default('false'),
+  SKIP_WEEKENDS: z.enum(['true', 'false']).default('false'),
+  SYNC_STAGGER_MS: z.coerce.number().min(0).max(60000).default(5000),
+  SYNC_MAX_RETRIES: z.coerce.number().min(0).max(5).default(3),
   // Email configuration - Resend API key (recommended for serverless)
   RESEND_API_KEY: z.string().min(1).optional(),
   // Email "From" address (optional, defaults to alerts@example.com)
