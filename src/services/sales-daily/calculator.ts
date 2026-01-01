@@ -221,6 +221,14 @@ export async function recalculateOrganicSales(options: {
 
     const organicAllChannels = calculateOrganicSales(totalAllChannels, adAttributedAllChannels)
 
+    // Check for anomaly (ad sales > total sales)
+    if (adAttributedAllChannels > totalAllChannels && totalAllChannels > 0) {
+      console.warn(
+        `[Calculator] Attribution anomaly on ${_dateKey}: ` +
+        `ad=$${adAttributedAllChannels.toFixed(2)} > total=$${totalAllChannels.toFixed(2)}`
+      )
+    }
+
     // Update each record's organic portion proportionally
     for (const rec of dateRecords) {
       const proportion = totalAllChannels > 0

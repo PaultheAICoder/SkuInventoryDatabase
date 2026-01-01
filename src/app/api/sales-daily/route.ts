@@ -11,6 +11,8 @@ import { prisma } from '@/lib/db'
 import { error } from '@/lib/api-response'
 import { Prisma } from '@prisma/client'
 import { calculateOrganicPercentage } from '@/services/sales-daily/calculator'
+import { getAttributionBreakdown } from '@/services/attribution/amazon-attribution'
+import type { AttributionWindow } from '@/types/attribution'
 import { format, subDays, parseISO, startOfDay, endOfDay } from 'date-fns'
 
 export async function GET(request: NextRequest) {
@@ -27,6 +29,8 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const _groupBy = searchParams.get('groupBy') || 'day' // day, week, month - reserved for future aggregation
     const channel = searchParams.get('channel') // amazon, shopify, or null for all
+    const breakdown = searchParams.get('breakdown') // 'attribution' for full breakdown
+    const attributionWindow = (searchParams.get('attributionWindow') || '7d') as AttributionWindow
 
     // Use selected company from session
     const selectedCompanyId = session.user.selectedCompanyId
@@ -50,6 +54,31 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const effectiveStartDate = startDate || format(subDays(now, 30), 'yyyy-MM-dd')
     const effectiveEndDate = endDate || format(now, 'yyyy-MM-dd')
+
+    // If attribution breakdown requested, use attribution service
+    if (breakdown === 'attribution' && brandId) {
+      try {
+        const result = await getAttributionBreakdown({
+          brandId,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          asin: asin || undefined,
+          attributionWindow,
+          groupBy: _groupBy as 'day' | 'week' | 'month',
+        })
+
+        return NextResponse.json({
+          attribution: result,
+          brands: brands.filter(b => b.id === brandId),
+        })
+      } catch (attrError) {
+        console.error('Attribution breakdown error:', attrError)
+        return NextResponse.json(
+          { error: 'Failed to get attribution breakdown' },
+          { status: 500 }
+        )
+      }
+    }
 
     // Build where clause
     const where: Prisma.SalesDailyWhereInput = {
