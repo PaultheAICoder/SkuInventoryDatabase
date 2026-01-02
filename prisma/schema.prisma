@@ -87,6 +87,10 @@ model Brand {
   salesDaily             SalesDaily[]
   asinSkuMappings        AsinSkuMapping[]
 
+  // V2: Recommendation Engine relations
+  recommendations   Recommendation[]
+  watchedKeywords   WatchedKeyword[]
+
   @@unique([companyId, name])
   @@index([companyId, isActive])
 }
@@ -150,6 +154,10 @@ model User {
   asinMappingsCreated AsinSkuMapping[] @relation("AsinMappingCreatedBy")
   syncLogsTriggered   SyncLog[]        @relation("SyncLogTriggeredBy")
   notifications       Notification[]
+
+  // V2: Recommendation Engine relations
+  changeLogEntries  ChangeLogEntry[]
+  watchedKeywords   WatchedKeyword[]
 }
 
 // Note: Partial unique index "one_primary_company_per_user" enforces one isPrimary=true per userId
@@ -808,6 +816,9 @@ model AdCampaign {
   adGroups       AdGroup[]
   keywordMetrics KeywordMetric[]
 
+  // V2: Recommendation Engine relation
+  recommendations   Recommendation[]
+
   @@unique([credentialId, externalId])
   @@index([portfolioId])
   @@index([credentialId])
@@ -872,6 +883,9 @@ model KeywordMetric {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // V2: Recommendation Engine relation
+  recommendations   Recommendation[]
 
   @@unique([portfolioId, campaignId, adGroupId, keyword, matchType, date, source])
   @@index([portfolioId, date])
@@ -1046,4 +1060,105 @@ model ContainerMonitorConfig {
   enableSlackAlerts   Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+// ============================================
+// Recommendation Engine (MVP-2)
+// ============================================
+
+enum RecommendationType {
+  KEYWORD_GRADUATION
+  DUPLICATE_KEYWORD
+  NEGATIVE_KEYWORD
+  BUDGET_INCREASE
+  BID_DECREASE
+}
+
+enum RecommendationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  SNOOZED
+  EXPIRED
+}
+
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ChangeLogAction {
+  ACCEPTED
+  REJECTED
+  SNOOZED
+}
+
+model Recommendation {
+  id              String               @id @default(uuid())
+  brandId         String
+  brand           Brand                @relation(fields: [brandId], references: [id])
+
+  type            RecommendationType
+  status          RecommendationStatus @default(PENDING)
+  confidence      ConfidenceLevel
+
+  keyword         String?              @db.VarChar(500)
+  keywordMetricId String?
+  keywordMetric   KeywordMetric?       @relation(fields: [keywordMetricId], references: [id])
+  campaignId      String?
+  campaign        AdCampaign?          @relation(fields: [campaignId], references: [id])
+
+  rationale       String               @db.Text
+  expectedImpact  Json
+  metadata        Json?
+
+  generatedAt     DateTime
+  snoozedUntil    DateTime?
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  changeLogEntries ChangeLogEntry[]
+
+  @@index([brandId, status, createdAt])
+  @@index([brandId, type, status])
+  @@index([keywordMetricId])
+}
+
+model ChangeLogEntry {
+  id               String           @id @default(uuid())
+  recommendationId String
+  recommendation   Recommendation   @relation(fields: [recommendationId], references: [id])
+
+  action           ChangeLogAction
+  reason           String?          @db.Text
+  notes            String?          @db.Text
+
+  beforeValues     Json
+  afterValues      Json?
+
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+
+  createdAt        DateTime         @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([action])
+  @@index([recommendationId])
+  @@index([userId, createdAt])
+}
+
+model WatchedKeyword {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  keyword  String   @db.VarChar(500)
+  brandId  String
+  brand    Brand    @relation(fields: [brandId], references: [id])
+  addedAt  DateTime @default(now())
+
+  @@unique([userId, keyword, brandId])
+  @@index([userId, brandId])
+  @@index([keyword, brandId])
 }

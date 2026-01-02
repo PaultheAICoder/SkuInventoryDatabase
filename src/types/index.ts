@@ -115,3 +115,6 @@ export * from './container-health'
 
 // Attribution types
 export * from './attribution'
+
+// Recommendation types
+export * from './recommendations'
