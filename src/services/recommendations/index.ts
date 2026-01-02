@@ -37,3 +37,13 @@ export {
   type GenerateRecommendationsOptions,
   type GenerateRecommendationsResult,
 } from './generator'
+
+// API Helpers
+export {
+  getRecommendationsForBrand,
+  getRecommendationById,
+  actionRecommendation,
+  getRecommendationSummary,
+  type ActionRecommendationParams,
+  type ActionRecommendationResult,
+} from './api-helpers'

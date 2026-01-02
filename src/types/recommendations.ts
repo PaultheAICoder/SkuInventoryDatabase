@@ -276,3 +276,30 @@ export interface RecommendationSummary {
   byType: Record<RecommendationType, number>
   byConfidence: Record<ConfidenceLevel, number>
 }
+
+// ============================================
+// API Response Types
+// ============================================
+
+/**
+ * Paginated list response for recommendations API
+ */
+export interface RecommendationListResponse {
+  data: RecommendationWithRelations[]
+  meta: {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
+}
+
+/**
+ * API request for triggering recommendation generation
+ */
+export const generateRecommendationsRequestSchema = z.object({
+  dryRun: z.boolean().optional(),
+  lookbackDays: z.number().int().positive().optional(),
+})
+
+export type GenerateRecommendationsRequest = z.infer<typeof generateRecommendationsRequestSchema>
