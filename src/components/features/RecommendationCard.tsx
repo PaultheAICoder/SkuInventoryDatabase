@@ -61,6 +61,45 @@ function getNegativeKeywordMetadata(metadata: Record<string, unknown> | null): N
   return metadata as unknown as NegativeKeywordMetadata
 }
 
+/**
+ * Metadata structure for budget increase recommendations
+ */
+interface BudgetIncreaseMetadata {
+  campaignName: string
+  currentDailyBudget: number
+  suggestedDailyBudget: number
+  budgetUtilization: number
+  currentAcos: number
+  expectedAdditionalSpend: number
+}
+
+/**
+ * Extract budget increase metadata from recommendation
+ */
+function getBudgetIncreaseMetadata(metadata: Record<string, unknown> | null): BudgetIncreaseMetadata | null {
+  if (!metadata || typeof metadata.currentDailyBudget !== 'number') return null
+  return metadata as unknown as BudgetIncreaseMetadata
+}
+
+/**
+ * Metadata structure for bid decrease recommendations
+ */
+interface BidDecreaseMetadata {
+  campaignName: string
+  currentAcos: number
+  targetAcos: number
+  suggestedBidReduction: number  // percentage
+  expectedAcosImprovement: number
+}
+
+/**
+ * Extract bid decrease metadata from recommendation
+ */
+function getBidDecreaseMetadata(metadata: Record<string, unknown> | null): BidDecreaseMetadata | null {
+  if (!metadata || typeof metadata.suggestedBidReduction !== 'number') return null
+  return metadata as unknown as BidDecreaseMetadata
+}
+
 interface RecommendationCardProps {
   recommendation: RecommendationWithRelations
   onAccept: (id: string, notes?: string) => Promise<void>
@@ -266,6 +305,70 @@ export function RecommendationCard({
                     <li key={negMeta.campaignIds[i]}>{name}</li>
                   ))}
                 </ul>
+              </div>
+            )
+          })()}
+
+          {/* Budget Increase: Show current vs suggested budget with utilization */}
+          {recommendation.type === 'BUDGET_INCREASE' && (() => {
+            const budgetMeta = getBudgetIncreaseMetadata(recommendation.metadata)
+            if (!budgetMeta) return null
+            return (
+              <div className="bg-muted/50 p-3 rounded-md">
+                <p className="text-sm font-medium mb-2">Budget Recommendation:</p>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-muted-foreground">Current Budget:</span>
+                    <span className="font-medium ml-1">${budgetMeta.currentDailyBudget.toFixed(2)}/day</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Suggested Budget:</span>
+                    <span className="font-medium ml-1 text-green-600">${budgetMeta.suggestedDailyBudget.toFixed(2)}/day</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Budget Usage:</span>
+                    <span className="font-medium ml-1">{(budgetMeta.budgetUtilization * 100).toFixed(0)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Current ACOS:</span>
+                    <span className="font-medium ml-1">{(budgetMeta.currentAcos * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Expected additional daily spend: ${budgetMeta.expectedAdditionalSpend.toFixed(2)}
+                </p>
+              </div>
+            )
+          })()}
+
+          {/* Bid Decrease: Show current vs target ACOS with reduction suggestion */}
+          {recommendation.type === 'BID_DECREASE' && (() => {
+            const bidMeta = getBidDecreaseMetadata(recommendation.metadata)
+            if (!bidMeta) return null
+            return (
+              <div className="bg-muted/50 p-3 rounded-md">
+                <p className="text-sm font-medium mb-2">Bid Adjustment:</p>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-muted-foreground">Current ACOS:</span>
+                    <span className="font-medium ml-1 text-red-600">{(bidMeta.currentAcos * 100).toFixed(1)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Target ACOS:</span>
+                    <span className="font-medium ml-1">{(bidMeta.targetAcos * 100).toFixed(1)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Suggested Reduction:</span>
+                    <span className="font-medium ml-1 text-purple-600">{(bidMeta.suggestedBidReduction * 100).toFixed(0)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Expected ACOS:</span>
+                    <span className="font-medium ml-1 text-green-600">{(bidMeta.expectedAcosImprovement * 100).toFixed(1)}%</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Reduce bids across this campaign to improve ACOS towards target.
+                </p>
               </div>
             )
           })()}

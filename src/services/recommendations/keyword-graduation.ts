@@ -288,6 +288,8 @@ export function generateGraduationRecommendation(
     budget: {
       minRoas: 1.5,
       budgetUtilization: 0.95,
+      maxAcosForIncrease: 0.25,
+      minAcosForDecrease: 0.35,
     },
   }
 

@@ -2,8 +2,7 @@
  * Recommendation Generator Orchestrator
  *
  * Coordinates recommendation generation for a brand.
- * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD
- * Future: BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
  */
 
 import { prisma } from '@/lib/db'
@@ -26,9 +25,22 @@ import {
   generateNegativeRecommendation,
   type NegativeRecommendation,
 } from './negative-suggestions'
+import {
+  findBudgetIncreaseCandidates,
+  findBidDecreaseCandidates,
+  generateBudgetRecommendation,
+  generateBidDecreaseRecommendation,
+  type BudgetRecommendation,
+  type BidDecreaseRecommendation,
+} from './budget-strategy'
 
 // Union type for all recommendation types
-type AnyRecommendation = GraduationRecommendation | DuplicateRecommendation | NegativeRecommendation
+type AnyRecommendation =
+  | GraduationRecommendation
+  | DuplicateRecommendation
+  | NegativeRecommendation
+  | BudgetRecommendation
+  | BidDecreaseRecommendation
 
 // ============================================
 // Types
@@ -57,8 +69,7 @@ export interface GenerateRecommendationsResult {
 
 /**
  * Generate all recommendations for a brand
- * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD
- * Future: BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
  */
 export async function generateRecommendations(
   options: GenerateRecommendationsOptions
@@ -153,6 +164,34 @@ export async function generateRecommendations(
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error'
         errors.push(`Error generating negative recommendation for "${candidate.keyword}": ${errMsg}`)
+      }
+    }
+
+    // Find budget increase candidates
+    const budgetCandidates = await findBudgetIncreaseCandidates(brandId, lookbackDays, thresholds)
+
+    // Generate recommendations for each budget increase candidate
+    for (const candidate of budgetCandidates) {
+      try {
+        const recommendation = generateBudgetRecommendation(candidate)
+        recommendations.push(recommendation)
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Error generating budget recommendation for "${candidate.campaignName}": ${errMsg}`)
+      }
+    }
+
+    // Find bid decrease candidates
+    const bidDecreaseCandidates = await findBidDecreaseCandidates(brandId, lookbackDays, thresholds)
+
+    // Generate recommendations for each bid decrease candidate
+    for (const candidate of bidDecreaseCandidates) {
+      try {
+        const recommendation = generateBidDecreaseRecommendation(candidate)
+        recommendations.push(recommendation)
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Error generating bid decrease recommendation for "${candidate.campaignName}": ${errMsg}`)
       }
     }
 
@@ -335,6 +374,8 @@ async function findLatestKeywordMetricId(
  * For KEYWORD_GRADUATION: checks by keyword + campaignId (within a specific campaign)
  * For DUPLICATE_KEYWORD: checks by keyword only (spans multiple campaigns)
  * For NEGATIVE_KEYWORD: checks by keyword + campaignId (specific campaign)
+ * For BUDGET_INCREASE: checks by campaignId only (campaign-level, no keyword)
+ * For BID_DECREASE: checks by campaignId only (campaign-level, no keyword)
  */
 async function saveRecommendations(
   brandId: string,
@@ -348,6 +389,7 @@ async function saveRecommendations(
       // Check for existing PENDING recommendation
       // DUPLICATE_KEYWORD: check by keyword only (no campaignId, spans multiple campaigns)
       // KEYWORD_GRADUATION, NEGATIVE_KEYWORD: check by keyword + campaignId (specific campaign)
+      // BUDGET_INCREASE, BID_DECREASE: check by campaignId only (campaign-level)
       let whereClause
       if (rec.type === 'DUPLICATE_KEYWORD') {
         whereClause = {
@@ -362,6 +404,20 @@ async function saveRecommendations(
           type: 'NEGATIVE_KEYWORD' as const,
           status: 'PENDING' as const,
           keyword: rec.keyword,
+          campaignId: rec.campaignId,
+        }
+      } else if (rec.type === 'BUDGET_INCREASE') {
+        whereClause = {
+          brandId,
+          type: 'BUDGET_INCREASE' as const,
+          status: 'PENDING' as const,
+          campaignId: rec.campaignId,
+        }
+      } else if (rec.type === 'BID_DECREASE') {
+        whereClause = {
+          brandId,
+          type: 'BID_DECREASE' as const,
+          status: 'PENDING' as const,
           campaignId: rec.campaignId,
         }
       } else {

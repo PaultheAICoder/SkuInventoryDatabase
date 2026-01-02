@@ -26,6 +26,8 @@ export interface RequiredThresholds {
   budget: {
     minRoas: number
     budgetUtilization: number
+    maxAcosForIncrease: number  // Max ACOS to qualify for budget increase
+    minAcosForDecrease: number  // Min ACOS to trigger bid decrease
   }
 }
 
@@ -55,6 +57,10 @@ export const DEFAULT_THRESHOLDS: RequiredThresholds = {
     minRoas: 1.5,
     /** Budget utilization percentage threshold */
     budgetUtilization: 0.95,
+    /** Max ACOS to qualify for budget increase (same as graduation threshold) */
+    maxAcosForIncrease: 0.25,
+    /** Min ACOS to trigger bid decrease (35% = significantly above target) */
+    minAcosForDecrease: 0.35,
   },
 }
 
@@ -102,6 +108,8 @@ export function mergeThresholds(
     budget: {
       minRoas: brandSettings.budget?.minRoas ?? defaults.budget.minRoas,
       budgetUtilization: brandSettings.budget?.budgetUtilization ?? defaults.budget.budgetUtilization,
+      maxAcosForIncrease: brandSettings.budget?.maxAcosForIncrease ?? defaults.budget.maxAcosForIncrease,
+      minAcosForDecrease: brandSettings.budget?.minAcosForDecrease ?? defaults.budget.minAcosForDecrease,
     },
   }
 }

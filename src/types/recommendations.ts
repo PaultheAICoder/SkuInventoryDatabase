@@ -110,6 +110,10 @@ export interface RecommendationThresholds {
     minRoas?: number
     /** Budget utilization threshold (default: 0.95 = 95%) */
     budgetUtilization?: number
+    /** Max ACOS to qualify for budget increase (default: 0.25 = 25%) */
+    maxAcosForIncrease?: number
+    /** Min ACOS to trigger bid decrease (default: 0.35 = 35%) */
+    minAcosForDecrease?: number
   }
 }
 
@@ -132,6 +136,8 @@ export const recommendationThresholdsSchema = z.object({
     .object({
       minRoas: z.number().optional(),
       budgetUtilization: z.number().optional(),
+      maxAcosForIncrease: z.number().optional(),
+      minAcosForDecrease: z.number().optional(),
     })
     .optional(),
 })

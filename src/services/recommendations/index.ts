@@ -42,6 +42,23 @@ export {
   type NegativeRecommendation,
 } from './negative-suggestions'
 
+// Budget and Bid Strategy
+export {
+  findBudgetIncreaseCandidates,
+  findBidDecreaseCandidates,
+  generateBudgetRecommendation,
+  generateBidDecreaseRecommendation,
+  buildBudgetIncreaseRationale,
+  buildBidDecreaseRationale,
+  calculateBudgetImpact,
+  calculateBidImpact,
+  type CampaignMetricsAggregate,
+  type BudgetIncreaseCandidate,
+  type BidDecreaseCandidate,
+  type BudgetRecommendation,
+  type BidDecreaseRecommendation,
+} from './budget-strategy'
+
 // Confidence Scoring
 export {
   calculateConfidence,
