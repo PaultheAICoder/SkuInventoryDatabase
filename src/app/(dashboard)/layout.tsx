@@ -32,6 +32,7 @@ import {
   Store,
   Link2,
   Lightbulb,
+  History,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -54,6 +55,7 @@ const mainNavigation = [
   { name: 'SKU Mappings', href: '/shopify/mappings', icon: Link2, adminOnly: true },
   { name: 'Amazon', href: '/amazon', icon: Store, adminOnly: true },
   { name: 'Recommendations', href: '/recommendations', icon: Lightbulb },
+  { name: 'Change Log', href: '/change-log', icon: History },
 ]
 
 // Settings sub-navigation items

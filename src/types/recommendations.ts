@@ -221,6 +221,8 @@ export type UpdateRecommendationRequest = z.infer<typeof updateRecommendationSch
 export const changeLogQuerySchema = z.object({
   recommendationId: z.string().uuid().optional(),
   action: changeLogActionSchema.optional(),
+  type: recommendationTypeSchema.optional(), // Filter by recommendation type
+  keyword: z.string().optional(), // Text search on recommendation.keyword
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -303,3 +305,36 @@ export const generateRecommendationsRequestSchema = z.object({
 })
 
 export type GenerateRecommendationsRequest = z.infer<typeof generateRecommendationsRequestSchema>
+
+// ============================================
+// Change Log API Types
+// ============================================
+
+/**
+ * ChangeLogEntry with related recommendation and user data
+ */
+export interface ChangeLogEntryWithRelations extends ChangeLogEntry {
+  recommendation: {
+    id: string
+    type: RecommendationType
+    keyword: string | null
+    campaign?: { name: string } | null
+  }
+  user: {
+    id: string
+    name: string
+  }
+}
+
+/**
+ * Paginated response for Change Log listing API
+ */
+export interface ChangeLogListResponse {
+  data: ChangeLogEntryWithRelations[]
+  meta: {
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }
+}
