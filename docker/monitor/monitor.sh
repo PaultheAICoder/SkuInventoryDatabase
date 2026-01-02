@@ -89,10 +89,19 @@ get_container_stats() {
         return
     fi
 
-    # Parse CPU and memory
+    # Parse CPU percentage (remove % suffix)
     local cpu=$(echo "$stats" | jq -r '.CPUPerc' | tr -d '%')
-    local mem_usage=$(echo "$stats" | jq -r '.MemUsage' | awk -F'/' '{print $1}' | tr -d ' MiB')
-    local mem_limit=$(echo "$stats" | jq -r '.MemUsage' | awk -F'/' '{print $2}' | tr -d ' MiB')
+
+    # Parse memory usage and limit (handle MiB, GiB, etc.)
+    local mem_raw=$(echo "$stats" | jq -r '.MemUsage')
+    local mem_usage=$(echo "$mem_raw" | awk -F'/' '{print $1}' | sed 's/[^0-9.]//g')
+    local mem_limit=$(echo "$mem_raw" | awk -F'/' '{print $2}' | sed 's/[^0-9.]//g')
+
+    # Convert GiB to MiB if needed (rough check - if limit < usage, it's probably in GiB)
+    if echo "$mem_raw" | grep -q 'GiB'; then
+        # Multiply GiB limit by 1024 to get MiB approximation
+        mem_limit=$(echo "$mem_limit * 1024" | bc 2>/dev/null || echo "$mem_limit")
+    fi
 
     echo "{\"cpuPercent\": ${cpu:-null}, \"memoryUsageMb\": ${mem_usage:-null}, \"memoryLimitMb\": ${mem_limit:-null}}"
 }
@@ -104,9 +113,14 @@ check_container() {
     local stats=$(get_container_stats "$container")
     local container_id=$(docker inspect "$container" --format '{{.Id}}' 2>/dev/null | cut -c1-12 || echo "")
 
-    local cpu=$(echo "$stats" | jq -r '.cpuPercent')
-    local mem_usage=$(echo "$stats" | jq -r '.memoryUsageMb')
-    local mem_limit=$(echo "$stats" | jq -r '.memoryLimitMb')
+    local cpu=$(echo "$stats" | jq -r '.cpuPercent // empty')
+    local mem_usage=$(echo "$stats" | jq -r '.memoryUsageMb // empty')
+    local mem_limit=$(echo "$stats" | jq -r '.memoryLimitMb // empty')
+
+    # Ensure values are valid JSON (null if empty or invalid)
+    [ -z "$cpu" ] || ! echo "$cpu" | grep -qE '^[0-9.]+$' && cpu="null"
+    [ -z "$mem_usage" ] || ! echo "$mem_usage" | grep -qE '^[0-9.]+$' && mem_usage="null"
+    [ -z "$mem_limit" ] || ! echo "$mem_limit" | grep -qE '^[0-9.]+$' && mem_limit="null"
 
     # Send health log
     local data=$(cat <<EOF

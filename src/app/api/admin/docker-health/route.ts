@@ -12,12 +12,19 @@ import {
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
 
-// Container names to monitor
-const MONITORED_CONTAINERS = [
-  'inventory-app',
-  'inventory-db-prod',
-  'inventory-nginx',
-]
+// Container names to monitor (configurable via environment)
+// Default: inventory-app,inventory-db-prod for production
+// Test: Set DOCKER_MONITOR_CONTAINERS=inventory-app-test,inventory-db-test
+function getMonitoredContainers(): string[] {
+  const envContainers = process.env.DOCKER_MONITOR_CONTAINERS
+  if (envContainers) {
+    return envContainers.split(',').map(c => c.trim()).filter(Boolean)
+  }
+  // Default containers for production
+  return ['inventory-app', 'inventory-db-prod']
+}
+
+const MONITORED_CONTAINERS = getMonitoredContainers()
 
 /**
  * GET /api/admin/docker-health - Get dashboard data

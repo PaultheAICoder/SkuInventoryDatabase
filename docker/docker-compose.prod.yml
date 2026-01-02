@@ -37,6 +37,7 @@ services:
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
       - FEEDBACK_EMAIL=${FEEDBACK_EMAIL}
       - CRON_SECRET=${CRON_SECRET}
+      - DOCKER_MONITOR_CONTAINERS=inventory-app,inventory-db-prod,inventory-nginx
     depends_on:
       db:
         condition: service_healthy
