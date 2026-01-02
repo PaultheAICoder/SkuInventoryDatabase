@@ -31,6 +31,17 @@ export {
   type DuplicateRecommendation,
 } from './duplicate-detection'
 
+// Negative Keyword Suggestions
+export {
+  findNegativeKeywords,
+  meetsNegativeThresholds,
+  generateNegativeRecommendation,
+  buildNegativeRationale,
+  calculateNegativeImpact,
+  type NegativeKeywordCandidate,
+  type NegativeRecommendation,
+} from './negative-suggestions'
+
 // Confidence Scoring
 export {
   calculateConfidence,

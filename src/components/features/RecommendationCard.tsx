@@ -42,6 +42,25 @@ function getCampaignOccurrences(metadata: Record<string, unknown> | null): Campa
   return metadata.occurrences as CampaignOccurrence[]
 }
 
+/**
+ * Metadata structure for negative keyword recommendations
+ */
+interface NegativeKeywordMetadata {
+  campaigns: string[]
+  campaignIds: string[]
+  totalSpend: number
+  totalClicks: number
+  totalImpressions: number
+}
+
+/**
+ * Extract negative keyword metadata from recommendation
+ */
+function getNegativeKeywordMetadata(metadata: Record<string, unknown> | null): NegativeKeywordMetadata | null {
+  if (!metadata || !metadata.campaigns) return null
+  return metadata as unknown as NegativeKeywordMetadata
+}
+
 interface RecommendationCardProps {
   recommendation: RecommendationWithRelations
   onAccept: (id: string, notes?: string) => Promise<void>
@@ -217,6 +236,39 @@ export function RecommendationCard({
               </div>
             </div>
           )}
+
+          {/* Negative Keyword: Show spend, clicks, impressions, target campaigns */}
+          {recommendation.type === 'NEGATIVE_KEYWORD' && (() => {
+            const negMeta = getNegativeKeywordMetadata(recommendation.metadata)
+            if (!negMeta) return null
+            return (
+              <div className="bg-muted/50 p-3 rounded-md">
+                <p className="text-sm font-medium mb-2">Keyword Performance:</p>
+                <div className="grid grid-cols-3 gap-2 text-sm mb-3">
+                  <div>
+                    <span className="text-muted-foreground">Spend:</span>
+                    <span className="font-medium ml-1">${negMeta.totalSpend.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Clicks:</span>
+                    <span className="font-medium ml-1">{negMeta.totalClicks}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Impressions:</span>
+                    <span className="font-medium ml-1">{negMeta.totalImpressions.toLocaleString()}</span>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-1">
+                  Add as negative in {negMeta.campaigns.length} campaign{negMeta.campaigns.length !== 1 ? 's' : ''}:
+                </p>
+                <ul className="text-sm list-disc list-inside text-muted-foreground">
+                  {negMeta.campaigns.map((name, i) => (
+                    <li key={negMeta.campaignIds[i]}>{name}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
 
           {/* Status badge for non-pending */}
           {!isPending && (

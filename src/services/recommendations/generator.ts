@@ -2,8 +2,8 @@
  * Recommendation Generator Orchestrator
  *
  * Coordinates recommendation generation for a brand.
- * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD
- * Future: NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD
+ * Future: BUDGET_INCREASE, BID_DECREASE
  */
 
 import { prisma } from '@/lib/db'
@@ -21,9 +21,14 @@ import {
   generateDuplicateRecommendation,
   type DuplicateRecommendation,
 } from './duplicate-detection'
+import {
+  findNegativeKeywords,
+  generateNegativeRecommendation,
+  type NegativeRecommendation,
+} from './negative-suggestions'
 
 // Union type for all recommendation types
-type AnyRecommendation = GraduationRecommendation | DuplicateRecommendation
+type AnyRecommendation = GraduationRecommendation | DuplicateRecommendation | NegativeRecommendation
 
 // ============================================
 // Types
@@ -52,8 +57,8 @@ export interface GenerateRecommendationsResult {
 
 /**
  * Generate all recommendations for a brand
- * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD
- * Future: NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD, NEGATIVE_KEYWORD
+ * Future: BUDGET_INCREASE, BID_DECREASE
  */
 export async function generateRecommendations(
   options: GenerateRecommendationsOptions
@@ -125,6 +130,29 @@ export async function generateRecommendations(
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error'
         errors.push(`Error generating duplicate recommendation for "${group.keyword}": ${errMsg}`)
+      }
+    }
+
+    // Find negative keyword candidates
+    const negativeCandidates = await findNegativeKeywords(brandId, lookbackDays, thresholds)
+
+    // Generate recommendations for each negative keyword candidate
+    for (const candidate of negativeCandidates) {
+      try {
+        const latestMetric = await findLatestKeywordMetricId(
+          candidate.keyword,
+          candidate.campaignId
+        )
+        const recommendation = generateNegativeRecommendation(
+          candidate,
+          latestMetric,
+          candidate.campaignId,
+          candidate.campaignName
+        )
+        recommendations.push(recommendation)
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Error generating negative recommendation for "${candidate.keyword}": ${errMsg}`)
       }
     }
 
@@ -306,6 +334,7 @@ async function findLatestKeywordMetricId(
  *
  * For KEYWORD_GRADUATION: checks by keyword + campaignId (within a specific campaign)
  * For DUPLICATE_KEYWORD: checks by keyword only (spans multiple campaigns)
+ * For NEGATIVE_KEYWORD: checks by keyword + campaignId (specific campaign)
  */
 async function saveRecommendations(
   brandId: string,
@@ -318,21 +347,32 @@ async function saveRecommendations(
     try {
       // Check for existing PENDING recommendation
       // DUPLICATE_KEYWORD: check by keyword only (no campaignId, spans multiple campaigns)
-      // KEYWORD_GRADUATION: check by keyword + campaignId (specific campaign)
-      const whereClause = rec.type === 'DUPLICATE_KEYWORD'
-        ? {
-            brandId,
-            type: 'DUPLICATE_KEYWORD' as const,
-            status: 'PENDING' as const,
-            keyword: rec.keyword,
-          }
-        : {
-            brandId,
-            type: 'KEYWORD_GRADUATION' as const,
-            status: 'PENDING' as const,
-            keyword: rec.keyword,
-            campaignId: rec.campaignId,
-          }
+      // KEYWORD_GRADUATION, NEGATIVE_KEYWORD: check by keyword + campaignId (specific campaign)
+      let whereClause
+      if (rec.type === 'DUPLICATE_KEYWORD') {
+        whereClause = {
+          brandId,
+          type: 'DUPLICATE_KEYWORD' as const,
+          status: 'PENDING' as const,
+          keyword: rec.keyword,
+        }
+      } else if (rec.type === 'NEGATIVE_KEYWORD') {
+        whereClause = {
+          brandId,
+          type: 'NEGATIVE_KEYWORD' as const,
+          status: 'PENDING' as const,
+          keyword: rec.keyword,
+          campaignId: rec.campaignId,
+        }
+      } else {
+        whereClause = {
+          brandId,
+          type: 'KEYWORD_GRADUATION' as const,
+          status: 'PENDING' as const,
+          keyword: rec.keyword,
+          campaignId: rec.campaignId,
+        }
+      }
 
       const existing = await prisma.recommendation.findFirst({
         where: whereClause,
