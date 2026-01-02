@@ -20,6 +20,17 @@ export {
   type GraduationRecommendation,
 } from './keyword-graduation'
 
+// Duplicate Keyword Detection
+export {
+  findDuplicateKeywords,
+  generateDuplicateRecommendation,
+  buildDuplicateRationale,
+  calculateDuplicateImpact,
+  type DuplicateKeywordGroup,
+  type CampaignOccurrence,
+  type DuplicateRecommendation,
+} from './duplicate-detection'
+
 // Confidence Scoring
 export {
   calculateConfidence,

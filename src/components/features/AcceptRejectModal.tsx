@@ -22,12 +22,19 @@ import {
 
 type ModalMode = 'accept' | 'reject' | 'snooze'
 
+interface CampaignOption {
+  id: string
+  name: string
+}
+
 interface AcceptRejectModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   mode: ModalMode
   keyword?: string
-  onConfirm: (data: { notes?: string; reason?: string; snoozeDays?: number }) => Promise<void>
+  recommendationType?: string
+  campaignOptions?: CampaignOption[]
+  onConfirm: (data: { notes?: string; reason?: string; snoozeDays?: number; selectedCampaignId?: string }) => Promise<void>
 }
 
 const snoozeOptions = [
@@ -63,20 +70,26 @@ export function AcceptRejectModal({
   onOpenChange,
   mode,
   keyword,
+  recommendationType,
+  campaignOptions,
   onConfirm,
 }: AcceptRejectModalProps) {
   const [notes, setNotes] = useState('')
   const [reason, setReason] = useState('')
   const [snoozeDays, setSnoozeDays] = useState('7')
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const config = modeConfig[mode]
+  const isDuplicateKeyword = recommendationType === 'DUPLICATE_KEYWORD'
+  const hasCampaignOptions = campaignOptions && campaignOptions.length > 0
 
   const resetState = () => {
     setNotes('')
     setReason('')
     setSnoozeDays('7')
+    setSelectedCampaignId('')
     setError(null)
   }
 
@@ -94,6 +107,12 @@ export function AcceptRejectModal({
       return
     }
 
+    // Validate duplicate keyword requires campaign selection
+    if (mode === 'accept' && isDuplicateKeyword && hasCampaignOptions && !selectedCampaignId) {
+      setError('Please select which campaign to keep the keyword in')
+      return
+    }
+
     setError(null)
     setIsLoading(true)
 
@@ -102,6 +121,7 @@ export function AcceptRejectModal({
         notes: mode === 'accept' ? notes.trim() || undefined : undefined,
         reason: mode === 'reject' ? reason.trim() : undefined,
         snoozeDays: mode === 'snooze' ? parseInt(snoozeDays, 10) : undefined,
+        selectedCampaignId: mode === 'accept' && isDuplicateKeyword ? selectedCampaignId || undefined : undefined,
       })
       handleOpenChange(false)
     } catch (err) {
@@ -126,6 +146,36 @@ export function AcceptRejectModal({
         </DialogHeader>
 
         <div className="py-4 space-y-4">
+          {mode === 'accept' && isDuplicateKeyword && hasCampaignOptions && (
+            <div className="space-y-2">
+              <Label htmlFor="campaign">
+                Keep keyword in campaign <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={selectedCampaignId}
+                onValueChange={(value) => {
+                  setSelectedCampaignId(value)
+                  if (error) setError(null)
+                }}
+              >
+                <SelectTrigger id="campaign" className={error ? 'border-destructive' : ''}>
+                  <SelectValue placeholder="Select campaign to keep" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaignOptions.map((campaign) => (
+                    <SelectItem key={campaign.id} value={campaign.id}>
+                      {campaign.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                The keyword will be removed from other campaigns.
+              </p>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          )}
+
           {mode === 'accept' && (
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (optional)</Label>

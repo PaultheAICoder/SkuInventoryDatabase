@@ -22,6 +22,26 @@ import {
 } from '@/lib/recommendation-utils'
 import { AcceptRejectModal } from './AcceptRejectModal'
 
+/**
+ * Campaign occurrence data for duplicate keyword display
+ */
+interface CampaignOccurrence {
+  campaignId: string
+  campaignName: string
+  matchType: string
+  spend: number
+  orders: number
+  acos: number
+}
+
+/**
+ * Extract campaign occurrences from recommendation metadata
+ */
+function getCampaignOccurrences(metadata: Record<string, unknown> | null): CampaignOccurrence[] {
+  if (!metadata || !metadata.occurrences) return []
+  return metadata.occurrences as CampaignOccurrence[]
+}
+
 interface RecommendationCardProps {
   recommendation: RecommendationWithRelations
   onAccept: (id: string, notes?: string) => Promise<void>
@@ -85,10 +105,24 @@ export function RecommendationCard({
 
   const improvement = calculateImprovementPercentage(recommendation.expectedImpact)
 
-  const handleAccept = async (data: { notes?: string }) => {
+  // Extract campaign options for DUPLICATE_KEYWORD recommendations
+  const campaignOptions = recommendation.type === 'DUPLICATE_KEYWORD'
+    ? getCampaignOccurrences(recommendation.metadata).map(occ => ({
+        id: occ.campaignId,
+        name: occ.campaignName,
+      }))
+    : undefined
+
+  const handleAccept = async (data: { notes?: string; selectedCampaignId?: string }) => {
     setIsActioning(true)
     try {
-      await onAccept(recommendation.id, data.notes)
+      // For DUPLICATE_KEYWORD, include the selected campaign in notes
+      let acceptNotes = data.notes
+      if (recommendation.type === 'DUPLICATE_KEYWORD' && data.selectedCampaignId) {
+        const selectedCampaign = campaignOptions?.find(c => c.id === data.selectedCampaignId)
+        acceptNotes = `Kept in campaign: ${selectedCampaign?.name || data.selectedCampaignId}${data.notes ? `. ${data.notes}` : ''}`
+      }
+      await onAccept(recommendation.id, acceptNotes)
     } finally {
       setIsActioning(false)
     }
@@ -162,6 +196,28 @@ export function RecommendationCard({
             </p>
           </div>
 
+          {/* Duplicate Keyword: Show all campaign occurrences */}
+          {recommendation.type === 'DUPLICATE_KEYWORD' && (
+            <div className="bg-muted/50 p-3 rounded-md">
+              <p className="text-sm font-medium mb-2">
+                Found in {getCampaignOccurrences(recommendation.metadata).length} campaigns:
+              </p>
+              <div className="space-y-2 text-sm">
+                {getCampaignOccurrences(recommendation.metadata).map((occ) => (
+                  <div key={occ.campaignId} className="flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{occ.campaignName}</span>
+                      <span className="text-xs text-muted-foreground capitalize">{occ.matchType} match</span>
+                    </div>
+                    <span className="text-muted-foreground text-xs">
+                      ${occ.spend.toFixed(2)} | {occ.orders} orders | {(occ.acos * 100).toFixed(1)}% ACOS
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Status badge for non-pending */}
           {!isPending && (
             <div className="flex items-center gap-2">
@@ -223,6 +279,8 @@ export function RecommendationCard({
         onOpenChange={setShowAcceptModal}
         mode="accept"
         keyword={displayName}
+        recommendationType={recommendation.type}
+        campaignOptions={campaignOptions}
         onConfirm={handleAccept}
       />
 

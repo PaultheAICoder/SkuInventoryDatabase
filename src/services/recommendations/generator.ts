@@ -2,8 +2,8 @@
  * Recommendation Generator Orchestrator
  *
  * Coordinates recommendation generation for a brand.
- * Currently implements KEYWORD_GRADUATION recommendations.
- * Future: DUPLICATE_KEYWORD, NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD
+ * Future: NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
  */
 
 import { prisma } from '@/lib/db'
@@ -16,6 +16,14 @@ import {
   type KeywordMetricsAggregate,
   type GraduationRecommendation,
 } from './keyword-graduation'
+import {
+  findDuplicateKeywords,
+  generateDuplicateRecommendation,
+  type DuplicateRecommendation,
+} from './duplicate-detection'
+
+// Union type for all recommendation types
+type AnyRecommendation = GraduationRecommendation | DuplicateRecommendation
 
 // ============================================
 // Types
@@ -44,8 +52,8 @@ export interface GenerateRecommendationsResult {
 
 /**
  * Generate all recommendations for a brand
- * Currently implements: KEYWORD_GRADUATION
- * Future: DUPLICATE_KEYWORD, NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
+ * Implements: KEYWORD_GRADUATION, DUPLICATE_KEYWORD
+ * Future: NEGATIVE_KEYWORD, BUDGET_INCREASE, BID_DECREASE
  */
 export async function generateRecommendations(
   options: GenerateRecommendationsOptions
@@ -53,7 +61,7 @@ export async function generateRecommendations(
   const { brandId, lookbackDays = 30, dryRun = false } = options
 
   const errors: string[] = []
-  const recommendations: GraduationRecommendation[] = []
+  const recommendations: AnyRecommendation[] = []
 
   try {
     // Get brand settings for custom thresholds
@@ -98,6 +106,25 @@ export async function generateRecommendations(
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error'
         errors.push(`Error generating recommendation for "${candidate.keyword}": ${errMsg}`)
+      }
+    }
+
+    // Find duplicate keywords
+    const duplicateGroups = await findDuplicateKeywords(brandId, lookbackDays)
+
+    // Generate recommendations for each duplicate group
+    for (const group of duplicateGroups) {
+      try {
+        // Find the most recent KeywordMetric ID for reference (from first occurrence)
+        const latestMetric = await findLatestKeywordMetricId(
+          group.keyword,
+          group.occurrences[0].campaignId
+        )
+        const recommendation = generateDuplicateRecommendation(group, latestMetric)
+        recommendations.push(recommendation)
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error'
+        errors.push(`Error generating duplicate recommendation for "${group.keyword}": ${errMsg}`)
       }
     }
 
@@ -276,25 +303,39 @@ async function findLatestKeywordMetricId(
 /**
  * Save generated recommendations to database
  * Avoids duplicates by checking for existing PENDING recommendations
+ *
+ * For KEYWORD_GRADUATION: checks by keyword + campaignId (within a specific campaign)
+ * For DUPLICATE_KEYWORD: checks by keyword only (spans multiple campaigns)
  */
 async function saveRecommendations(
   brandId: string,
-  recommendations: GraduationRecommendation[]
+  recommendations: AnyRecommendation[]
 ): Promise<{ saved: number; skipped: number }> {
   let saved = 0
   let skipped = 0
 
   for (const rec of recommendations) {
     try {
-      // Check for existing PENDING recommendation for this keyword + campaign
+      // Check for existing PENDING recommendation
+      // DUPLICATE_KEYWORD: check by keyword only (no campaignId, spans multiple campaigns)
+      // KEYWORD_GRADUATION: check by keyword + campaignId (specific campaign)
+      const whereClause = rec.type === 'DUPLICATE_KEYWORD'
+        ? {
+            brandId,
+            type: 'DUPLICATE_KEYWORD' as const,
+            status: 'PENDING' as const,
+            keyword: rec.keyword,
+          }
+        : {
+            brandId,
+            type: 'KEYWORD_GRADUATION' as const,
+            status: 'PENDING' as const,
+            keyword: rec.keyword,
+            campaignId: rec.campaignId,
+          }
+
       const existing = await prisma.recommendation.findFirst({
-        where: {
-          brandId,
-          type: 'KEYWORD_GRADUATION',
-          status: 'PENDING',
-          keyword: rec.keyword,
-          campaignId: rec.campaignId,
-        },
+        where: whereClause,
       })
 
       if (existing) {
