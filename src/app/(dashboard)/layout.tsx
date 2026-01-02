@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { cn, getClientCompanyRole } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { BuildFooter } from '@/components/ui/BuildFooter'
 import {
@@ -75,7 +75,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [chatbotOpen, setChatbotOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const isAdmin = getClientCompanyRole(session?.user) === 'admin'
+  // Settings menu should be visible if user is admin in ANY company (cross-company feature)
+  const isAdminInAnyCompany = session?.user?.companies?.some(c => c.role === 'admin') ?? false
 
   // Auto-expand settings if current path is in settings
   useEffect(() => {
@@ -99,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const filteredMainNavigation = mainNavigation.filter(
-    (item) => !item.adminOnly || isAdmin
+    (item) => !item.adminOnly || isAdminInAnyCompany
   )
 
   return (
@@ -158,7 +159,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
 
           {/* Settings section (admin only) */}
-          {isAdmin && (
+          {isAdminInAnyCompany && (
             <>
               <button
                 onClick={() => setSettingsOpen(!settingsOpen)}
