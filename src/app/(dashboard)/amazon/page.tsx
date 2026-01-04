@@ -151,6 +151,10 @@ export default function AmazonPage() {
   const [salesError, setSalesError] = useState<string | null>(null)
   const [keywordsError, setKeywordsError] = useState<string | null>(null)
 
+  // Watched keywords state
+  const [watchedKeywords, setWatchedKeywords] = useState<Set<string>>(new Set())
+  const [isWatchLoading, setIsWatchLoading] = useState(false)
+
   // Fetch sales data with attribution breakdown
   const fetchSalesData = useCallback(async () => {
     setIsLoadingSales(true)
@@ -386,6 +390,64 @@ export default function AmazonPage() {
     }
   }, [dateRangePreset, customStartDate, customEndDate, selectedBrandId])
 
+  // Fetch watched keywords for this brand
+  const fetchWatchedKeywords = useCallback(async () => {
+    if (!selectedBrandId) return
+
+    try {
+      const res = await fetch(`/api/watched-keywords?brandId=${selectedBrandId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setWatchedKeywords(
+          new Set(data.watchedKeywords.map((wk: { keyword: string }) => wk.keyword))
+        )
+      }
+    } catch (err) {
+      console.error('Failed to fetch watched keywords:', err)
+    }
+  }, [selectedBrandId])
+
+  // Toggle watch status for a keyword
+  const handleToggleWatch = async (keyword: string) => {
+    if (!selectedBrandId) return
+
+    setIsWatchLoading(true)
+    try {
+      if (watchedKeywords.has(keyword)) {
+        // Find the watched keyword ID and delete it
+        const findRes = await fetch(`/api/watched-keywords?brandId=${selectedBrandId}`)
+        if (findRes.ok) {
+          const data = await findRes.json()
+          const wk = data.watchedKeywords.find(
+            (w: { keyword: string }) => w.keyword === keyword
+          )
+          if (wk) {
+            await fetch(`/api/watched-keywords/${wk.id}`, { method: 'DELETE' })
+          }
+        }
+        setWatchedKeywords((prev) => {
+          const next = new Set(prev)
+          next.delete(keyword)
+          return next
+        })
+      } else {
+        // Add new watched keyword
+        const res = await fetch('/api/watched-keywords', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword, brandId: selectedBrandId }),
+        })
+        if (res.ok) {
+          setWatchedKeywords((prev) => new Set(prev).add(keyword))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to toggle watch:', err)
+    } finally {
+      setIsWatchLoading(false)
+    }
+  }
+
   // Initial data fetch
   useEffect(() => {
     fetchSalesData()
@@ -405,6 +467,13 @@ export default function AmazonPage() {
       fetchCampaignData()
     }
   }, [isLoadingSales, salesTrendData.length, fetchFullKeywordData, fetchCampaignData])
+
+  // Fetch watched keywords when brand changes
+  useEffect(() => {
+    if (selectedBrandId) {
+      fetchWatchedKeywords()
+    }
+  }, [selectedBrandId, fetchWatchedKeywords])
 
   // Handle date range change
   const handleDateRangeChange = (
@@ -536,7 +605,14 @@ export default function AmazonPage() {
           <h2 className="text-xl font-semibold">Data Tables</h2>
 
           {/* Keyword Metrics Table - Full Width */}
-          <KeywordMetricsTable data={fullKeywordData} isLoading={isLoadingFullKeywords} />
+          <KeywordMetricsTable
+            data={fullKeywordData}
+            isLoading={isLoadingFullKeywords}
+            watchedKeywords={watchedKeywords}
+            onToggleWatch={handleToggleWatch}
+            brandId={selectedBrandId}
+            isWatchLoading={isWatchLoading}
+          />
 
           {/* Campaign and Daily Sales Tables - Side by Side on large screens */}
           <div className="grid gap-6 lg:grid-cols-2">

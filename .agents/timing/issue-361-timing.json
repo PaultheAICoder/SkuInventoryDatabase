@@ -1,0 +1,11 @@
+{
+  "issue": "361",
+  "workflow": "3-agent",
+  "workflow_start": "2026-01-04T22:08:50.000Z",
+  "scout_plan_start": "2026-01-04T22:11:55.000Z",
+  "scout_plan_end": "2026-01-04T22:15:55.000Z",
+  "build_start": "2026-01-04T22:16:11.000Z",
+  "build_end": "2026-01-04T22:27:36.000Z",
+  "cleanup_start": "2026-01-04T22:28:00.000Z",
+  "cleanup_end": "2026-01-04T22:40:00.000Z"
+}

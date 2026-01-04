@@ -16,10 +16,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowUpDown, Search, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
 import type { KeywordPerformanceData } from '@/types/amazon-analytics'
 import { toCSV, type CSVColumn } from '@/services/export'
+import { WatchedKeywordBadge } from '@/components/features/WatchedKeywordBadge'
 
 interface KeywordMetricsTableProps {
   data: KeywordPerformanceData[]
   isLoading?: boolean
+  // Watch functionality props (optional for backward compatibility)
+  watchedKeywords?: Set<string>
+  onToggleWatch?: (keyword: string) => void
+  brandId?: string
+  isWatchLoading?: boolean
 }
 
 type SortColumn = 'keyword' | 'impressions' | 'clicks' | 'spend' | 'sales' | 'acos' | 'roas'
@@ -75,7 +81,16 @@ function downloadCSV(csvContent: string, filename: string) {
   URL.revokeObjectURL(link.href)
 }
 
-export function KeywordMetricsTable({ data, isLoading = false }: KeywordMetricsTableProps) {
+export function KeywordMetricsTable({
+  data,
+  isLoading = false,
+  watchedKeywords,
+  onToggleWatch,
+  brandId: _brandId, // Currently unused, kept for future API integration
+  isWatchLoading = false,
+}: KeywordMetricsTableProps) {
+  // Determine if watch functionality is enabled
+  const watchEnabled = Boolean(onToggleWatch)
   const [search, setSearch] = useState('')
   const [sortColumn, setSortColumn] = useState<SortColumn>('spend')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -193,6 +208,9 @@ export function KeywordMetricsTable({ data, isLoading = false }: KeywordMetricsT
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {watchEnabled && (
+                      <TableHead className="w-[50px]">Watch</TableHead>
+                    )}
                     <TableHead>
                       <Button
                         variant="ghost"
@@ -278,13 +296,22 @@ export function KeywordMetricsTable({ data, isLoading = false }: KeywordMetricsT
                 <TableBody>
                   {paginatedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={watchEnabled ? 11 : 10} className="h-24 text-center text-muted-foreground">
                         {search ? 'No keywords match your search.' : 'No keyword data available.'}
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginatedData.map((row, index) => (
                       <TableRow key={`${row.keyword}-${index}`}>
+                        {watchEnabled && onToggleWatch && (
+                          <TableCell className="text-center">
+                            <WatchedKeywordBadge
+                              isWatched={watchedKeywords?.has(row.keyword) ?? false}
+                              onToggle={() => onToggleWatch(row.keyword)}
+                              disabled={isWatchLoading}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="font-medium max-w-[200px] truncate" title={row.keyword}>
                           {row.keyword}
                         </TableCell>

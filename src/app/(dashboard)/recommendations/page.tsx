@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RecommendationList } from '@/components/features/RecommendationList'
+import { WatchedKeywordAlerts } from '@/components/features/WatchedKeywordAlerts'
 import {
   Lightbulb,
   CheckCircle,
@@ -320,6 +321,11 @@ export default function RecommendationsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Watched Keyword Alerts */}
+      {session?.user?.selectedBrandId && (
+        <WatchedKeywordAlerts brandId={session.user.selectedBrandId} />
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
