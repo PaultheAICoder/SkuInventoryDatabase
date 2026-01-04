@@ -189,6 +189,20 @@ export interface WatchedKeyword {
   addedAt: Date
 }
 
+/**
+ * Alert for significant ACOS change on a watched keyword
+ */
+export interface WatchedKeywordAlert {
+  watchedKeywordId: string
+  keyword: string
+  brandId: string
+  currentAcos: number
+  previousAcos: number
+  acosChangePercent: number // positive = ACOS increased (bad), negative = decreased (good)
+  alertType: 'ACOS_INCREASE' | 'ACOS_DECREASE'
+  severity: 'warning' | 'critical' // warning: >20% change, critical: >50% change
+}
+
 // ============================================
 // API Query/Filter Schemas
 // ============================================
@@ -343,4 +357,45 @@ export interface ChangeLogListResponse {
     pageSize: number
     totalPages: number
   }
+}
+
+// ============================================
+// Scheduler Types
+// ============================================
+
+/**
+ * Configuration for recommendation scheduler
+ */
+export interface SchedulerConfig {
+  enabled: boolean
+  dayOfWeek: number  // 0=Sunday, 1=Monday, etc.
+  hour: number       // 0-23
+  minute: number     // 0-59
+  timezone: string   // e.g., 'America/New_York'
+}
+
+export const schedulerConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  dayOfWeek: z.number().int().min(0).max(6).default(0),  // Sunday
+  hour: z.number().int().min(0).max(23).default(23),      // 11 PM
+  minute: z.number().int().min(0).max(59).default(0),
+  timezone: z.string().default('America/New_York'),
+})
+
+/**
+ * Result of scheduled recommendation generation
+ */
+export interface ScheduledGenerationResult {
+  totalBrands: number
+  brandsProcessed: number
+  brandsFailed: number
+  results: Array<{
+    brandId: string
+    brandName: string
+    generated: number
+    skipped: number
+    errors: string[]
+  }>
+  skipped: 'disabled' | 'wrong_day' | null
+  duration: number
 }

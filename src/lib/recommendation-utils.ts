@@ -79,37 +79,61 @@ export const MAX_SNOOZE_DAYS = 30
 // ============================================
 
 /**
- * Merge brand-specific thresholds with defaults.
- * Brand settings override defaults for any specified values.
+ * Merge brand-specific thresholds with company defaults, then system defaults.
+ * Priority: brandSettings > companySettings > DEFAULT_THRESHOLDS
  *
- * @param brandSettings - Threshold overrides from Brand.settings
+ * @param brandSettings - Threshold overrides from Brand-specific settings (JSON)
+ * @param companySettings - Threshold overrides from Company.settings (JSON)
  * @param defaults - Default thresholds (optional, uses DEFAULT_THRESHOLDS)
  * @returns Complete thresholds object with all values
  */
 export function mergeThresholds(
   brandSettings: RecommendationThresholds | undefined | null,
+  companySettings?: RecommendationThresholds | undefined | null,
   defaults: RequiredThresholds = DEFAULT_THRESHOLDS
 ): RequiredThresholds {
-  if (!brandSettings) {
-    return defaults
-  }
-
-  return {
+  // First merge company with defaults
+  const companyMerged = companySettings ? {
     graduation: {
-      maxAcos: brandSettings.graduation?.maxAcos ?? defaults.graduation.maxAcos,
-      minConversions: brandSettings.graduation?.minConversions ?? defaults.graduation.minConversions,
-      minSpend: brandSettings.graduation?.minSpend ?? defaults.graduation.minSpend,
+      maxAcos: companySettings.graduation?.maxAcos ?? defaults.graduation.maxAcos,
+      minConversions: companySettings.graduation?.minConversions ?? defaults.graduation.minConversions,
+      minSpend: companySettings.graduation?.minSpend ?? defaults.graduation.minSpend,
     },
     negative: {
-      minSpend: brandSettings.negative?.minSpend ?? defaults.negative.minSpend,
-      maxOrders: brandSettings.negative?.maxOrders ?? defaults.negative.maxOrders,
-      minClicks: brandSettings.negative?.minClicks ?? defaults.negative.minClicks,
+      minSpend: companySettings.negative?.minSpend ?? defaults.negative.minSpend,
+      maxOrders: companySettings.negative?.maxOrders ?? defaults.negative.maxOrders,
+      minClicks: companySettings.negative?.minClicks ?? defaults.negative.minClicks,
     },
     budget: {
-      minRoas: brandSettings.budget?.minRoas ?? defaults.budget.minRoas,
-      budgetUtilization: brandSettings.budget?.budgetUtilization ?? defaults.budget.budgetUtilization,
-      maxAcosForIncrease: brandSettings.budget?.maxAcosForIncrease ?? defaults.budget.maxAcosForIncrease,
-      minAcosForDecrease: brandSettings.budget?.minAcosForDecrease ?? defaults.budget.minAcosForDecrease,
+      minRoas: companySettings.budget?.minRoas ?? defaults.budget.minRoas,
+      budgetUtilization: companySettings.budget?.budgetUtilization ?? defaults.budget.budgetUtilization,
+      maxAcosForIncrease: companySettings.budget?.maxAcosForIncrease ?? defaults.budget.maxAcosForIncrease,
+      minAcosForDecrease: companySettings.budget?.minAcosForDecrease ?? defaults.budget.minAcosForDecrease,
+    },
+  } : defaults
+
+  // If no brand settings, return company merged
+  if (!brandSettings) {
+    return companyMerged
+  }
+
+  // Merge brand settings over company merged
+  return {
+    graduation: {
+      maxAcos: brandSettings.graduation?.maxAcos ?? companyMerged.graduation.maxAcos,
+      minConversions: brandSettings.graduation?.minConversions ?? companyMerged.graduation.minConversions,
+      minSpend: brandSettings.graduation?.minSpend ?? companyMerged.graduation.minSpend,
+    },
+    negative: {
+      minSpend: brandSettings.negative?.minSpend ?? companyMerged.negative.minSpend,
+      maxOrders: brandSettings.negative?.maxOrders ?? companyMerged.negative.maxOrders,
+      minClicks: brandSettings.negative?.minClicks ?? companyMerged.negative.minClicks,
+    },
+    budget: {
+      minRoas: brandSettings.budget?.minRoas ?? companyMerged.budget.minRoas,
+      budgetUtilization: brandSettings.budget?.budgetUtilization ?? companyMerged.budget.budgetUtilization,
+      maxAcosForIncrease: brandSettings.budget?.maxAcosForIncrease ?? companyMerged.budget.maxAcosForIncrease,
+      minAcosForDecrease: brandSettings.budget?.minAcosForDecrease ?? companyMerged.budget.minAcosForDecrease,
     },
   }
 }

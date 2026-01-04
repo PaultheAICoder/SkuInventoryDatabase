@@ -86,3 +86,8 @@ export {
   type ActionRecommendationParams,
   type ActionRecommendationResult,
 } from './api-helpers'
+
+// Scheduler
+export {
+  runScheduledRecommendationGeneration,
+} from './scheduler'

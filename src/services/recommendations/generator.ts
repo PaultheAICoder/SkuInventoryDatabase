@@ -96,8 +96,13 @@ export async function generateRecommendations(
     }
 
     // Merge brand thresholds with defaults
-    const companySettings = brand.company.settings as { recommendationThresholds?: RecommendationThresholds } | null
-    const thresholds = mergeThresholds(companySettings?.recommendationThresholds)
+    // Priority: brand-specific thresholds > company thresholds > defaults
+    const companySettings = brand.company.settings as {
+      recommendationThresholds?: RecommendationThresholds
+      brandThresholds?: Record<string, RecommendationThresholds>
+    } | null
+    const brandThresholds = companySettings?.brandThresholds?.[brandId]
+    const thresholds = mergeThresholds(brandThresholds, companySettings?.recommendationThresholds)
 
     // Find graduation candidates
     const candidates = await findGraduationCandidates(brandId, thresholds, lookbackDays)
