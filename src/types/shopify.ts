@@ -200,3 +200,93 @@ export interface ShopifyOAuthConfig {
   redirectUri: string
   scopes: string[]
 }
+
+// =============================================================================
+// Database Model Types (mirror Prisma models)
+// =============================================================================
+
+/**
+ * Shopify product status enum (mirrors Prisma enum)
+ */
+export type ShopifyProductStatus = 'ACTIVE' | 'DRAFT' | 'ARCHIVED'
+
+/**
+ * Shopify product from database
+ */
+export interface ShopifyProductRecord {
+  id: string
+  connectionId: string
+  shopifyProductId: string
+  title: string
+  handle: string | null
+  status: ShopifyProductStatus
+  vendor: string | null
+  productType: string | null
+  rawData: Record<string, unknown>
+  syncedAt: Date
+  createdAt: Date
+  updatedAt: Date
+  variants?: ShopifyVariantRecord[]
+}
+
+/**
+ * Shopify variant from database
+ */
+export interface ShopifyVariantRecord {
+  id: string
+  productId: string
+  shopifyVariantId: string
+  title: string
+  sku: string | null
+  price: number
+  inventoryQuantity: number
+  rawData: Record<string, unknown>
+}
+
+/**
+ * Shopify customer from database
+ */
+export interface ShopifyCustomerRecord {
+  id: string
+  connectionId: string
+  shopifyCustomerId: string
+  email: string | null
+  firstName: string | null
+  lastName: string | null
+  ordersCount: number
+  totalSpent: number
+  firstOrderDate: Date | null
+  lastOrderDate: Date | null
+  rawData: Record<string, unknown>
+  syncedAt: Date
+}
+
+/**
+ * Channel daily sales for cross-channel analytics
+ */
+export interface ChannelDailySalesRecord {
+  id: string
+  brandId: string
+  channel: string
+  date: Date
+  skuId: string | null
+  revenue: number
+  orders: number
+  units: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Channel marketing spend for CAC/ROAS calculation
+ */
+export interface ChannelMarketingSpendRecord {
+  id: string
+  brandId: string
+  channel: string
+  month: Date
+  adSpend: number
+  notes: string | null
+  createdAt: Date
+  updatedAt: Date
+}

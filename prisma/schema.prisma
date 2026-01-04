@@ -91,6 +91,10 @@ model Brand {
   recommendations   Recommendation[]
   watchedKeywords   WatchedKeyword[]
 
+  // V2: Cross-channel analytics relations
+  channelDailySales     ChannelDailySales[]
+  channelMarketingSpend ChannelMarketingSpend[]
+
   @@unique([companyId, name])
   @@index([companyId, isActive])
 }
@@ -297,6 +301,12 @@ enum ShopifyOrderStatus {
   error // Processing error
 }
 
+enum ShopifyProductStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
 model Transaction {
   id             String          @id @default(uuid())
   companyId      String
@@ -428,6 +438,9 @@ model SKU {
 
   // V2: ASIN mapping relation
   asinMappings AsinSkuMapping[]
+
+  // V2: Cross-channel analytics relation
+  channelDailySales ChannelDailySales[]
 
   @@unique([brandId, internalCode])
   @@index([brandId, isActive])
@@ -602,7 +615,9 @@ model ShopifyConnection {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  orders ShopifyOrder[]
+  orders    ShopifyOrder[]
+  products  ShopifyProduct[]
+  customers ShopifyCustomer[]
 
   @@unique([companyId]) // One connection per company initially
   @@index([companyId, isActive])
@@ -623,12 +638,15 @@ model ShopifyOrder {
   rawData            Json               @default("{}") // Store raw order JSON
   syncedAt           DateTime           @default(now())
   processedAt        DateTime?
+  customerId         String?
+  customer           ShopifyCustomer?   @relation(fields: [customerId], references: [id])
 
   lines ShopifyOrderLine[]
 
   @@unique([connectionId, shopifyOrderId])
   @@index([connectionId, status])
   @@index([syncedAt])
+  @@index([customerId])
 }
 
 model ShopifyOrderLine {
@@ -648,6 +666,62 @@ model ShopifyOrderLine {
   @@index([shopifyVariantId])
 }
 
+model ShopifyProduct {
+  id               String               @id @default(uuid())
+  connectionId     String
+  connection       ShopifyConnection    @relation(fields: [connectionId], references: [id])
+  shopifyProductId String
+  title            String               @db.VarChar(500)
+  handle           String?              @db.VarChar(255)
+  status           ShopifyProductStatus @default(ACTIVE)
+  vendor           String?              @db.VarChar(255)
+  productType      String?              @db.VarChar(255)
+  rawData          Json                 @default("{}")
+  syncedAt         DateTime             @default(now())
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  variants ShopifyVariant[]
+
+  @@unique([connectionId, shopifyProductId])
+  @@index([connectionId, status])
+}
+
+model ShopifyVariant {
+  id                String         @id @default(uuid())
+  productId         String
+  product           ShopifyProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  shopifyVariantId  String         @unique
+  title             String         @db.VarChar(255)
+  sku               String?        @db.VarChar(100)
+  price             Decimal        @db.Decimal(10, 2)
+  inventoryQuantity Int            @default(0)
+  rawData           Json           @default("{}")
+
+  @@index([productId])
+}
+
+model ShopifyCustomer {
+  id                String            @id @default(uuid())
+  connectionId      String
+  connection        ShopifyConnection @relation(fields: [connectionId], references: [id])
+  shopifyCustomerId String
+  email             String?           @db.VarChar(255)
+  firstName         String?           @db.VarChar(100)
+  lastName          String?           @db.VarChar(100)
+  ordersCount       Int               @default(0)
+  totalSpent        Decimal           @default(0) @db.Decimal(12, 2)
+  firstOrderDate    DateTime?
+  lastOrderDate     DateTime?
+  rawData           Json              @default("{}")
+  syncedAt          DateTime          @default(now())
+
+  orders ShopifyOrder[]
+
+  @@unique([connectionId, shopifyCustomerId])
+  @@index([connectionId, email])
+}
+
 model SkuChannelMapping {
   id          String   @id @default(uuid())
   companyId   String
@@ -664,6 +738,39 @@ model SkuChannelMapping {
   @@unique([companyId, channelType, externalId])
   @@index([companyId, channelType])
   @@index([skuId])
+}
+
+model ChannelDailySales {
+  id        String   @id @default(uuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  channel   String   @db.VarChar(20)
+  date      DateTime @db.Date
+  skuId     String?
+  sku       SKU?     @relation(fields: [skuId], references: [id])
+  revenue   Decimal  @db.Decimal(12, 2)
+  orders    Int
+  units     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, channel, date, skuId])
+  @@index([brandId, date])
+  @@index([channel, date])
+}
+
+model ChannelMarketingSpend {
+  id        String   @id @default(uuid())
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id])
+  channel   String   @db.VarChar(20)
+  month     DateTime @db.Date
+  adSpend   Decimal  @db.Decimal(12, 2)
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, channel, month])
 }
 
 // ============================================
