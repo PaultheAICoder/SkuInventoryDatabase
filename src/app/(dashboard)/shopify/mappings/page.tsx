@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -12,14 +12,13 @@ import {
 } from '@/components/ui/select'
 import { SkuMappingTable } from '@/components/features/SkuMappingTable'
 import { SkuMappingForm } from '@/components/features/SkuMappingForm'
+import { MappingImportModal } from '@/components/features/MappingImportModal'
 import { Link2, Search, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { channelTypes, CHANNEL_TYPE_DISPLAY_NAMES } from '@/types/channel-mapping'
-import type { MappingResponse, MappingImportResult } from '@/types/channel-mapping'
+import type { MappingResponse } from '@/types/channel-mapping'
 
 export default function ChannelMappingsPage() {
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [mappings, setMappings] = useState<MappingResponse[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +28,7 @@ export default function ChannelMappingsPage() {
 
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingMapping, setEditingMapping] = useState<MappingResponse | null>(null)
-  const [isImporting, setIsImporting] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const fetchMappings = useCallback(async () => {
     setIsLoading(true)
@@ -77,54 +76,6 @@ export default function ChannelMappingsPage() {
     toast.success(editingMapping ? 'Mapping updated successfully' : 'Mapping created successfully')
   }
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setIsImporting(true)
-
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const res = await fetch('/api/shopify/mappings/import', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const data = await res.json() as { data?: MappingImportResult; error?: string }
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Import failed')
-      }
-
-      const result = data.data
-      if (result) {
-        const message = `Imported ${result.imported} of ${result.total} mappings. ${result.skipped} skipped.`
-        if (result.errors.length > 0) {
-          toast.warning(message)
-          console.log('Import errors:', result.errors)
-        } else {
-          toast.success(message)
-        }
-      }
-
-      fetchMappings()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to import mappings')
-    } finally {
-      setIsImporting(false)
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
   const handleDownloadTemplate = async () => {
     try {
       const res = await fetch('/api/shopify/mappings/import')
@@ -159,9 +110,9 @@ export default function ChannelMappingsPage() {
             <Download className="mr-2 h-4 w-4" />
             Template
           </Button>
-          <Button variant="outline" onClick={handleImportClick} disabled={isImporting}>
+          <Button variant="outline" onClick={() => setShowImportModal(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            {isImporting ? 'Importing...' : 'Import CSV'}
+            Import CSV
           </Button>
           <Button onClick={() => setShowAddDialog(true)}>
             <Link2 className="mr-2 h-4 w-4" />
@@ -169,15 +120,6 @@ export default function ChannelMappingsPage() {
           </Button>
         </div>
       </div>
-
-      {/* Hidden file input for CSV import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        className="hidden"
-        onChange={handleFileSelect}
-      />
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
@@ -259,6 +201,16 @@ export default function ChannelMappingsPage() {
           }
         }}
         onSuccess={handleFormSuccess}
+      />
+
+      {/* Import Modal */}
+      <MappingImportModal
+        open={showImportModal}
+        onOpenChange={setShowImportModal}
+        onSuccess={() => {
+          fetchMappings()
+          toast.success('Mappings imported successfully')
+        }}
       />
     </div>
   )

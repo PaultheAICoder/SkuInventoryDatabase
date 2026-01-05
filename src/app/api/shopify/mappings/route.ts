@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
       where.isActive = isActive
     }
 
-    // Get total count
-    const total = await prisma.skuChannelMapping.count({ where })
+    // Get total count for SkuChannelMapping
+    const channelMappingTotal = await prisma.skuChannelMapping.count({ where })
 
     // Get mappings with related SKU data
-    const mappings = await prisma.skuChannelMapping.findMany({
+    const channelMappings = await prisma.skuChannelMapping.findMany({
       where,
       select: {
         id: true,
@@ -82,12 +82,100 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
     })
 
+    // Get brands for this company to query AsinSkuMapping
+    const brands = await prisma.brand.findMany({
+      where: { companyId: selectedCompanyId },
+      select: { id: true, name: true },
+    })
+    const brandIds = brands.map(b => b.id)
+    const brandNameMap = Object.fromEntries(brands.map(b => [b.id, b.name]))
+
+    // Only include AsinSkuMapping if not filtering by non-amazon channel
+    const includeAsinMappings = !channelType || channelType === 'amazon'
+
+    interface TransformedAsinMapping {
+      id: string
+      channelType: string
+      externalId: string
+      externalSku: string | null
+      skuId: string
+      sku: { id: string; name: string; internalCode: string }
+      isActive: boolean
+      createdAt: Date
+      updatedAt: Date
+      source: 'asin'
+      productName: string | null
+      brandName: string
+    }
+
+    let asinMappings: TransformedAsinMapping[] = []
+
+    if (includeAsinMappings && brandIds.length > 0) {
+      // Build AsinSkuMapping where clause
+      const asinWhere: Prisma.AsinSkuMappingWhereInput = {
+        brandId: { in: brandIds },
+      }
+
+      if (search) {
+        asinWhere.OR = [
+          { asin: { contains: search, mode: 'insensitive' } },
+          { productName: { contains: search, mode: 'insensitive' } },
+          { sku: { internalCode: { contains: search, mode: 'insensitive' } } },
+          { sku: { name: { contains: search, mode: 'insensitive' } } },
+        ]
+      }
+
+      // Note: AsinSkuMapping has no isActive field, so we only filter if isActive is false
+      // (meaning we exclude them when explicitly filtering for inactive mappings)
+      if (isActive === false) {
+        // Don't include ASIN mappings when filtering for inactive (they don't have this state)
+        asinMappings = []
+      } else {
+        const rawAsinMappings = await prisma.asinSkuMapping.findMany({
+          where: asinWhere,
+          include: {
+            sku: { select: { id: true, name: true, internalCode: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+
+        // Transform to unified format
+        asinMappings = rawAsinMappings.map(m => ({
+          id: m.id,
+          channelType: 'amazon',
+          externalId: m.asin,
+          externalSku: null,
+          skuId: m.skuId,
+          sku: m.sku,
+          isActive: true, // AsinSkuMapping has no isActive field - always considered active
+          createdAt: m.createdAt,
+          updatedAt: m.createdAt, // No updatedAt in AsinSkuMapping, use createdAt
+          source: 'asin' as const,
+          productName: m.productName,
+          brandName: brandNameMap[m.brandId] || '',
+        }))
+      }
+    }
+
+    // Combine and sort all mappings by createdAt descending
+    const allMappings = [
+      ...channelMappings.map(m => ({
+        ...m,
+        source: 'channel' as const,
+        productName: null as string | null,
+        brandName: null as string | null,
+      })),
+      ...asinMappings,
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    // Apply pagination to combined results
+    const paginatedMappings = allMappings.slice((page - 1) * pageSize, page * pageSize)
+    const combinedTotal = channelMappingTotal + asinMappings.length
+
     return NextResponse.json({
-      data: mappings.map((mapping) => ({
+      data: paginatedMappings.map((mapping) => ({
         ...mapping,
         createdAt: mapping.createdAt.toISOString(),
         updatedAt: mapping.updatedAt.toISOString(),
@@ -95,8 +183,8 @@ export async function GET(request: NextRequest) {
       meta: {
         page,
         pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
+        total: combinedTotal,
+        totalPages: Math.ceil(combinedTotal / pageSize),
       },
     })
   } catch (error) {

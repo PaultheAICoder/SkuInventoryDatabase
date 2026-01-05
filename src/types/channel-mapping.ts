@@ -71,6 +71,10 @@ export interface MappingResponse {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  // Additional fields for unified display of different mapping sources
+  source?: 'channel' | 'asin'  // Indicates which table the mapping came from
+  productName?: string | null   // Amazon product name (from AsinSkuMapping)
+  brandName?: string | null     // Brand name (from AsinSkuMapping)
 }
 
 // CSV import schema for mappings

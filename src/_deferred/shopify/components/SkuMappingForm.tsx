@@ -86,7 +86,7 @@ export function SkuMappingForm({ mapping, open, onOpenChange, onSuccess }: SkuMa
   const fetchSkus = async () => {
     setIsLoadingSkus(true)
     try {
-      const res = await fetch('/api/skus?pageSize=500&isActive=true')
+      const res = await fetch('/api/skus?pageSize=100&isActive=true')
       if (!res.ok) {
         throw new Error('Failed to load SKUs')
       }

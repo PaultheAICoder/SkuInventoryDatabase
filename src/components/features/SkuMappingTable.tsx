@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { MoreHorizontal, Edit, Trash2, Power, PowerOff } from 'lucide-react'
+import { MoreHorizontal, Edit, Trash2, Power, PowerOff, Info } from 'lucide-react'
 import { CHANNEL_TYPE_DISPLAY_NAMES, type ChannelType } from '@/types/channel-mapping'
 import type { MappingResponse } from '@/types/channel-mapping'
 
@@ -131,10 +131,19 @@ export function SkuMappingTable({ mappings, onRefresh, onEdit }: SkuMappingTable
             {mappings.map((mapping) => (
               <TableRow key={mapping.id}>
                 <TableCell className="font-mono text-sm">
-                  {mapping.externalId}
+                  <div className="flex flex-col">
+                    <span>{mapping.externalId}</span>
+                    {mapping.source === 'asin' && mapping.brandName && (
+                      <span className="text-xs text-muted-foreground">
+                        Brand: {mapping.brandName}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {mapping.externalSku || '-'}
+                  {mapping.source === 'asin' && mapping.productName
+                    ? mapping.productName
+                    : mapping.externalSku || '-'}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col">
@@ -145,9 +154,16 @@ export function SkuMappingTable({ mappings, onRefresh, onEdit }: SkuMappingTable
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getChannelBadgeVariant(mapping.channelType)}>
-                    {CHANNEL_TYPE_DISPLAY_NAMES[mapping.channelType as ChannelType] || mapping.channelType}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <Badge variant={getChannelBadgeVariant(mapping.channelType)}>
+                      {CHANNEL_TYPE_DISPLAY_NAMES[mapping.channelType as ChannelType] || mapping.channelType}
+                    </Badge>
+                    {mapping.source === 'asin' && (
+                      <Badge variant="outline" className="text-xs">
+                        ASIN
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={mapping.isActive ? 'success' : 'secondary'}>
@@ -163,30 +179,39 @@ export function SkuMappingTable({ mappings, onRefresh, onEdit }: SkuMappingTable
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEdit(mapping)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleActive(mapping)}>
-                        {mapping.isActive ? (
-                          <>
-                            <PowerOff className="mr-2 h-4 w-4" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <Power className="mr-2 h-4 w-4" />
-                            Activate
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => setMappingToDelete(mapping)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
+                      {mapping.source !== 'asin' ? (
+                        <>
+                          <DropdownMenuItem onClick={() => onEdit(mapping)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleActive(mapping)}>
+                            {mapping.isActive ? (
+                              <>
+                                <PowerOff className="mr-2 h-4 w-4" />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <Power className="mr-2 h-4 w-4" />
+                                Activate
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => setMappingToDelete(mapping)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem disabled className="text-muted-foreground">
+                          <Info className="mr-2 h-4 w-4" />
+                          Managed via Amazon integration
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
