@@ -46,7 +46,8 @@ describe('Analytics Calculations', () => {
 
   describe('Date Grouping', () => {
     it('should group by day correctly', () => {
-      const date = new Date('2025-12-03')
+      // Use explicit local time to avoid timezone issues (noon local time)
+      const date = new Date(2025, 11, 3, 12, 0, 0) // December 3, 2025 at noon local
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const day = String(date.getDate()).padStart(2, '0')
@@ -55,7 +56,8 @@ describe('Analytics Calculations', () => {
     })
 
     it('should group by month correctly', () => {
-      const date = new Date('2025-12-15')
+      // Use explicit local time to avoid timezone issues
+      const date = new Date(2025, 11, 15, 12, 0, 0) // December 15, 2025 at noon local
       const year = date.getFullYear()
       const month = String(date.getMonth() + 1).padStart(2, '0')
       const key = `${year}-${month}-01`
@@ -63,8 +65,8 @@ describe('Analytics Calculations', () => {
     })
 
     it('should get Monday for week grouping', () => {
-      // Wednesday December 3, 2025
-      const date = new Date('2025-12-03')
+      // Wednesday December 3, 2025 (use local time to avoid timezone issues)
+      const date = new Date(2025, 11, 3, 12, 0, 0) // December 3, 2025 at noon local
       const dayOfWeek = date.getDay()
       const diff = date.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
       const monday = new Date(date)

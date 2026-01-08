@@ -115,9 +115,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
 
-    // Merge new settings with existing
+    // Only merge fields that were actually provided in the request body
+    // (not the defaults applied by zod schema parsing)
+    const providedFields: Record<string, unknown> = {}
+    for (const key of Object.keys(body)) {
+      if (key in validation.data) {
+        providedFields[key] = validation.data[key as keyof typeof validation.data]
+      }
+    }
+
+    // Merge new settings with existing - only override fields that were provided
     const currentSettings = (company.settings as Record<string, unknown>) || {}
-    const newSettings = { ...DEFAULT_SETTINGS, ...currentSettings, ...validation.data }
+    const newSettings = { ...DEFAULT_SETTINGS, ...currentSettings, ...providedFields }
 
     // Update company settings
     const updatedCompany = await prisma.company.update({

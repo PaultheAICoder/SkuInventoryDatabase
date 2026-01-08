@@ -1,0 +1,9 @@
+{
+  "issue": "387",
+  "workflow": "3-agent",
+  "workflow_start": "2026-01-08T22:00:34.000Z",
+  "cleanup_start": "2026-01-08T22:12:00.000Z",
+  "cleanup_end": "2026-01-08T22:20:00.000Z",
+  "workflow_end": "2026-01-08T22:20:00.000Z",
+  "status": "complete"
+}

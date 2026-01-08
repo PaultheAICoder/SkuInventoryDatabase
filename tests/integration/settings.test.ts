@@ -353,8 +353,7 @@ describe('Company Settings', () => {
       expect(result.data?.settings.defaultLeadTimeDays).toBe(30)
     })
 
-    // TODO: Investigate potential Prisma caching issue in sequential PATCH calls
-    it.skip('partial updates preserve other settings', async () => {
+    it('partial updates preserve other settings', async () => {
       setTestSession(TEST_SESSIONS.admin!)
       const prisma = getIntegrationPrisma()
 
