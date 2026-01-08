@@ -416,3 +416,14 @@ export function getSelectedCompanyRole(
   const company = session.user.companies.find((c) => c.id === session.user.selectedCompanyId)
   return company?.role as 'admin' | 'ops' | 'viewer' | undefined
 }
+
+/**
+ * Check if user is admin in ANY company they have access to
+ * Used for cross-company admin features like Settings management
+ * This matches the UI logic in layout.tsx for Settings menu visibility
+ */
+export function isAdminInAnyCompany(
+  session: { user: { companies: Array<{ id: string; role?: string }> } }
+): boolean {
+  return session.user.companies.some((c) => c.role === 'admin')
+}

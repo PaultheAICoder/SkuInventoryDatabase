@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
+import { authOptions, isAdminInAnyCompany } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import {
   companySettingsSchema,
@@ -27,8 +27,7 @@ export async function GET() {
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -86,8 +85,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

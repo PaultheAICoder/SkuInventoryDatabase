@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
+import { authOptions, isAdminInAnyCompany } from '@/lib/auth'
 import {
   success,
   unauthorized,
@@ -32,8 +32,7 @@ export async function GET() {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return forbidden()
     }
 
@@ -74,8 +73,7 @@ export async function PATCH(request: NextRequest) {
       return error('No company selected. Please select a company from the sidebar.', 400)
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return forbidden()
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
+import { authOptions, isAdminInAnyCompany } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { updateUserCompaniesSchema } from '@/types/user'
 import { UserRole } from '@prisma/client'
@@ -26,8 +26,7 @@ export async function GET(
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -103,8 +102,7 @@ export async function PUT(
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

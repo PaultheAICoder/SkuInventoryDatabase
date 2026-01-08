@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
+import { authOptions, isAdminInAnyCompany } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { updateLocationSchema } from '@/types/location'
 import { setDefaultLocation, canDeactivateLocation, canDeleteLocation } from '@/services/location'
@@ -26,8 +26,7 @@ export async function GET(
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -88,8 +87,7 @@ export async function PATCH(
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -215,8 +213,7 @@ export async function DELETE(
       )
     }
 
-    const companyRole = getSelectedCompanyRole(session)
-    if (companyRole !== 'admin') {
+    if (!isAdminInAnyCompany(session)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
