@@ -50,6 +50,7 @@ prisma/*.db-journal
 # Misc
 *.tmp
 *.swp
+*.bak
 Thumbs.db
 
 /src/generated/prisma
