@@ -59,7 +59,7 @@ Interpret common patterns:
 - "received from [name]" or "got in from [name]" -> receipt with supplier
 - "adjusted down" or "damaged" or "lost" -> adjustment
 - "built" or "made" or "assembled" -> build transaction
-- Relative dates: "today" = current date, "yesterday" = day before current date
+- Relative dates: The current date will be provided at the start of the user message as "Today's date is YYYY-MM-DD". Use this date for "today". "yesterday" = the day before this provided date.
 
 For adjustment reasons, map common phrases:
 - "damaged" or "broke" or "broken" -> reason: "Damaged goods"
