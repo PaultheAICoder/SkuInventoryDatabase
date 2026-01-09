@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
 import { AlertTriangle } from 'lucide-react'
 import { salesChannels } from '@/types'
-import { cn, toLocalDateString } from '@/lib/utils'
+import { cn, toLocalDateString, parseFractionOrNumber } from '@/lib/utils'
 
 interface ComponentOption {
   id: string
@@ -326,7 +326,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
             date: inboundFormData.date,
             quantity: parseFloat(inboundFormData.quantity),
             supplier: inboundFormData.supplier,
-            costPerUnit: inboundFormData.costPerUnit ? parseFloat(inboundFormData.costPerUnit) : undefined,
+            costPerUnit: inboundFormData.costPerUnit ? parseFractionOrNumber(inboundFormData.costPerUnit) ?? undefined : undefined,
             locationId: inboundFormData.locationId || undefined,
             lotNumber: inboundFormData.lotNumber || undefined,
             expiryDate: inboundFormData.expiryDate || undefined,
@@ -373,7 +373,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
           date: inboundFormData.date,
           quantity: parseFloat(inboundFormData.quantity),
           supplier: inboundFormData.supplier,
-          costPerUnit: inboundFormData.costPerUnit ? parseFloat(inboundFormData.costPerUnit) : undefined,
+          costPerUnit: inboundFormData.costPerUnit ? parseFractionOrNumber(inboundFormData.costPerUnit) ?? undefined : undefined,
           locationId: inboundFormData.locationId || undefined,
           lotNumber: inboundFormData.lotNumber || undefined,
           expiryDate: inboundFormData.expiryDate || undefined,
@@ -661,11 +661,9 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
                 </Label>
                 <Input
                   id="receipt-cost"
-                  type="number"
-                  step="0.0001"
-                  min="0"
+                  type="text"
                   className="col-span-3"
-                  placeholder="Leave blank to use component default"
+                  placeholder="e.g., 0.02, 1/45 (blank = default)"
                   value={inboundFormData.costPerUnit}
                   onChange={(e) => setInboundFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))}
                 />
