@@ -8,6 +8,7 @@ export const createReceiptSchema = z.object({
   componentId: z.string().uuid('Invalid component ID'),
   quantity: z.coerce.number().positive('Quantity must be positive'),
   supplier: z.string().min(1, 'Supplier is required').max(100),
+  vendorId: z.string().uuid('Invalid vendor ID').optional(),
   costPerUnit: z.coerce.number().nonnegative().optional(),
   updateComponentCost: z.boolean().default(false),
   notes: z.string().optional().nullable(),
@@ -161,6 +162,8 @@ export interface TransactionResponse {
   unitBomCost: string | null
   totalBomCost: string | null
   supplier: string | null
+  vendorId: string | null
+  vendor?: { id: string; name: string } | null
   reason: string | null
   notes: string | null
   defectCount: number | null

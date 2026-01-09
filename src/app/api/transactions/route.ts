@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
         location: { select: { id: true, name: true } },
         fromLocation: { select: { id: true, name: true } },
         toLocation: { select: { id: true, name: true } },
+        vendor: { select: { id: true, name: true } },
         createdBy: { select: { id: true, name: true } },
         lines: {
           include: {
@@ -114,6 +115,8 @@ export async function GET(request: NextRequest) {
       unitBomCost: tx.unitBomCost?.toString() ?? null,
       totalBomCost: tx.totalBomCost?.toString() ?? null,
       supplier: tx.supplier,
+      vendorId: tx.vendorId,
+      vendor: tx.vendor,
       reason: tx.reason,
       notes: tx.notes,
       defectCount: tx.defectCount,

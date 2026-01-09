@@ -246,6 +246,7 @@ export async function createReceiptTransaction(params: {
   quantity: number
   date: Date
   supplier: string
+  vendorId?: string
   costPerUnit?: number
   updateComponentCost: boolean
   notes?: string | null
@@ -260,6 +261,7 @@ export async function createReceiptTransaction(params: {
     quantity,
     date,
     supplier,
+    vendorId,
     costPerUnit,
     updateComponentCost,
     notes,
@@ -356,6 +358,7 @@ export async function createReceiptTransaction(params: {
         type: 'receipt',
         date,
         supplier,
+        vendorId: vendorId ?? null,
         notes,
         createdById,
         locationId: locationIdToUse,
@@ -383,6 +386,9 @@ export async function createReceiptTransaction(params: {
           select: { id: true, name: true },
         },
         location: {
+          select: { id: true, name: true },
+        },
+        vendor: {
           select: { id: true, name: true },
         },
       },

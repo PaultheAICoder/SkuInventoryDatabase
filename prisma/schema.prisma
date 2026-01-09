@@ -129,6 +129,8 @@ model Vendor {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  transactions Transaction[]
+
   @@unique([companyId, name])
   @@index([companyId, isActive])
 }
@@ -352,6 +354,8 @@ model Transaction {
   unitBomCost    Decimal?        @db.Decimal(10, 4)
   totalBomCost   Decimal?        @db.Decimal(10, 4)
   supplier       String?         @db.VarChar(100)
+  vendorId       String?
+  vendor         Vendor?         @relation(fields: [vendorId], references: [id])
   reason         String?         @db.VarChar(200)
   notes          String?         @db.Text
   defectCount    Int?
@@ -391,6 +395,7 @@ model Transaction {
   @@index([locationId])
   @@index([fromLocationId])
   @@index([toLocationId])
+  @@index([vendorId])
   @@index([sourceType, sourceOrderId])
   @@index([companyId, status])
   @@index([companyId, status, deletedAt])

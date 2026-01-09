@@ -55,6 +55,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate vendor if provided
+    if (data.vendorId) {
+      const vendor = await prisma.vendor.findFirst({
+        where: {
+          id: data.vendorId,
+          companyId: selectedCompanyId,
+          isActive: true,
+        },
+      })
+      if (!vendor) {
+        return notFound('Vendor')
+      }
+    }
+
     // Create the receipt transaction for the selected company
     const transaction = await createReceiptTransaction({
       companyId: selectedCompanyId,
@@ -62,6 +76,7 @@ export async function POST(request: NextRequest) {
       quantity: data.quantity,
       date: data.date,
       supplier: data.supplier,
+      vendorId: data.vendorId,
       costPerUnit: data.costPerUnit,
       updateComponentCost: data.updateComponentCost,
       notes: data.notes,
@@ -76,6 +91,8 @@ export async function POST(request: NextRequest) {
       type: transaction.type,
       date: toLocalDateString(transaction.date),
       supplier: transaction.supplier,
+      vendorId: transaction.vendorId,
+      vendor: transaction.vendor,
       notes: transaction.notes,
       locationId: transaction.locationId,
       location: transaction.location,

@@ -71,6 +71,8 @@ interface TransactionDetailProps {
     unitBomCost: string | null
     totalBomCost: string | null
     supplier: string | null
+    vendorId?: string | null
+    vendor?: { id: string; name: string } | null
     reason: string | null
     notes: string | null
     defectCount: number | null
@@ -271,10 +273,23 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
 
             {/* Receipt-specific info */}
             {transaction.type === 'receipt' && (
-              <div>
-                <p className="text-sm text-muted-foreground">Supplier</p>
-                <p className="font-medium">{transaction.supplier || '-'}</p>
-              </div>
+              <>
+                {transaction.vendor && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Vendor</p>
+                    <Link
+                      href={`/vendors/${transaction.vendor.id}`}
+                      className="font-medium hover:underline"
+                    >
+                      {transaction.vendor.name}
+                    </Link>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-muted-foreground">Supplier</p>
+                  <p className="font-medium">{transaction.supplier || '-'}</p>
+                </div>
+              </>
             )}
 
             {/* Adjustment-specific info */}

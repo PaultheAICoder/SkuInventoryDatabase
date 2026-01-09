@@ -41,6 +41,11 @@ interface LocationOption {
   name: string
 }
 
+interface VendorOption {
+  id: string
+  name: string
+}
+
 // Initial values that can be passed to pre-populate the form
 // All fields are optional to support partial pre-fill
 export interface QuickEntryFormInitialValues {
@@ -49,6 +54,7 @@ export interface QuickEntryFormInitialValues {
   componentId?: string
   quantity?: number
   supplier?: string
+  vendorId?: string
   date?: string  // YYYY-MM-DD format
   locationId?: string
   notes?: string
@@ -94,11 +100,13 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
   const [isLoadingComponents, setIsLoadingComponents] = useState(true)
   const [isLoadingSkus, setIsLoadingSkus] = useState(true)
   const [isLoadingLocations, setIsLoadingLocations] = useState(true)
+  const [isLoadingVendors, setIsLoadingVendors] = useState(true)
 
   // Options
   const [components, setComponents] = useState<ComponentOption[]>([])
   const [skus, setSkus] = useState<SKUOption[]>([])
   const [locations, setLocations] = useState<LocationOption[]>([])
+  const [vendors, setVendors] = useState<VendorOption[]>([])
 
   // Inbound form data (receiving components)
   const [inboundFormData, setInboundFormData] = useState({
@@ -106,6 +114,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     componentId: '',
     quantity: '',
     supplier: '',
+    vendorId: '',
     costPerUnit: '',
     locationId: '',
     lotNumber: '',
@@ -168,12 +177,13 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     // Pre-fill from initialValues prop (for "Edit manually" flow)
     if (initialValues) {
       // Pre-fill inbound form
-      if (initialValues.componentId || initialValues.quantity !== undefined || initialValues.supplier || initialValues.date || initialValues.notes) {
+      if (initialValues.componentId || initialValues.quantity !== undefined || initialValues.supplier || initialValues.vendorId || initialValues.date || initialValues.notes) {
         setInboundFormData((prev) => ({
           ...prev,
           componentId: initialValues.componentId || prev.componentId,
           quantity: initialValues.quantity !== undefined ? initialValues.quantity.toString() : prev.quantity,
           supplier: initialValues.supplier || prev.supplier,
+          vendorId: initialValues.vendorId || prev.vendorId,
           date: initialValues.date || prev.date,
           locationId: initialValues.locationId || prev.locationId,
           notes: initialValues.notes || prev.notes,
@@ -288,11 +298,36 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     }
   }, [])
 
+  const fetchVendors = useCallback(async () => {
+    setIsLoadingVendors(true)
+    try {
+      const res = await fetch('/api/vendors?isActive=true&pageSize=100')
+      if (res.ok) {
+        const data = await res.json()
+        setVendors(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch vendors:', err)
+    } finally {
+      setIsLoadingVendors(false)
+    }
+  }, [])
+
+  // Auto-populate supplier when vendor is selected
+  const handleVendorChange = (vendorId: string) => {
+    setInboundFormData((prev) => ({ ...prev, vendorId }))
+    const selectedVendor = vendors.find((v) => v.id === vendorId)
+    if (selectedVendor && !inboundFormData.supplier) {
+      setInboundFormData((prev) => ({ ...prev, supplier: selectedVendor.name }))
+    }
+  }
+
   useEffect(() => {
     fetchComponents()
     fetchSkus()
     fetchLocations()
-  }, [fetchComponents, fetchSkus, fetchLocations])
+    fetchVendors()
+  }, [fetchComponents, fetchSkus, fetchLocations, fetchVendors])
 
   // Get selected component for adjustment preview
   const selectedAdjustmentComponent = components.find((c) => c.id === adjustmentFormData.componentId)
@@ -326,6 +361,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
             date: inboundFormData.date,
             quantity: parseFloat(inboundFormData.quantity),
             supplier: inboundFormData.supplier,
+            vendorId: inboundFormData.vendorId || undefined,
             costPerUnit: inboundFormData.costPerUnit ? parseFractionOrNumber(inboundFormData.costPerUnit) ?? undefined : undefined,
             locationId: inboundFormData.locationId || undefined,
             lotNumber: inboundFormData.lotNumber || undefined,
@@ -373,6 +409,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
           date: inboundFormData.date,
           quantity: parseFloat(inboundFormData.quantity),
           supplier: inboundFormData.supplier,
+          vendorId: inboundFormData.vendorId || undefined,
           costPerUnit: inboundFormData.costPerUnit ? parseFractionOrNumber(inboundFormData.costPerUnit) ?? undefined : undefined,
           locationId: inboundFormData.locationId || undefined,
           lotNumber: inboundFormData.lotNumber || undefined,
@@ -487,6 +524,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
         componentId: '',
         quantity: '',
         supplier: '',
+        vendorId: '',
         costPerUnit: '',
         locationId: '',
         lotNumber: '',
@@ -639,6 +677,28 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
                   onChange={(e) => setInboundFormData((prev) => ({ ...prev, quantity: e.target.value }))}
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="receipt-vendor" className="text-right">
+                  Vendor
+                </Label>
+                <Select
+                  value={inboundFormData.vendorId}
+                  onValueChange={handleVendorChange}
+                  disabled={isLoadingVendors}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder={isLoadingVendors ? 'Loading...' : 'Select vendor (optional)'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-4 items-center gap-4">

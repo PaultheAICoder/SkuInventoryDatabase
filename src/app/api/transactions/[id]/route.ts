@@ -70,6 +70,12 @@ export async function GET(
             type: true,
           },
         },
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         lines: {
           include: {
             component: {
@@ -152,6 +158,8 @@ export async function GET(
         unitBomCost: transaction.unitBomCost?.toString() ?? null,
         totalBomCost: transaction.totalBomCost?.toString() ?? null,
         supplier: transaction.supplier,
+        vendorId: transaction.vendorId,
+        vendor: transaction.vendor,
         reason: transaction.reason,
         notes: transaction.notes,
         defectCount: transaction.defectCount,

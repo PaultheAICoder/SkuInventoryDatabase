@@ -44,12 +44,15 @@ export function ReceiptDialog({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
+  const [vendors, setVendors] = useState<Array<{ id: string; name: string }>>([])
   const [isLoadingLocations, setIsLoadingLocations] = useState(false)
+  const [isLoadingVendors, setIsLoadingVendors] = useState(false)
 
   const [formData, setFormData] = useState({
     date: toLocalDateString(new Date()),
     quantity: '',
     supplier: '',
+    vendorId: '',
     costPerUnit: currentCost,
     updateComponentCost: false,
     notes: '',
@@ -61,6 +64,7 @@ export function ReceiptDialog({
   useEffect(() => {
     if (open) {
       fetchLocations()
+      fetchVendors()
       // Pre-select brand's default location if available
       if (brandId) {
         fetchBrandDefaultLocation(brandId).then((defaultLocId) => {
@@ -87,6 +91,30 @@ export function ReceiptDialog({
     }
   }
 
+  const fetchVendors = async () => {
+    setIsLoadingVendors(true)
+    try {
+      const res = await fetch('/api/vendors?isActive=true&pageSize=100')
+      if (res.ok) {
+        const data = await res.json()
+        setVendors(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch vendors:', err)
+    } finally {
+      setIsLoadingVendors(false)
+    }
+  }
+
+  // Auto-populate supplier when vendor is selected
+  const handleVendorChange = (vendorId: string) => {
+    setFormData((prev) => ({ ...prev, vendorId }))
+    const selectedVendor = vendors.find((v) => v.id === vendorId)
+    if (selectedVendor && !formData.supplier) {
+      setFormData((prev) => ({ ...prev, supplier: selectedVendor.name }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -101,6 +129,7 @@ export function ReceiptDialog({
           date: formData.date,
           quantity: parseFloat(formData.quantity),
           supplier: formData.supplier,
+          vendorId: formData.vendorId || undefined,
           costPerUnit: formData.costPerUnit ? parseFloat(formData.costPerUnit) : undefined,
           updateComponentCost: formData.updateComponentCost,
           notes: formData.notes || null,
@@ -123,6 +152,7 @@ export function ReceiptDialog({
         date: toLocalDateString(new Date()),
         quantity: '',
         supplier: '',
+        vendorId: '',
         costPerUnit: currentCost,
         updateComponentCost: false,
         notes: '',
@@ -184,6 +214,28 @@ export function ReceiptDialog({
                 onChange={(e) => setFormData((prev) => ({ ...prev, quantity: e.target.value }))}
                 required
               />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="vendor" className="text-right">
+                Vendor
+              </Label>
+              <Select
+                value={formData.vendorId}
+                onValueChange={handleVendorChange}
+                disabled={isLoadingVendors}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={isLoadingVendors ? 'Loading...' : 'Select vendor (optional)'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-4 items-center gap-4">
