@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toLocalDateString } from '@/lib/utils'
+import { fetchBrandDefaultLocation } from '@/lib/brand-utils'
 
 interface FinishedGoodsAdjustmentDialogProps {
   open: boolean
@@ -27,6 +28,7 @@ interface FinishedGoodsAdjustmentDialogProps {
   skuId: string
   skuName: string
   currentQuantity: number
+  brandId?: string
 }
 
 const ADJUSTMENT_REASONS = [
@@ -43,6 +45,7 @@ export function FinishedGoodsAdjustmentDialog({
   skuId,
   skuName,
   currentQuantity,
+  brandId,
 }: FinishedGoodsAdjustmentDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,8 +64,16 @@ export function FinishedGoodsAdjustmentDialog({
   useEffect(() => {
     if (open) {
       fetchLocations()
+      // Pre-select brand's default location if available
+      if (brandId) {
+        fetchBrandDefaultLocation(brandId).then((defaultLocId) => {
+          if (defaultLocId) {
+            setFormData((prev) => ({ ...prev, locationId: defaultLocId }))
+          }
+        })
+      }
     }
-  }, [open])
+  }, [open, brandId])
 
   const fetchLocations = async () => {
     setIsLoadingLocations(true)

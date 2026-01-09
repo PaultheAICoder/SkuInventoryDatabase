@@ -319,6 +319,7 @@ export default function SKUDetailPage() {
             }
           }}
           preselectedSkuId={skuId}
+          brandId={session?.user?.selectedBrandId ?? undefined}
         />
       )}
 
@@ -338,6 +339,7 @@ export default function SKUDetailPage() {
             skuId={skuId}
             skuName={sku.name}
             currentQuantity={sku.finishedGoodsInventory?.totalQuantity ?? 0}
+            brandId={session?.user?.selectedBrandId ?? undefined}
           />
           <FinishedGoodsReceiptDialog
             open={fgReceiptDialogOpen}
@@ -352,6 +354,7 @@ export default function SKUDetailPage() {
             skuId={skuId}
             skuName={sku.name}
             currentQuantity={sku.finishedGoodsInventory?.totalQuantity ?? 0}
+            brandId={session?.user?.selectedBrandId ?? undefined}
           />
         </>
       )}

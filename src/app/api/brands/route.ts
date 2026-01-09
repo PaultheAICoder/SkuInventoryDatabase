@@ -73,6 +73,13 @@ export async function GET(request: NextRequest) {
         name: true,
         isActive: true,
         companyId: true,
+        defaultLocationId: true,
+        defaultLocation: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         company: {
           select: {
             id: true,
@@ -104,6 +111,8 @@ export async function GET(request: NextRequest) {
         companyName: brand.company?.name,
         componentCount: brand._count.components,
         skuCount: brand._count.skus,
+        defaultLocationId: brand.defaultLocationId,
+        defaultLocationName: brand.defaultLocation?.name ?? null,
         createdAt: brand.createdAt.toISOString(),
         updatedAt: brand.updatedAt.toISOString(),
       })),
@@ -152,7 +161,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { name } = validation.data
+    const { name, defaultLocationId } = validation.data
+
+    // Verify location belongs to company if provided
+    if (defaultLocationId) {
+      const location = await prisma.location.findFirst({
+        where: { id: defaultLocationId, companyId: selectedCompanyId, isActive: true }
+      })
+      if (!location) {
+        return NextResponse.json({ error: 'Invalid location' }, { status: 400 })
+      }
+    }
 
     // Check if name already exists for this company
     const existingBrand = await prisma.brand.findFirst({
@@ -174,11 +193,16 @@ export async function POST(request: NextRequest) {
       data: {
         companyId: selectedCompanyId,
         name,
+        defaultLocationId: defaultLocationId || null,
       },
       select: {
         id: true,
         name: true,
         isActive: true,
+        defaultLocationId: true,
+        defaultLocation: {
+          select: { id: true, name: true },
+        },
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -198,6 +222,8 @@ export async function POST(request: NextRequest) {
           isActive: brand.isActive,
           componentCount: brand._count.components,
           skuCount: brand._count.skus,
+          defaultLocationId: brand.defaultLocationId,
+          defaultLocationName: brand.defaultLocation?.name ?? null,
           createdAt: brand.createdAt.toISOString(),
           updatedAt: brand.updatedAt.toISOString(),
         },

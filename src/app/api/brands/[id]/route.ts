@@ -40,6 +40,10 @@ export async function GET(
         id: true,
         name: true,
         isActive: true,
+        defaultLocationId: true,
+        defaultLocation: {
+          select: { id: true, name: true },
+        },
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -62,6 +66,8 @@ export async function GET(
         isActive: brand.isActive,
         componentCount: brand._count.components,
         skuCount: brand._count.skus,
+        defaultLocationId: brand.defaultLocationId,
+        defaultLocationName: brand.defaultLocation?.name ?? null,
         createdAt: brand.createdAt.toISOString(),
         updatedAt: brand.updatedAt.toISOString(),
       },
@@ -161,11 +167,24 @@ export async function PATCH(
       }
     }
 
+    // Validate defaultLocationId if provided (can be null to clear, or a valid UUID)
+    if (validation.data.defaultLocationId !== undefined) {
+      if (validation.data.defaultLocationId !== null) {
+        const location = await prisma.location.findFirst({
+          where: { id: validation.data.defaultLocationId, companyId: selectedCompanyId, isActive: true }
+        })
+        if (!location) {
+          return NextResponse.json({ error: 'Invalid location' }, { status: 400 })
+        }
+      }
+    }
+
     // Prepare update data
     const updateData: Parameters<typeof prisma.brand.update>[0]['data'] = {}
 
     if (validation.data.name) updateData.name = validation.data.name
     if (validation.data.isActive !== undefined) updateData.isActive = validation.data.isActive
+    if (validation.data.defaultLocationId !== undefined) updateData.defaultLocationId = validation.data.defaultLocationId
 
     // Update brand
     const brand = await prisma.brand.update({
@@ -175,6 +194,10 @@ export async function PATCH(
         id: true,
         name: true,
         isActive: true,
+        defaultLocationId: true,
+        defaultLocation: {
+          select: { id: true, name: true },
+        },
         createdAt: true,
         updatedAt: true,
         _count: {
@@ -193,6 +216,8 @@ export async function PATCH(
         isActive: brand.isActive,
         componentCount: brand._count.components,
         skuCount: brand._count.skus,
+        defaultLocationId: brand.defaultLocationId,
+        defaultLocationName: brand.defaultLocation?.name ?? null,
         createdAt: brand.createdAt.toISOString(),
         updatedAt: brand.updatedAt.toISOString(),
       },

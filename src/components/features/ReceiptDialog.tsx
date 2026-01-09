@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toLocalDateString } from '@/lib/utils'
+import { fetchBrandDefaultLocation } from '@/lib/brand-utils'
 
 interface ReceiptDialogProps {
   open: boolean
@@ -28,6 +29,7 @@ interface ReceiptDialogProps {
   componentId: string
   componentName: string
   currentCost: string
+  brandId?: string
 }
 
 export function ReceiptDialog({
@@ -36,6 +38,7 @@ export function ReceiptDialog({
   componentId,
   componentName,
   currentCost,
+  brandId,
 }: ReceiptDialogProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -58,8 +61,16 @@ export function ReceiptDialog({
   useEffect(() => {
     if (open) {
       fetchLocations()
+      // Pre-select brand's default location if available
+      if (brandId) {
+        fetchBrandDefaultLocation(brandId).then((defaultLocId) => {
+          if (defaultLocId) {
+            setFormData((prev) => ({ ...prev, locationId: defaultLocId }))
+          }
+        })
+      }
     }
-  }, [open])
+  }, [open, brandId])
 
   const fetchLocations = async () => {
     setIsLoadingLocations(true)

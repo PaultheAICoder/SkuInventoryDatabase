@@ -403,6 +403,7 @@ export default function ComponentDetailPage() {
         componentId={component.id}
         componentName={component.name}
         currentCost={component.costPerUnit}
+        brandId={session?.user?.selectedBrandId ?? undefined}
       />
       <AdjustmentDialog
         open={adjustmentDialogOpen}
@@ -413,6 +414,7 @@ export default function ComponentDetailPage() {
         componentId={component.id}
         componentName={component.name}
         currentQuantity={component.quantityOnHand}
+        brandId={session?.user?.selectedBrandId ?? undefined}
       />
       <TransferDialog
         open={transferDialogOpen}

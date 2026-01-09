@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toLocalDateString } from '@/lib/utils'
+import { fetchBrandDefaultLocation } from '@/lib/brand-utils'
 
 interface FinishedGoodsReceiptDialogProps {
   open: boolean
@@ -27,6 +28,7 @@ interface FinishedGoodsReceiptDialogProps {
   skuId: string
   skuName: string
   currentQuantity: number
+  brandId?: string
 }
 
 export function FinishedGoodsReceiptDialog({
@@ -35,6 +37,7 @@ export function FinishedGoodsReceiptDialog({
   skuId,
   skuName,
   currentQuantity,
+  brandId,
 }: FinishedGoodsReceiptDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,8 +56,16 @@ export function FinishedGoodsReceiptDialog({
   useEffect(() => {
     if (open) {
       fetchLocations()
+      // Pre-select brand's default location if available
+      if (brandId) {
+        fetchBrandDefaultLocation(brandId).then((defaultLocId) => {
+          if (defaultLocId) {
+            setFormData((prev) => ({ ...prev, locationId: defaultLocId }))
+          }
+        })
+      }
     }
-  }, [open])
+  }, [open, brandId])
 
   const fetchLocations = async () => {
     setIsLoadingLocations(true)

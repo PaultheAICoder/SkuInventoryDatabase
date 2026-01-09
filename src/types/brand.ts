@@ -3,6 +3,7 @@ import { z } from 'zod'
 // Brand create schema (admin only)
 export const createBrandSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less'),
+  defaultLocationId: z.string().uuid('Invalid location ID').nullable().optional(),
 })
 
 export type CreateBrandInput = z.infer<typeof createBrandSchema>
@@ -11,6 +12,7 @@ export type CreateBrandInput = z.infer<typeof createBrandSchema>
 export const updateBrandSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100).optional(),
   isActive: z.boolean().optional(),
+  defaultLocationId: z.string().uuid('Invalid location ID').nullable().optional(),
 })
 
 export type UpdateBrandInput = z.infer<typeof updateBrandSchema>
@@ -43,6 +45,8 @@ export interface BrandResponse {
   companyName?: string
   componentCount: number
   skuCount: number
+  defaultLocationId: string | null
+  defaultLocationName: string | null
   createdAt: string
   updatedAt: string
 }

@@ -1,12 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { BrandResponse } from '@/types/brand'
 
 interface BrandFormProps {
@@ -19,11 +26,33 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
   const { update: updateSession } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false)
 
   const [formData, setFormData] = useState({
     name: brand?.name ?? '',
     isActive: brand?.isActive ?? true,
+    defaultLocationId: brand?.defaultLocationId ?? '',
   })
+
+  useEffect(() => {
+    fetchLocations()
+  }, [])
+
+  const fetchLocations = async () => {
+    setIsLoadingLocations(true)
+    try {
+      const res = await fetch('/api/locations?isActive=true&pageSize=50')
+      if (res.ok) {
+        const data = await res.json()
+        setLocations(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch locations:', err)
+    } finally {
+      setIsLoadingLocations(false)
+    }
+  }
 
   const isEditing = !!brand
 
@@ -39,6 +68,7 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
       // Build request body
       const body: Record<string, unknown> = {
         name: formData.name,
+        defaultLocationId: formData.defaultLocationId || null,
       }
 
       if (isEditing) {
@@ -113,6 +143,30 @@ export function BrandForm({ brand, onSuccess }: BrandFormProps) {
               required
               maxLength={100}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="defaultLocation">Default Location</Label>
+            <Select
+              value={formData.defaultLocationId}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, defaultLocationId: value === 'none' ? '' : value }))}
+              disabled={isLoadingLocations}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'No default location'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No default location</SelectItem>
+                {locations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              This location will be pre-selected when creating transactions for this brand.
+            </p>
           </div>
 
           {isEditing && (

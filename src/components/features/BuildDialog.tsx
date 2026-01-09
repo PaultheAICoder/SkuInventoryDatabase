@@ -22,6 +22,7 @@ import {
 import { AlertTriangle, Package } from 'lucide-react'
 import type { InsufficientInventoryItem } from '@/types/transaction'
 import { toLocalDateString } from '@/lib/utils'
+import { fetchBrandDefaultLocation } from '@/lib/brand-utils'
 
 interface SKUOption {
   id: string
@@ -55,9 +56,10 @@ interface BuildDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   preselectedSkuId?: string
+  brandId?: string
 }
 
-export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialogProps) {
+export function BuildDialog({ open, onOpenChange, preselectedSkuId, brandId }: BuildDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingSkus, setIsLoadingSkus] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -117,8 +119,16 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         ...prev,
         skuId: preselectedSkuId || '',
       }))
+      // Pre-select brand's default location if available
+      if (brandId) {
+        fetchBrandDefaultLocation(brandId).then((defaultLocId) => {
+          if (defaultLocId) {
+            setFormData((prev) => ({ ...prev, locationId: defaultLocId }))
+          }
+        })
+      }
     }
-  }, [open, preselectedSkuId, fetchLocations])
+  }, [open, preselectedSkuId, brandId, fetchLocations])
 
   const fetchSkus = async () => {
     setIsLoadingSkus(true)
