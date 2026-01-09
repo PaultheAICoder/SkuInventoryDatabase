@@ -16,6 +16,7 @@ import {
 import { toast } from 'sonner'
 import type { ComponentResponse } from '@/types/component'
 import { parseApiError, type FieldErrors } from '@/lib/api-errors'
+import { parseFractionOrNumber } from '@/lib/utils'
 
 interface CategoryOption {
   value: string
@@ -93,7 +94,7 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          costPerUnit: parseFloat(formData.costPerUnit),
+          costPerUnit: parseFractionOrNumber(formData.costPerUnit) ?? 0,
           reorderPoint: parseInt(formData.reorderPoint, 10),
           leadTimeDays: parseInt(formData.leadTimeDays, 10),
           category: formData.category || null,
@@ -227,11 +228,10 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
               <Label htmlFor="costPerUnit">Cost per Unit ($)</Label>
               <Input
                 id="costPerUnit"
-                type="number"
-                step="0.000001"
-                min="0"
+                type="text"
                 value={formData.costPerUnit}
                 onChange={(e) => setFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))}
+                placeholder="e.g., 0.02, 1/45"
               />
             </div>
 

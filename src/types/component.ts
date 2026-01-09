@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseFractionOrNumber } from '@/lib/utils'
 
 // Component trend data point for sparkline visualization
 export interface ComponentTrendPoint {
@@ -16,7 +17,33 @@ export const createComponentSchema = z.object({
     .regex(/^[a-zA-Z0-9\-_]+$/, 'SKU code can only contain letters, numbers, hyphens, and underscores'),
   category: z.string().max(50).optional().nullable(),
   unitOfMeasure: z.string().max(20).default('each'),
-  costPerUnit: z.coerce.number().nonnegative('Cost must be non-negative').default(0),
+  costPerUnit: z
+    .union([z.string(), z.number()])
+    .transform((val, ctx) => {
+      // If already a number, validate it directly
+      if (typeof val === 'number') {
+        if (isNaN(val) || val < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Cost must be a non-negative number',
+          })
+          return z.NEVER
+        }
+        return val
+      }
+
+      // Parse string (fraction or decimal)
+      const parsed = parseFractionOrNumber(val)
+      if (parsed === null || parsed < 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Cost must be a non-negative number or fraction (e.g., "0.02", "1/45")',
+        })
+        return z.NEVER
+      }
+      return parsed
+    })
+    .default(0),
   reorderPoint: z.coerce.number().int().nonnegative('Reorder point must be non-negative').default(0),
   leadTimeDays: z.coerce.number().int().nonnegative('Lead time must be non-negative').default(0),
   notes: z.string().optional().nullable(),
