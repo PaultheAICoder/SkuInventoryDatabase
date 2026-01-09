@@ -59,18 +59,22 @@ const mainNavigation = [
   { name: 'Change Log', href: '/change-log', icon: History },
 ]
 
-// Settings sub-navigation items
-const settingsNavigation = [
-  { name: 'General', href: '/settings', icon: Settings },
-  { name: 'Import', href: '/import', icon: Upload },
-  { name: 'Users', href: '/settings/users', icon: Users },
+// Admin navigation items (company/brand management)
+const adminNavigation = [
   { name: 'Locations', href: '/settings/locations', icon: MapPin },
   { name: 'Brands', href: '/settings/brands', icon: Tag },
   { name: 'Categories', href: '/settings/categories', icon: FolderTree },
-  { name: 'Vendors', href: '/settings/vendors', icon: Truck },
   { name: 'Companies', href: '/settings/companies', icon: Building2 },
+  { name: 'Vendors', href: '/settings/vendors', icon: Truck },
+  { name: 'Users', href: '/settings/users', icon: Users },
+  { name: 'Import', href: '/import', icon: Upload },
   { name: 'Integrations', href: '/integrations', icon: Plug },
   { name: 'Docker Health', href: '/admin/docker-health', icon: Activity },
+]
+
+// Settings sub-navigation items (user-level)
+const settingsNavigation = [
+  { name: 'General', href: '/settings', icon: Settings },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -80,15 +84,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [chatbotOpen, setChatbotOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
 
   // Settings menu should be visible if user is admin in ANY company (cross-company feature)
   const isAdminInAnyCompany = session?.user?.companies?.some(c => c.role === 'admin') ?? false
 
-  // Auto-expand settings if current path is in settings
+  // Auto-expand admin/settings if current path is in those sections
   useEffect(() => {
+    const isAdminPath = adminNavigation.some(
+      (item) => pathname === item.href || pathname.startsWith(item.href + '/')
+    )
     const isSettingsPath = settingsNavigation.some(
       (item) => pathname === item.href || pathname.startsWith(item.href + '/')
     )
+    if (isAdminPath) {
+      setAdminOpen(true)
+    }
     if (isSettingsPath) {
       setSettingsOpen(true)
     }
@@ -163,6 +174,55 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )
           })}
+
+          {/* Admin section (admin only) */}
+          {isAdminInAnyCompany && (
+            <>
+              <button
+                onClick={() => setAdminOpen(!adminOpen)}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors w-full text-left',
+                  adminOpen
+                    ? 'bg-muted text-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5" />
+                  Admin
+                </div>
+                {adminOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </button>
+
+              {adminOpen && (
+                <div className="ml-4 flex flex-col gap-1 border-l pl-2">
+                  {adminNavigation.map((item) => {
+                    const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        )}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {item.name}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Settings section (admin only) */}
           {isAdminInAnyCompany && (
