@@ -23,10 +23,6 @@ import { AlertTriangle, Package } from 'lucide-react'
 import type { InsufficientInventoryItem } from '@/types/transaction'
 import { toLocalDateString } from '@/lib/utils'
 
-// Sentinel value for "no selection" in Select components
-// Radix UI Select requires non-empty string values
-const EMPTY_VALUE = '__none__'
-
 interface SKUOption {
   id: string
   name: string
@@ -89,8 +85,6 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
     defectNotes: '',
     affectedUnits: '',
     locationId: '',
-    outputLocationId: '',
-    outputQuantity: '',
     allowExpiredLots: false,
   })
   const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([])
@@ -106,16 +100,6 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         const data = await res.json()
         const locationsList = data.data || []
         setLocations(locationsList)
-
-        // Pre-select first location as output location if none selected
-        if (locationsList.length > 0) {
-          setFormData(prev => {
-            if (!prev.outputLocationId) {
-              return { ...prev, outputLocationId: locationsList[0].id }
-            }
-            return prev
-          })
-        }
       }
     } catch (err) {
       console.error('Failed to fetch locations:', err)
@@ -225,8 +209,6 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
           affectedUnits: formData.affectedUnits ? parseInt(formData.affectedUnits) : null,
           allowInsufficientInventory: forceSubmit,
           locationId: formData.locationId || undefined,
-          outputLocationId: formData.outputLocationId || undefined,
-          outputQuantity: formData.outputQuantity ? parseInt(formData.outputQuantity) : undefined,
           allowExpiredLots: forceSubmit ? formData.allowExpiredLots : false,
         }),
       })
@@ -270,8 +252,6 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
         defectNotes: '',
         affectedUnits: '',
         locationId: '',
-        outputLocationId: '',
-        outputQuantity: '',
         allowExpiredLots: false,
       })
       setInsufficientItems([])
@@ -299,8 +279,6 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
       if (err instanceof Error) {
         if (err.message.includes('company')) {
           userMessage = 'Please select a company from the sidebar and try again'
-        } else if (err.message.includes('output location') || err.message.includes('default location')) {
-          userMessage = 'No default location is set for your company. Please select an Output Location above, or set a default location in Company Settings.'
         } else if (err.message.includes('network') || err.message.includes('fetch')) {
           userMessage = 'Network error. Please check your connection and try again'
         } else {
@@ -532,69 +510,28 @@ export function BuildDialog({ open, onOpenChange, preselectedSkuId }: BuildDialo
             {/* Location Settings Section */}
             <div className="border-t pt-6 mt-2 space-y-4">
               <p className="text-sm font-medium text-foreground">Location Settings</p>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="location">Source Location</Label>
-                  <Select
-                    value={formData.locationId}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
-                    disabled={isLoadingLocations}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((loc) => (
-                        <SelectItem key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="outputLocation">Output Location</Label>
-                  <Select
-                    value={formData.outputLocationId || EMPTY_VALUE}
-                    onValueChange={(value) => setFormData((prev) => ({
-                      ...prev,
-                      outputLocationId: value === EMPTY_VALUE ? '' : value
-                    }))}
-                    disabled={isLoadingLocations}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Select output location'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={EMPTY_VALUE}>No finished goods output (not recommended)</SelectItem>
-                      {locations.map((loc) => (
-                        <SelectItem key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Source Location</Label>
+                <Select
+                  value={formData.locationId}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, locationId: value }))}
+                  disabled={isLoadingLocations}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Built items will remain at this location. Use a transfer transaction to move items elsewhere.
+                </p>
               </div>
-
-              {formData.outputLocationId && (
-                <div className="space-y-2">
-                  <Label htmlFor="outputQuantity">Output Quantity</Label>
-                  <Input
-                    id="outputQuantity"
-                    type="number"
-                    step="1"
-                    min="1"
-                    className="max-w-[200px]"
-                    placeholder={`Defaults to ${formData.unitsToBuild || 'units built'}`}
-                    value={formData.outputQuantity}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, outputQuantity: e.target.value }))
-                    }
-                  />
-                </div>
-              )}
             </div>
 
             {/* Defect Tracking (collapsible) */}
