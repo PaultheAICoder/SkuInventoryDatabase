@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   TrendingUp,
   TrendingDown,
@@ -20,6 +21,7 @@ import {
   getConfidenceLevelLabel,
   calculateImprovementPercentage,
 } from '@/lib/recommendation-utils'
+import { getConfidenceDescription } from '@/services/recommendations/confidence-scoring'
 import { AcceptRejectModal } from './AcceptRejectModal'
 
 /**
@@ -220,9 +222,18 @@ export function RecommendationCard({
                 {getRecommendationTypeLabel(recommendation.type)}
               </Badge>
             </div>
-            <Badge variant="outline" className={confidenceColors[recommendation.confidence]}>
-              {getConfidenceLevelLabel(recommendation.confidence)}
-            </Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className={`${confidenceColors[recommendation.confidence]} cursor-help`}>
+                    {getConfidenceLevelLabel(recommendation.confidence)}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>{getConfidenceDescription(recommendation.confidence)}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <CardTitle className="text-lg mt-2">{displayName}</CardTitle>
           {recommendation.campaign && recommendation.keyword && (
