@@ -15,8 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
-import type { TransactionResponse } from '@/types/transaction'
+import { ArrowLeft, Save, Loader2, Camera } from 'lucide-react'
+import type { TransactionResponse, TransactionPhotoResponse } from '@/types/transaction'
+import { TransactionPhotoGallery } from '@/components/features/TransactionPhotoGallery'
+import { TransactionPhotoUpload } from '@/components/features/TransactionPhotoUpload'
 import { salesChannels } from '@/types'
 
 interface ComponentOption {
@@ -63,6 +65,11 @@ export default function EditTransactionPage() {
   const [locations, setLocations] = useState<LocationOption[]>([])
   const [isLoadingRefs, setIsLoadingRefs] = useState(true)
 
+  // Photo state
+  const [photos, setPhotos] = useState<TransactionPhotoResponse[]>([])
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
   // Form state for different transaction types
   const [formData, setFormData] = useState<Record<string, unknown>>({})
 
@@ -95,6 +102,22 @@ export default function EditTransactionPage() {
     }
   }, [])
 
+  // Fetch photos for this transaction
+  const fetchPhotos = useCallback(async () => {
+    setIsLoadingPhotos(true)
+    try {
+      const res = await fetch(`/api/transactions/${id}/photos`)
+      if (res.ok) {
+        const data = await res.json()
+        setPhotos(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch photos:', err)
+    } finally {
+      setIsLoadingPhotos(false)
+    }
+  }, [id])
+
   // Fetch transaction and initialize form
   useEffect(() => {
     async function fetchTransaction() {
@@ -119,7 +142,8 @@ export default function EditTransactionPage() {
 
     fetchTransaction()
     fetchReferenceData()
-  }, [id, fetchReferenceData])
+    fetchPhotos()
+  }, [id, fetchReferenceData, fetchPhotos])
 
   // Initialize form data based on transaction type
   const initializeFormData = (tx: TransactionResponse) => {
@@ -201,6 +225,28 @@ export default function EditTransactionPage() {
   const handleInputChange = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
+
+  const handlePhotoUploaded = useCallback((photo: TransactionPhotoResponse) => {
+    setPhotos((prev) => [...prev, photo])
+    setPhotoError(null)
+  }, [])
+
+  const handlePhotoDelete = useCallback(async (photoId: string) => {
+    try {
+      const res = await fetch(`/api/transactions/photos/${photoId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to delete photo')
+      }
+
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId))
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Failed to delete photo')
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -912,6 +958,46 @@ export default function EditTransactionPage() {
             </Button>
           </CardFooter>
         </form>
+      </Card>
+
+      {/* Photos Section */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Photos
+          </CardTitle>
+          <CardDescription>
+            {photos.length === 0
+              ? 'No photos attached to this transaction'
+              : `${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {photoError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {photoError}
+            </div>
+          )}
+
+          {/* Photo Gallery */}
+          <TransactionPhotoGallery
+            photos={photos}
+            canDelete={true}
+            onDelete={handlePhotoDelete}
+            loading={isLoadingPhotos}
+          />
+
+          {/* Upload Section */}
+          <div className="pt-4 border-t">
+            <h4 className="text-sm font-medium mb-3">Add Photos</h4>
+            <TransactionPhotoUpload
+              transactionId={id}
+              onUploadComplete={handlePhotoUploaded}
+              onError={setPhotoError}
+            />
+          </div>
+        </CardContent>
       </Card>
     </div>
   )

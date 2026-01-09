@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Upload, X, Camera } from 'lucide-react'
 import { salesChannels } from '@/types'
 import { cn, toLocalDateString, parseFractionOrNumber } from '@/lib/utils'
 
@@ -162,6 +162,100 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     shortage: number
   }>>([])
   const [showBuildWarning, setShowBuildWarning] = useState(false)
+
+  // Photo staging for build transactions
+  const [stagedPhotos, setStagedPhotos] = useState<Array<{
+    file: File
+    preview: string
+    caption: string
+  }>>([])
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  // Photo validation constants
+  const MAX_PHOTO_SIZE = 10 * 1024 * 1024 // 10MB
+  const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic']
+
+  // Photo handling functions
+  const validatePhotoFile = (file: File): string | null => {
+    if (file.size > MAX_PHOTO_SIZE) {
+      return `File "${file.name}" is too large. Maximum size is 10MB.`
+    }
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      return `File "${file.name}" has an invalid type. Allowed: JPEG, PNG, WebP, HEIC.`
+    }
+    return null
+  }
+
+  const handlePhotoSelect = (files: FileList | null) => {
+    if (!files) return
+    const fileArray = Array.from(files)
+    const newPhotos: typeof stagedPhotos = []
+
+    for (const file of fileArray) {
+      const error = validatePhotoFile(file)
+      if (error) {
+        setPhotoError(error)
+        continue
+      }
+      newPhotos.push({
+        file,
+        preview: URL.createObjectURL(file),
+        caption: '',
+      })
+    }
+
+    setStagedPhotos(prev => [...prev, ...newPhotos])
+    setPhotoError(null)
+  }
+
+  const removeStagedPhoto = (index: number) => {
+    setStagedPhotos(prev => {
+      const updated = [...prev]
+      URL.revokeObjectURL(updated[index].preview)
+      updated.splice(index, 1)
+      return updated
+    })
+  }
+
+  const updatePhotoCaption = (index: number, caption: string) => {
+    setStagedPhotos(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], caption }
+      return updated
+    })
+  }
+
+  // Upload staged photos after transaction creation
+  const uploadStagedPhotos = async (transactionId: string): Promise<number> => {
+    let uploadedCount = 0
+
+    for (const { file, caption } of stagedPhotos) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        if (caption) {
+          formData.append('caption', caption)
+        }
+
+        const response = await fetch(`/api/transactions/${transactionId}/photos`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (response.ok) {
+          uploadedCount++
+        }
+      } catch (err) {
+        console.error('Failed to upload photo:', err)
+      }
+    }
+
+    // Clean up preview URLs
+    stagedPhotos.forEach(p => URL.revokeObjectURL(p.preview))
+    setStagedPhotos([])
+
+    return uploadedCount
+  }
 
   // Initialize from URL params AND/OR initialValues prop
   useEffect(() => {
@@ -476,6 +570,12 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
         setShowBuildWarning(false)
       }
 
+      // Upload staged photos if this was a build transaction
+      let photoCount = 0
+      if (transactionType === 'build' && stagedPhotos.length > 0 && data?.id) {
+        photoCount = await uploadStagedPhotos(data.id)
+      }
+
       // Success
       let successText = 'Transaction recorded successfully!'
       const isDraft = saveAsDraft
@@ -492,9 +592,10 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
       } else if (transactionType === 'build') {
         const buildableSkus = skus.filter((s) => s.hasActiveBom)
         const sku = buildableSkus.find((s) => s.id === buildFormData.skuId)
+        const photoText = photoCount > 0 ? ` with ${photoCount} photo${photoCount !== 1 ? 's' : ''}` : ''
         successText = isDraft
           ? `Draft saved: Build ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
-          : `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
+          : `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}${photoText}`
       } else {
         const component = components.find((c) => c.id === adjustmentFormData.componentId)
         const sign = adjustmentFormData.adjustmentType === 'add' ? '+' : '-'
@@ -551,6 +652,10 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
       })
       setInsufficientItems([])
       setShowBuildWarning(false)
+      // Clear staged photos
+      stagedPhotos.forEach(p => URL.revokeObjectURL(p.preview))
+      setStagedPhotos([])
+      setPhotoError(null)
     } else {
       setAdjustmentFormData({
         date: today,
@@ -569,6 +674,12 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     setTransactionType(type)
     setSuccessMessage(null)
     setError(null)
+    // Clear staged photos when changing transaction type
+    if (stagedPhotos.length > 0) {
+      stagedPhotos.forEach(p => URL.revokeObjectURL(p.preview))
+      setStagedPhotos([])
+      setPhotoError(null)
+    }
   }
 
   // Render success state
@@ -1231,6 +1342,73 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
                     value={buildFormData.notes}
                     onChange={(e) => setBuildFormData((prev) => ({ ...prev, notes: e.target.value }))}
                   />
+                </div>
+
+                {/* Photos Section for Build Transactions */}
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">
+                    <Camera className="h-4 w-4 inline mr-1" />
+                    Photos
+                  </Label>
+                  <div className="col-span-3 space-y-3">
+                    {photoError && (
+                      <div className="rounded-md bg-destructive/10 p-2 text-sm text-destructive">
+                        {photoError}
+                      </div>
+                    )}
+
+                    {/* Photo preview grid */}
+                    {stagedPhotos.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {stagedPhotos.map((photo, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={photo.preview}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full aspect-square object-cover rounded border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeStagedPhoto(index)}
+                              className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                            <Input
+                              placeholder="Caption (optional)"
+                              value={photo.caption}
+                              onChange={(e) => updatePhotoCaption(index, e.target.value)}
+                              className="mt-1 text-xs"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Add photos button */}
+                    <div>
+                      <input
+                        type="file"
+                        id="build-photos"
+                        multiple
+                        accept={ALLOWED_PHOTO_TYPES.join(',')}
+                        onChange={(e) => handlePhotoSelect(e.target.files)}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById('build-photos')?.click()}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {stagedPhotos.length > 0 ? 'Add More Photos' : 'Add Photos'}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        JPEG, PNG, WebP, or HEIC. Max 10MB per file.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )
