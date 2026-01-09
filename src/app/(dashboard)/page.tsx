@@ -236,9 +236,15 @@ export default function DashboardPage() {
                               </Link>
                             )}
                             {tx.lines.length > 1 && expandedTxId !== tx.id && (
-                              <span className="text-muted-foreground text-xs ml-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleExpand(tx.id)
+                                }}
+                                className="text-muted-foreground text-xs ml-1 hover:text-foreground hover:underline cursor-pointer"
+                              >
                                 +{tx.lines.length - 1} more
-                              </span>
+                              </button>
                             )}
                           </div>
                         </div>
