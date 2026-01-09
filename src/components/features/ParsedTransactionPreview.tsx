@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,14 +21,40 @@ import {
 } from 'lucide-react'
 import type { ConfidenceLevel, ParseTransactionResponse } from '@/types/parser'
 import { formatDateString, toLocalDateString } from '@/lib/utils'
+import { EditablePreviewField, EditableFieldOption } from './EditablePreviewField'
+
+// Adjustment reasons matching QuickEntryForm
+const ADJUSTMENT_REASONS: EditableFieldOption[] = [
+  { value: 'Inventory count correction', label: 'Inventory count correction' },
+  { value: 'Damaged goods', label: 'Damaged goods' },
+  { value: 'Lost/missing', label: 'Lost/missing' },
+  { value: 'Sample/testing', label: 'Sample/testing' },
+  { value: 'Returned to supplier', label: 'Returned to supplier' },
+  { value: 'Other', label: 'Other (specify in notes)' },
+]
+
+export interface FieldOverrides {
+  supplier?: string
+  locationId?: string
+  reason?: string
+}
 
 interface ParsedTransactionPreviewProps {
   result: ParseTransactionResponse
-  onConfirm: () => void
+  onConfirm: (overrides?: FieldOverrides) => void
   onEdit: () => void
   onCancel: () => void
-  onSaveAsDraft?: () => void
+  onSaveAsDraft?: (overrides?: FieldOverrides) => void
   isSubmitting?: boolean
+}
+
+interface LocationOption {
+  id: string
+  name: string
+}
+
+interface SupplierOption {
+  value: string
 }
 
 function ConfidenceIcon({ level }: { level: ConfidenceLevel }) {
@@ -60,6 +87,103 @@ export function ParsedTransactionPreview({
 }: ParsedTransactionPreviewProps) {
   const { parsed, suggestions } = result
 
+  // Local state for editable field values
+  const [supplierValue, setSupplierValue] = useState<string>(parsed.supplier?.value || '')
+  const [locationId, setLocationId] = useState<string>('')
+  const [locationName, setLocationName] = useState<string>(parsed.location?.value || '')
+  const [reasonValue, setReasonValue] = useState<string>(parsed.reason?.value || '')
+
+  // Data loading state
+  const [locations, setLocations] = useState<LocationOption[]>([])
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true)
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
+
+  // Debounce ref for supplier search
+  const supplierDebounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Fetch locations on mount
+  useEffect(() => {
+    const fetchLocations = async () => {
+      setIsLoadingLocations(true)
+      try {
+        const res = await fetch('/api/locations?isActive=true&pageSize=50')
+        if (res.ok) {
+          const data = await res.json()
+          setLocations(data.data || [])
+
+          // If parsed location name exists, try to find matching location ID
+          if (parsed.location?.value) {
+            const matchingLocation = (data.data || []).find(
+              (loc: LocationOption) => loc.name.toLowerCase() === parsed.location?.value?.toLowerCase()
+            )
+            if (matchingLocation) {
+              setLocationId(matchingLocation.id)
+              setLocationName(matchingLocation.name)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch locations:', err)
+      } finally {
+        setIsLoadingLocations(false)
+      }
+    }
+    fetchLocations()
+  }, [parsed.location?.value])
+
+  // Fetch suppliers on mount (only for receipt transactions)
+  useEffect(() => {
+    if (parsed.transactionType.value !== 'receipt') return
+
+    const fetchSuppliers = async () => {
+      setIsLoadingSuppliers(true)
+      try {
+        const res = await fetch('/api/suppliers')
+        if (res.ok) {
+          const data = await res.json()
+          setSuppliers(data.data || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch suppliers:', err)
+      } finally {
+        setIsLoadingSuppliers(false)
+      }
+    }
+    fetchSuppliers()
+  }, [parsed.transactionType.value])
+
+  // Handle supplier search with debounce
+  const handleSupplierSearch = useCallback((query: string) => {
+    if (supplierDebounceRef.current) {
+      clearTimeout(supplierDebounceRef.current)
+    }
+    supplierDebounceRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams()
+        if (query) {
+          params.set('search', query)
+        }
+        const res = await fetch(`/api/suppliers?${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          setSuppliers(data.data || [])
+        }
+      } catch (err) {
+        console.error('Failed to search suppliers:', err)
+      }
+    }, 300)
+  }, [])
+
+  // Handle location change - update both ID and name
+  const handleLocationChange = useCallback((selectedId: string) => {
+    setLocationId(selectedId)
+    const selectedLocation = locations.find((loc) => loc.id === selectedId)
+    if (selectedLocation) {
+      setLocationName(selectedLocation.name)
+    }
+  }, [locations])
+
   const formatDate = (date: Date | string) => {
     const dateStr = typeof date === 'string' ? date : toLocalDateString(date)
     return formatDateString(dateStr, {
@@ -87,12 +211,56 @@ export function ParsedTransactionPreview({
     !parsed.itemId.value ||
     parsed.itemId.confidence === 'low'
 
-  // Check for missing required fields that need user attention
-  const missingRequiredFields =
-    (parsed.transactionType.value === 'adjustment' && !parsed.reason?.value) ||
-    (parsed.transactionType.value === 'receipt' && !parsed.supplier?.value)
+  // Check for missing required fields with override values
+  const isSupplierMissing = parsed.transactionType.value === 'receipt' && !supplierValue
+  const isReasonMissing = parsed.transactionType.value === 'adjustment' && !reasonValue
+
+  const missingRequiredFields = isSupplierMissing || isReasonMissing
 
   const hasSuggestions = suggestions.length > 0
+
+  // Build overrides object for submission
+  const getOverrides = (): FieldOverrides | undefined => {
+    const overrides: FieldOverrides = {}
+
+    if (supplierValue && supplierValue !== parsed.supplier?.value) {
+      overrides.supplier = supplierValue
+    }
+    if (locationId) {
+      overrides.locationId = locationId
+    }
+    if (reasonValue && reasonValue !== parsed.reason?.value) {
+      overrides.reason = reasonValue
+    }
+
+    return Object.keys(overrides).length > 0 ? overrides : undefined
+  }
+
+  // Handle confirm with overrides
+  const handleConfirm = () => {
+    onConfirm(getOverrides())
+  }
+
+  // Handle save as draft with overrides
+  const handleSaveAsDraft = () => {
+    if (onSaveAsDraft) {
+      onSaveAsDraft(getOverrides())
+    }
+  }
+
+  // Prepare options for dropdowns
+  const locationOptions: EditableFieldOption[] = locations.map((loc) => ({
+    value: loc.id,
+    label: loc.name,
+  }))
+
+  const supplierOptions: EditableFieldOption[] = suppliers.map((s) => ({
+    value: s.value,
+    label: s.value,
+  }))
+
+  // Determine if confirm should be disabled
+  const isConfirmDisabled = isSubmitting || !parsed.itemId.value || missingRequiredFields
 
   return (
     <Card className={hasLowConfidence ? 'border-yellow-500' : ''}>
@@ -108,7 +276,7 @@ export function ParsedTransactionPreview({
         )}
         {missingRequiredFields && !hasLowConfidence && (
           <div className="rounded-md bg-orange-50 border border-orange-200 p-2 text-sm text-orange-800 dark:bg-orange-950 dark:border-orange-900 dark:text-orange-200">
-            Some fields will use default values. The form input would allow specifying these explicitly.
+            Please fill in the required fields below before confirming.
           </div>
         )}
       </CardHeader>
@@ -180,48 +348,48 @@ export function ParsedTransactionPreview({
           </div>
         </div>
 
-        {/* Supplier (for receipts) */}
-        {parsed.supplier && parsed.supplier.value && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Supplier</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>{parsed.supplier.value}</span>
-              <ConfidenceIcon level={parsed.supplier.confidence} />
-            </div>
-          </div>
+        {/* Supplier (for receipts) - Now editable */}
+        {parsed.transactionType.value === 'receipt' && (
+          <EditablePreviewField
+            label="Supplier"
+            icon={<Truck className="h-4 w-4" />}
+            value={supplierValue}
+            onChange={setSupplierValue}
+            options={supplierOptions}
+            isLoading={isLoadingSuppliers}
+            onSearch={handleSupplierSearch}
+            placeholder="Select or enter supplier"
+            required={true}
+            allowFreeText={true}
+          />
         )}
 
-        {/* Reason (for adjustments) */}
+        {/* Reason (for adjustments) - Now editable */}
         {parsed.transactionType.value === 'adjustment' && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileQuestion className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Reason</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={!parsed.reason?.value ? 'text-muted-foreground italic' : ''}>
-                {parsed.reason?.value || 'Adjustment (default)'}
-              </span>
-              <ConfidenceIcon level={parsed.reason?.confidence || 'low'} />
-            </div>
-          </div>
+          <EditablePreviewField
+            label="Reason"
+            icon={<FileQuestion className="h-4 w-4" />}
+            value={reasonValue}
+            onChange={setReasonValue}
+            options={ADJUSTMENT_REASONS}
+            placeholder="Select reason"
+            required={true}
+            allowFreeText={false}
+          />
         )}
 
-        {/* Location */}
-        {parsed.location && parsed.location.value && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Location</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>{parsed.location.value}</span>
-              <ConfidenceIcon level={parsed.location.confidence} />
-            </div>
-          </div>
-        )}
+        {/* Location - Now editable for all transaction types */}
+        <EditablePreviewField
+          label="Location"
+          icon={<MapPin className="h-4 w-4" />}
+          value={locationId ? locationName : null}
+          onChange={handleLocationChange}
+          options={locationOptions}
+          isLoading={isLoadingLocations}
+          placeholder="Select location (optional)"
+          required={false}
+          allowFreeText={false}
+        />
 
         {/* Notes */}
         {parsed.notes && parsed.notes.value && (
@@ -267,15 +435,15 @@ export function ParsedTransactionPreview({
           {onSaveAsDraft && (
             <Button
               variant="secondary"
-              onClick={onSaveAsDraft}
+              onClick={handleSaveAsDraft}
               disabled={isSubmitting || !parsed.itemId.value}
             >
               Save as Draft
             </Button>
           )}
           <Button
-            onClick={onConfirm}
-            disabled={isSubmitting || !parsed.itemId.value}
+            onClick={handleConfirm}
+            disabled={isConfirmDisabled}
           >
             <Check className="mr-2 h-4 w-4" />
             {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}

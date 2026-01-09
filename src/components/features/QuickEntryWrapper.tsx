@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, ClipboardList } from 'lucide-react'
 import { QuickEntryForm, type QuickEntryFormInitialValues } from './QuickEntryForm'
 import { ConversationalInput } from './ConversationalInput'
-import { ParsedTransactionPreview } from './ParsedTransactionPreview'
+import { ParsedTransactionPreview, FieldOverrides } from './ParsedTransactionPreview'
 import type { ParseTransactionResponse, ParsedTransaction } from '@/types/parser'
 import { toLocalDateString } from '@/lib/utils'
 
@@ -69,7 +69,10 @@ export function QuickEntryWrapper() {
     setSubmitError(null)
   }
 
-  const submitParsedTransaction = useCallback(async (parsed: ParsedTransaction) => {
+  const submitParsedTransaction = useCallback(async (
+    parsed: ParsedTransaction,
+    overrides?: FieldOverrides
+  ) => {
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -88,7 +91,8 @@ export function QuickEntryWrapper() {
           componentId: parsed.itemId.value,
           date,
           quantity: parsed.quantity.value,
-          supplier: parsed.supplier?.value || 'Unknown',
+          supplier: overrides?.supplier || parsed.supplier?.value || 'Unknown',
+          locationId: overrides?.locationId || undefined,
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
       } else if (transactionType === 'outbound') {
@@ -98,6 +102,7 @@ export function QuickEntryWrapper() {
           date,
           quantity: parsed.quantity.value,
           salesChannel: parsed.salesChannel?.value || 'Generic',
+          locationId: overrides?.locationId || undefined,
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
       } else {
@@ -107,7 +112,8 @@ export function QuickEntryWrapper() {
           componentId: parsed.itemId.value,
           date,
           quantity: -Math.abs(parsed.quantity.value), // Default to negative for adjustments
-          reason: parsed.reason?.value || 'Adjustment',
+          reason: overrides?.reason || parsed.reason?.value || 'Adjustment',
+          locationId: overrides?.locationId || undefined,
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
       }
@@ -135,10 +141,10 @@ export function QuickEntryWrapper() {
     }
   }, [])
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (overrides?: FieldOverrides) => {
     if (!parsedResult) return
 
-    const success = await submitParsedTransaction(parsedResult.parsed)
+    const success = await submitParsedTransaction(parsedResult.parsed, overrides)
     if (success) {
       // Stay in preview mode showing success, or reset for another
     }
