@@ -181,8 +181,30 @@ export interface TransactionLineResponse {
   lot: { id: string; lotNumber: string; expiryDate: string | null } | null
 }
 
+// Transaction photo types
+export interface TransactionPhotoResponse {
+  id: string
+  transactionId: string
+  filename: string
+  mimeType: string
+  fileSize: number
+  caption: string | null
+  sortOrder: number
+  uploadedAt: string
+  uploadedBy: { id: string; name: string }
+  // URL will be generated at runtime (signed URL or public URL)
+  url: string
+  thumbnailUrl?: string
+}
+
+export interface UploadPhotoInput {
+  transactionId: string
+  caption?: string
+}
+
 // Transaction detail response
 export interface TransactionDetailResponse extends TransactionResponse {
   company: { id: string; name: string }
   location?: { id: string; name: string; type: string } | null
+  photos?: TransactionPhotoResponse[]
 }

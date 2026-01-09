@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,10 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil, Trash2 } from 'lucide-react'
+import { Package, Receipt, Minus, Settings, ArrowLeftRight, PackageMinus, Pencil, Trash2, Camera } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
 import { formatDateString } from '@/lib/utils'
+import { TransactionPhotoGallery } from './TransactionPhotoGallery'
+import { TransactionPhotoUpload } from './TransactionPhotoUpload'
+import type { TransactionPhotoResponse } from '@/types/transaction'
 
 interface TransactionLine {
   id: string
@@ -77,6 +80,7 @@ interface TransactionDetailProps {
     createdBy: { id: string; name: string }
     lines: TransactionLine[]
     finishedGoodsLines?: FinishedGoodsLine[]
+    photos?: TransactionPhotoResponse[]
     summary?: {
       componentsConsumed: number
       totalUnitsBuilt: number | null
@@ -137,6 +141,32 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Photo state
+  const [photos, setPhotos] = useState<TransactionPhotoResponse[]>(transaction.photos || [])
+  const [photoError, setPhotoError] = useState<string | null>(null)
+
+  const handlePhotoUploaded = useCallback((photo: TransactionPhotoResponse) => {
+    setPhotos((prev) => [...prev, photo])
+    setPhotoError(null)
+  }, [])
+
+  const handlePhotoDelete = useCallback(async (photoId: string) => {
+    try {
+      const res = await fetch(`/api/transactions/photos/${photoId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.message || 'Failed to delete photo')
+      }
+
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId))
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : 'Failed to delete photo')
+    }
+  }, [])
 
   const handleDelete = async () => {
     setIsDeleting(true)
@@ -512,6 +542,47 @@ export function TransactionDetail({ transaction }: TransactionDetailProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Photos Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Photos
+          </CardTitle>
+          <CardDescription>
+            {photos.length === 0
+              ? 'No photos attached to this transaction'
+              : `${photos.length} photo${photos.length !== 1 ? 's' : ''} attached`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {photoError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {photoError}
+            </div>
+          )}
+
+          {/* Photo Gallery */}
+          <TransactionPhotoGallery
+            photos={photos}
+            canDelete={canEdit}
+            onDelete={handlePhotoDelete}
+          />
+
+          {/* Upload Section (only for users who can edit) */}
+          {canEdit && (
+            <div className="pt-4 border-t">
+              <h4 className="text-sm font-medium mb-3">Add Photos</h4>
+              <TransactionPhotoUpload
+                transactionId={transaction.id}
+                onUploadComplete={handlePhotoUploaded}
+                onError={setPhotoError}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

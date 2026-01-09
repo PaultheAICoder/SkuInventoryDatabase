@@ -35,6 +35,7 @@ export async function cleanupTestData(prisma: PrismaClient): Promise<void> {
   await prisma.defectAlert.deleteMany({}) // Must delete before transactions (FK constraint)
   await prisma.finishedGoodsLine.deleteMany({})
   await prisma.finishedGoodsBalance.deleteMany({}) // New balance table for SKUs
+  await prisma.transactionPhoto.deleteMany({}) // Must delete before transactions (FK constraint)
   await prisma.transactionLine.deleteMany({})
   await prisma.transaction.deleteMany({})
   await prisma.lotBalance.deleteMany({})

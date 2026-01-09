@@ -12,6 +12,7 @@ import {
   updateOutboundSchema,
 } from '@/types/transaction-edit'
 import { toLocalDateString } from '@/lib/utils'
+import { getSignedPhotoUrl, isS3Configured } from '@/services/photo-storage'
 
 export async function GET(
   request: NextRequest,
@@ -101,11 +102,72 @@ export async function GET(
         createdBy: {
           select: { id: true, name: true },
         },
+        photos: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            uploadedBy: { select: { id: true, name: true } },
+          },
+        },
       },
     })
 
     if (!transaction) {
       return NextResponse.json({ error: 'Transaction not found' }, { status: 404 })
+    }
+
+    // Generate signed URLs for photos if S3 is configured
+    let photosWithUrls: Array<{
+      id: string
+      transactionId: string
+      filename: string
+      mimeType: string
+      fileSize: number
+      caption: string | null
+      sortOrder: number
+      uploadedAt: string
+      uploadedBy: { id: string; name: string }
+      url: string
+      thumbnailUrl: string
+    }> = []
+
+    if (transaction.photos.length > 0 && isS3Configured()) {
+      photosWithUrls = await Promise.all(
+        transaction.photos.map(async (photo) => {
+          const thumbKey = photo.s3Key.replace(/\/(\d+_)/, '/thumb_$1')
+          const [url, thumbnailUrl] = await Promise.all([
+            getSignedPhotoUrl(photo.s3Key),
+            getSignedPhotoUrl(thumbKey),
+          ])
+          return {
+            id: photo.id,
+            transactionId: photo.transactionId,
+            filename: photo.filename,
+            mimeType: photo.mimeType,
+            fileSize: photo.fileSize,
+            caption: photo.caption,
+            sortOrder: photo.sortOrder,
+            uploadedAt: photo.uploadedAt.toISOString(),
+            uploadedBy: photo.uploadedBy,
+            url,
+            thumbnailUrl,
+          }
+        })
+      )
+    } else if (transaction.photos.length > 0) {
+      // Return photos without URLs if S3 not configured
+      photosWithUrls = transaction.photos.map((photo) => ({
+        id: photo.id,
+        transactionId: photo.transactionId,
+        filename: photo.filename,
+        mimeType: photo.mimeType,
+        fileSize: photo.fileSize,
+        caption: photo.caption,
+        sortOrder: photo.sortOrder,
+        uploadedAt: photo.uploadedAt.toISOString(),
+        uploadedBy: photo.uploadedBy,
+        url: '',
+        thumbnailUrl: '',
+      }))
     }
 
     return NextResponse.json({
@@ -160,6 +222,7 @@ export async function GET(
           locationId: fgLine.locationId,
           locationName: fgLine.location.name,
         })),
+        photos: photosWithUrls,
         // Calculated summary for build transactions
         summary:
           transaction.type === 'build'

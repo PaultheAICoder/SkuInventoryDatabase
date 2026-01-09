@@ -180,6 +180,9 @@ model User {
   // V2: Recommendation Engine relations
   changeLogEntries  ChangeLogEntry[]
   watchedKeywords   WatchedKeyword[]
+
+  // V2: Transaction photo uploads
+  photosUploaded TransactionPhoto[] @relation("PhotoUploadedBy")
 }
 
 // Note: Partial unique index "one_primary_company_per_user" enforces one isPrimary=true per userId
@@ -373,6 +376,7 @@ model Transaction {
   lines              TransactionLine[]
   finishedGoodsLines FinishedGoodsLine[] @relation("FinishedGoodsLines")
   defectAlerts       DefectAlert[]
+  photos             TransactionPhoto[]
 
   // Source tracking for automated transactions (e.g., from Shopify orders)
   sourceType    String? @db.VarChar(20) // "shopify", "manual", etc.
@@ -418,6 +422,32 @@ model FinishedGoodsLine {
   @@index([skuId])
   @@index([locationId])
   @@index([transactionId])
+}
+
+model TransactionPhoto {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  // S3 storage info
+  s3Key    String @db.VarChar(500) // Full S3 key path
+  s3Bucket String @db.VarChar(100) // Bucket name
+
+  // File metadata
+  filename String @db.VarChar(255) // Original filename
+  mimeType String @db.VarChar(50) // image/jpeg, image/png, etc.
+  fileSize Int // Size in bytes
+
+  // Optional metadata
+  caption   String? @db.VarChar(500)
+  sortOrder Int     @default(0) // For ordering photos
+
+  uploadedAt   DateTime @default(now())
+  uploadedById String
+  uploadedBy   User     @relation("PhotoUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([transactionId])
+  @@index([uploadedAt])
 }
 
 // ============================================
