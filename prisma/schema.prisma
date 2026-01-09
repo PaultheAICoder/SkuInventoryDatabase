@@ -20,6 +20,7 @@ model Company {
   brands           Brand[]
   categories       Category[]
   locations        Location[]
+  vendors          Vendor[]
   transactions     Transaction[]
   securityEvents   SecurityEvent[]
   defectThresholds DefectThreshold[]
@@ -107,6 +108,23 @@ model Category {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@index([companyId, isActive])
+}
+
+model Vendor {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  name         String   @db.VarChar(100)
+  contactEmail String?  @db.VarChar(255)
+  contactPhone String?  @db.VarChar(50)
+  address      String?  @db.Text
+  notes        String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([companyId, name])
   @@index([companyId, isActive])

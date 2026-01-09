@@ -33,6 +33,7 @@ import {
   Link2,
   Lightbulb,
   History,
+  Truck,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { FeedbackButton } from '@/components/features/FeedbackButton'
@@ -66,6 +67,7 @@ const settingsNavigation = [
   { name: 'Locations', href: '/settings/locations', icon: MapPin },
   { name: 'Brands', href: '/settings/brands', icon: Tag },
   { name: 'Categories', href: '/settings/categories', icon: FolderTree },
+  { name: 'Vendors', href: '/settings/vendors', icon: Truck },
   { name: 'Companies', href: '/settings/companies', icon: Building2 },
   { name: 'Integrations', href: '/integrations', icon: Plug },
   { name: 'Docker Health', href: '/admin/docker-health', icon: Activity },
