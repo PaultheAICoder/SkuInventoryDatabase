@@ -25,6 +25,19 @@ import { ArrowLeft, Edit, Package, Plus, Minus, ArrowLeftRight } from 'lucide-re
 import { formatDateString } from '@/lib/utils'
 import type { ComponentDetailResponse } from '@/types/component'
 
+/**
+ * Format price with up to 6 decimal places, trimming trailing zeros
+ * but always showing at least 2 decimals for currency consistency
+ */
+function formatPrice(value: string | number): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  // Format to 6 decimals, then trim trailing zeros (keep minimum 2)
+  const formatted = num.toFixed(6)
+  // Remove trailing zeros but keep at least 2 decimal places
+  const trimmed = formatted.replace(/(\.\d{2})0+$/, '$1').replace(/(\.\d{2}\d*?)0+$/, '$1')
+  return trimmed
+}
+
 export default function ComponentDetailPage() {
   const params = useParams()
   const id = params.id as string
@@ -198,7 +211,7 @@ export default function ComponentDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Cost per Unit</p>
                 <p className="text-3xl font-bold">
-                  ${parseFloat(component.costPerUnit).toFixed(4)}
+                  ${formatPrice(component.costPerUnit)}
                 </p>
               </div>
               <div>

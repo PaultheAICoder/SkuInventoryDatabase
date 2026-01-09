@@ -228,7 +228,7 @@ export function ComponentForm({ component, onSuccess }: ComponentFormProps) {
               <Input
                 id="costPerUnit"
                 type="number"
-                step="0.0001"
+                step="0.000001"
                 min="0"
                 value={formData.costPerUnit}
                 onChange={(e) => setFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))}

@@ -211,7 +211,7 @@ model Component {
   skuCode       String   @db.VarChar(50)
   category      String?  @db.VarChar(50)
   unitOfMeasure String   @default("each") @db.VarChar(20)
-  costPerUnit   Decimal  @default(0) @db.Decimal(10, 4)
+  costPerUnit   Decimal  @default(0) @db.Decimal(12, 6)
   reorderPoint  Int      @default(0)
   leadTimeDays  Int      @default(0)
   notes         String?  @db.Text
