@@ -40,6 +40,29 @@ interface LocationOption {
   name: string
 }
 
+// Initial values that can be passed to pre-populate the form
+// All fields are optional to support partial pre-fill
+export interface QuickEntryFormInitialValues {
+  transactionType?: 'inbound' | 'outbound' | 'adjustment'
+  // Inbound fields
+  componentId?: string
+  quantity?: number
+  supplier?: string
+  date?: string  // YYYY-MM-DD format
+  locationId?: string
+  notes?: string
+  // Outbound fields
+  skuId?: string
+  salesChannel?: string
+  // Adjustment fields
+  adjustmentType?: 'add' | 'subtract'
+  reason?: string
+}
+
+interface QuickEntryFormProps {
+  initialValues?: QuickEntryFormInitialValues
+}
+
 const ADJUSTMENT_REASONS = [
   { value: 'Inventory count correction', label: 'Inventory count correction' },
   { value: 'Damaged goods', label: 'Damaged goods' },
@@ -49,7 +72,7 @@ const ADJUSTMENT_REASONS = [
   { value: 'Other', label: 'Other (specify in notes)' },
 ]
 
-export function QuickEntryForm() {
+export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -108,29 +131,78 @@ export function QuickEntryForm() {
     notes: '',
   })
 
-  // Initialize from URL params
+  // Initialize from URL params AND/OR initialValues prop
   useEffect(() => {
+    // Handle transaction type - URL params take precedence over initialValues
     const typeParam = searchParams.get('type')
-    if (typeParam && ['inbound', 'outbound', 'adjustment'].includes(typeParam)) {
-      setTransactionType(typeParam as TransactionTypeValue)
+    const typeFromProps = initialValues?.transactionType
+    const effectiveType = typeParam || typeFromProps
+
+    if (effectiveType && ['inbound', 'outbound', 'adjustment'].includes(effectiveType)) {
+      setTransactionType(effectiveType as TransactionTypeValue)
     }
-    // Pre-fill sales channel from URL (for outbound)
+
+    // Pre-fill from initialValues prop (for "Edit manually" flow)
+    if (initialValues) {
+      // Pre-fill inbound form
+      if (initialValues.componentId || initialValues.quantity !== undefined || initialValues.supplier || initialValues.date || initialValues.notes) {
+        setInboundFormData((prev) => ({
+          ...prev,
+          componentId: initialValues.componentId || prev.componentId,
+          quantity: initialValues.quantity !== undefined ? initialValues.quantity.toString() : prev.quantity,
+          supplier: initialValues.supplier || prev.supplier,
+          date: initialValues.date || prev.date,
+          locationId: initialValues.locationId || prev.locationId,
+          notes: initialValues.notes || prev.notes,
+        }))
+      }
+
+      // Pre-fill outbound form
+      if (initialValues.skuId || initialValues.salesChannel || initialValues.quantity !== undefined) {
+        setOutboundFormData((prev) => ({
+          ...prev,
+          skuId: initialValues.skuId || prev.skuId,
+          salesChannel: initialValues.salesChannel || prev.salesChannel,
+          quantity: initialValues.quantity !== undefined ? initialValues.quantity.toString() : prev.quantity,
+          date: initialValues.date || prev.date,
+          locationId: initialValues.locationId || prev.locationId,
+          notes: initialValues.notes || prev.notes,
+        }))
+      }
+
+      // Pre-fill adjustment form
+      if (initialValues.componentId || initialValues.reason || initialValues.quantity !== undefined) {
+        setAdjustmentFormData((prev) => ({
+          ...prev,
+          componentId: initialValues.componentId || prev.componentId,
+          adjustmentType: initialValues.adjustmentType || prev.adjustmentType,
+          quantity: initialValues.quantity !== undefined ? Math.abs(initialValues.quantity).toString() : prev.quantity,
+          reason: initialValues.reason || prev.reason,
+          date: initialValues.date || prev.date,
+          locationId: initialValues.locationId || prev.locationId,
+          notes: initialValues.notes || prev.notes,
+        }))
+      }
+    }
+
+    // Keep existing URL param handling for backward compatibility
+    // URL params override initialValues for individual fields
     const channelParam = searchParams.get('channel')
     if (channelParam) {
       setOutboundFormData((prev) => ({ ...prev, salesChannel: channelParam }))
     }
-    // Pre-fill component ID from URL (for inbound/adjustment)
+
     const componentParam = searchParams.get('componentId')
     if (componentParam) {
       setInboundFormData((prev) => ({ ...prev, componentId: componentParam }))
       setAdjustmentFormData((prev) => ({ ...prev, componentId: componentParam }))
     }
-    // Pre-fill SKU ID from URL (for outbound)
+
     const skuParam = searchParams.get('skuId')
     if (skuParam) {
       setOutboundFormData((prev) => ({ ...prev, skuId: skuParam }))
     }
-  }, [searchParams])
+  }, [searchParams, initialValues])
 
   // Fetch data on mount
   const fetchComponents = useCallback(async () => {

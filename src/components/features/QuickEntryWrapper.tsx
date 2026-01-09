@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MessageSquare, ClipboardList } from 'lucide-react'
-import { QuickEntryForm } from './QuickEntryForm'
+import { QuickEntryForm, type QuickEntryFormInitialValues } from './QuickEntryForm'
 import { ConversationalInput } from './ConversationalInput'
 import { ParsedTransactionPreview } from './ParsedTransactionPreview'
 import type { ParseTransactionResponse, ParsedTransaction } from '@/types/parser'
@@ -16,6 +16,7 @@ export function QuickEntryWrapper() {
   const router = useRouter()
   const [mode, setMode] = useState<EntryMode>('form')
   const [parsedResult, setParsedResult] = useState<ParseTransactionResponse | null>(null)
+  const [formInitialValues, setFormInitialValues] = useState<QuickEntryFormInitialValues | undefined>(undefined)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
@@ -28,23 +29,35 @@ export function QuickEntryWrapper() {
   }
 
   const handleEditManually = () => {
-    // Navigate to form mode with pre-filled data via URL params
     if (parsedResult) {
       const parsed = parsedResult.parsed
-      const params = new URLSearchParams()
-      params.set('type', parsed.transactionType.value)
 
-      if (parsed.transactionType.value === 'outbound' && parsed.itemId.value) {
-        params.set('skuId', parsed.itemId.value)
-        if (parsed.salesChannel?.value) {
-          params.set('channel', parsed.salesChannel.value)
-        }
-      } else if (parsed.itemId.value) {
-        params.set('componentId', parsed.itemId.value)
+      // Map parsed transaction to form initial values
+      // Map 'receipt' to 'inbound' for UI consistency
+      const transactionType = parsed.transactionType.value === 'receipt' ? 'inbound' : parsed.transactionType.value
+
+      const values: QuickEntryFormInitialValues = {
+        transactionType: transactionType as 'inbound' | 'outbound' | 'adjustment',
+        quantity: parsed.quantity.value,
+        date: toLocalDateString(parsed.date.value instanceof Date ? parsed.date.value : new Date(parsed.date.value)),
+        notes: parsed.notes?.value || undefined,
       }
 
-      // Navigate with params
-      router.push(`/transactions/new?${params.toString()}`)
+      // Add type-specific fields
+      if (parsed.transactionType.value === 'receipt') {
+        values.componentId = parsed.itemId.value || undefined
+        values.supplier = parsed.supplier?.value || undefined
+      } else if (parsed.transactionType.value === 'outbound') {
+        values.skuId = parsed.itemId.value || undefined
+        values.salesChannel = parsed.salesChannel?.value || undefined
+      } else if (parsed.transactionType.value === 'adjustment') {
+        values.componentId = parsed.itemId.value || undefined
+        values.reason = parsed.reason?.value || undefined
+        // Default to subtract for adjustments
+        values.adjustmentType = 'subtract'
+      }
+
+      setFormInitialValues(values)
       setMode('form')
     }
   }
@@ -52,6 +65,7 @@ export function QuickEntryWrapper() {
   const handleCancel = () => {
     setMode('conversational')
     setParsedResult(null)
+    setFormInitialValues(undefined)
     setSubmitError(null)
   }
 
@@ -132,6 +146,7 @@ export function QuickEntryWrapper() {
 
   const handleRecordAnother = () => {
     setParsedResult(null)
+    setFormInitialValues(undefined)
     setSubmitSuccess(null)
     setSubmitError(null)
     setMode('conversational')
@@ -187,7 +202,7 @@ export function QuickEntryWrapper() {
       </TabsList>
 
       <TabsContent value="form" className="space-y-4">
-        <QuickEntryForm />
+        <QuickEntryForm initialValues={formInitialValues} />
       </TabsContent>
 
       <TabsContent value="conversational" className="space-y-4">
