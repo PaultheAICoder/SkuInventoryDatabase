@@ -18,6 +18,7 @@ import {
   X,
   MapPin,
   FileQuestion,
+  Hammer,
 } from 'lucide-react'
 import type { ConfidenceLevel, ParseTransactionResponse } from '@/types/parser'
 import { formatDateString, toLocalDateString } from '@/lib/utils'
@@ -198,12 +199,14 @@ export function ParsedTransactionPreview({
     receipt: 'Receipt (Receive Components)',
     build: 'Build (Create SKU Units)',
     adjustment: 'Adjustment',
+    outbound: 'Outbound (Ship SKUs)',
   }
 
   const transactionTypeIcons: Record<string, React.ReactNode> = {
     receipt: <Truck className="h-4 w-4" />,
-    build: <Package className="h-4 w-4" />,
+    build: <Hammer className="h-4 w-4" />,
     adjustment: <Edit2 className="h-4 w-4" />,
+    outbound: <Package className="h-4 w-4" />,
   }
 
   const hasLowConfidence =

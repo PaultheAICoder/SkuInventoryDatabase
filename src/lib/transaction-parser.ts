@@ -144,7 +144,7 @@ function calculateConfidence(
     case 'date':
       return value ? 'high' : 'medium'
     case 'transactionType':
-      return ['receipt', 'build', 'adjustment'].includes(value as string) ? 'high' : 'low'
+      return ['receipt', 'build', 'adjustment', 'outbound'].includes(value as string) ? 'high' : 'low'
     case 'salesChannel':
       return ['Amazon', 'Shopify', 'TikTok', 'Generic'].includes(value as string)
         ? 'high'
@@ -157,13 +157,15 @@ function calculateConfidence(
 /**
  * Map action to transaction type
  */
-function mapActionToType(action: string): 'receipt' | 'outbound' | 'adjustment' {
+function mapActionToType(action: string): 'receipt' | 'outbound' | 'adjustment' | 'build' {
   switch (action) {
     case 'receive':
       return 'receipt'
     case 'ship':
     case 'outbound':
       return 'outbound'
+    case 'build':
+      return 'build'
     case 'adjust':
       return 'adjustment'
     default:
@@ -446,7 +448,7 @@ export async function parseTransactionText(
     }
 
     // Add optional fields based on transaction type
-    if (transactionType === 'outbound') {
+    if (transactionType === 'outbound' || transactionType === 'build') {
       parsed.salesChannel = {
         value: rawParsed.channel,
         confidence: calculateConfidence('salesChannel', rawParsed.channel),

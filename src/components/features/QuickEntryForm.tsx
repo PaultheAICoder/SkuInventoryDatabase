@@ -16,8 +16,9 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { TransactionTypeSelector, TransactionTypeValue } from './TransactionTypeSelector'
+import { AlertTriangle } from 'lucide-react'
 import { salesChannels } from '@/types'
-import { toLocalDateString } from '@/lib/utils'
+import { cn, toLocalDateString } from '@/lib/utils'
 
 interface ComponentOption {
   id: string
@@ -43,7 +44,7 @@ interface LocationOption {
 // Initial values that can be passed to pre-populate the form
 // All fields are optional to support partial pre-fill
 export interface QuickEntryFormInitialValues {
-  transactionType?: 'inbound' | 'outbound' | 'adjustment'
+  transactionType?: 'inbound' | 'outbound' | 'adjustment' | 'build'
   // Inbound fields
   componentId?: string
   quantity?: number
@@ -57,6 +58,8 @@ export interface QuickEntryFormInitialValues {
   // Adjustment fields
   adjustmentType?: 'add' | 'subtract'
   reason?: string
+  // Build fields
+  unitsToBuild?: number
 }
 
 interface QuickEntryFormProps {
@@ -131,6 +134,26 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     notes: '',
   })
 
+  // Build form data (building SKUs from components)
+  const [buildFormData, setBuildFormData] = useState({
+    date: toLocalDateString(new Date()),
+    skuId: '',
+    unitsToBuild: '',
+    salesChannel: '',
+    locationId: '',
+    notes: '',
+  })
+
+  // Build-specific UI state
+  const [insufficientItems, setInsufficientItems] = useState<Array<{
+    componentId: string
+    componentName: string
+    required: number
+    available: number
+    shortage: number
+  }>>([])
+  const [showBuildWarning, setShowBuildWarning] = useState(false)
+
   // Initialize from URL params AND/OR initialValues prop
   useEffect(() => {
     // Handle transaction type - URL params take precedence over initialValues
@@ -138,7 +161,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     const typeFromProps = initialValues?.transactionType
     const effectiveType = typeParam || typeFromProps
 
-    if (effectiveType && ['inbound', 'outbound', 'adjustment'].includes(effectiveType)) {
+    if (effectiveType && ['inbound', 'outbound', 'adjustment', 'build'].includes(effectiveType)) {
       setTransactionType(effectiveType as TransactionTypeValue)
     }
 
@@ -183,6 +206,19 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
           notes: initialValues.notes || prev.notes,
         }))
       }
+
+      // Pre-fill build form
+      if (initialValues.skuId || initialValues.unitsToBuild !== undefined || initialValues.salesChannel) {
+        setBuildFormData((prev) => ({
+          ...prev,
+          skuId: initialValues.skuId || prev.skuId,
+          unitsToBuild: initialValues.unitsToBuild !== undefined ? initialValues.unitsToBuild.toString() : prev.unitsToBuild,
+          salesChannel: initialValues.salesChannel || prev.salesChannel,
+          date: initialValues.date || prev.date,
+          locationId: initialValues.locationId || prev.locationId,
+          notes: initialValues.notes || prev.notes,
+        }))
+      }
     }
 
     // Keep existing URL param handling for backward compatibility
@@ -201,6 +237,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
     const skuParam = searchParams.get('skuId')
     if (skuParam) {
       setOutboundFormData((prev) => ({ ...prev, skuId: skuParam }))
+      setBuildFormData((prev) => ({ ...prev, skuId: skuParam }))
     }
   }, [searchParams, initialValues])
 
@@ -305,6 +342,16 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
             locationId: outboundFormData.locationId || undefined,
             notes: outboundFormData.notes || null,
           }
+        } else if (transactionType === 'build') {
+          payload = {
+            type: 'build',
+            skuId: buildFormData.skuId,
+            date: buildFormData.date,
+            unitsToBuild: parseInt(buildFormData.unitsToBuild),
+            salesChannel: buildFormData.salesChannel || undefined,
+            locationId: buildFormData.locationId || undefined,
+            notes: buildFormData.notes || null,
+          }
         } else {
           // adjustment
           const quantity = parseFloat(adjustmentFormData.quantity)
@@ -342,6 +389,17 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
           locationId: outboundFormData.locationId || undefined,
           notes: outboundFormData.notes || null,
         }
+      } else if (transactionType === 'build') {
+        endpoint = '/api/transactions/build'
+        payload = {
+          skuId: buildFormData.skuId,
+          date: buildFormData.date,
+          unitsToBuild: parseInt(buildFormData.unitsToBuild),
+          salesChannel: buildFormData.salesChannel || undefined,
+          locationId: buildFormData.locationId || undefined,
+          notes: buildFormData.notes || null,
+          allowInsufficientInventory: showBuildWarning,
+        }
       } else {
         // adjustment
         endpoint = '/api/transactions/adjustment'
@@ -366,7 +424,19 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
+        // Handle insufficient inventory for build transactions
+        if (transactionType === 'build' && data?.insufficientItems && data.insufficientItems.length > 0) {
+          setInsufficientItems(data.insufficientItems)
+          setShowBuildWarning(true)
+          return
+        }
         throw new Error(data?.message || data?.error || 'Failed to record transaction')
+      }
+
+      // Success - clear build warning state on success
+      if (transactionType === 'build') {
+        setInsufficientItems([])
+        setShowBuildWarning(false)
       }
 
       // Success
@@ -382,6 +452,12 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
         successText = isDraft
           ? `Draft saved: Outbound for ${outboundFormData.quantity} x ${sku?.name || 'SKU'}`
           : `Outbound recorded: ${outboundFormData.quantity} x ${sku?.name || 'SKU'}`
+      } else if (transactionType === 'build') {
+        const buildableSkus = skus.filter((s) => s.hasActiveBom)
+        const sku = buildableSkus.find((s) => s.id === buildFormData.skuId)
+        successText = isDraft
+          ? `Draft saved: Build ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
+          : `Build recorded: ${buildFormData.unitsToBuild} x ${sku?.name || 'SKU'}`
       } else {
         const component = components.find((c) => c.id === adjustmentFormData.componentId)
         const sign = adjustmentFormData.adjustmentType === 'add' ? '+' : '-'
@@ -426,6 +502,17 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
         locationId: '',
         notes: '',
       })
+    } else if (transactionType === 'build') {
+      setBuildFormData({
+        date: today,
+        skuId: '',
+        unitsToBuild: '',
+        salesChannel: buildFormData.salesChannel, // Keep sales channel
+        locationId: '',
+        notes: '',
+      })
+      setInsufficientItems([])
+      setShowBuildWarning(false)
     } else {
       setAdjustmentFormData({
         date: today,
@@ -917,6 +1004,179 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
               </div>
             </div>
           )}
+
+          {/* Build Form Fields */}
+          {transactionType === 'build' && (() => {
+            // Get buildable SKUs (only those with active BOMs)
+            const buildableSkus = skus.filter((s) => s.hasActiveBom)
+            const selectedBuildSku = buildableSkus.find((s) => s.id === buildFormData.skuId)
+            const unitsToBuildNum = parseInt(buildFormData.unitsToBuild) || 0
+            const exceedsBuildable = selectedBuildSku?.maxBuildableUnits != null && unitsToBuildNum > selectedBuildSku.maxBuildableUnits
+
+            return (
+              <div className="space-y-4">
+                {/* Warning for insufficient inventory */}
+                {showBuildWarning && insufficientItems.length > 0 && (
+                  <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="font-medium text-yellow-800">Insufficient Inventory</p>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          The following components have insufficient inventory:
+                        </p>
+                        <ul className="mt-2 text-sm text-yellow-700 space-y-1">
+                          {insufficientItems.map((item) => (
+                            <li key={item.componentId} suppressHydrationWarning>
+                              <span className="font-medium">{item.componentName}</span>:{' '}
+                              Need {item.required.toLocaleString()}, have {item.available.toLocaleString()}{' '}
+                              (short {item.shortage.toLocaleString()})
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-4 flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowBuildWarning(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="destructive"
+                            disabled={isLoading}
+                          >
+                            {isLoading ? 'Building...' : 'Build Anyway'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="build-date" className="text-right">Date *</Label>
+                  <Input
+                    id="build-date"
+                    type="date"
+                    className="col-span-3"
+                    value={buildFormData.date}
+                    onChange={(e) => setBuildFormData((prev) => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="build-sku" className="text-right">SKU *</Label>
+                  <Select
+                    value={buildFormData.skuId}
+                    onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, skuId: value }))}
+                    disabled={isLoadingSkus}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder={isLoadingSkus ? 'Loading SKUs...' : 'Select SKU to build'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {buildableSkus.length === 0 && !isLoadingSkus && (
+                        <div className="px-3 py-4 text-sm text-muted-foreground text-center">
+                          No SKUs with active BOMs found.<br />Create a BOM for your SKUs first.
+                        </div>
+                      )}
+                      {buildableSkus.map((sku) => (
+                        <SelectItem key={sku.id} value={sku.id}>
+                          <span suppressHydrationWarning>
+                            {sku.name} ({sku.maxBuildableUnits?.toLocaleString() ?? '0'} buildable)
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedBuildSku && (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="col-span-1" />
+                    <div className="col-span-3 text-xs text-muted-foreground" suppressHydrationWarning>
+                      Max buildable: {selectedBuildSku.maxBuildableUnits?.toLocaleString() ?? '0'} units
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="build-units" className="text-right">Units to Build *</Label>
+                  <Input
+                    id="build-units"
+                    type="number"
+                    step="1"
+                    min="1"
+                    className={cn("col-span-3", exceedsBuildable && "border-yellow-500")}
+                    placeholder="e.g., 10"
+                    value={buildFormData.unitsToBuild}
+                    onChange={(e) => setBuildFormData((prev) => ({ ...prev, unitsToBuild: e.target.value }))}
+                    required
+                  />
+                </div>
+                {exceedsBuildable && (
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <div className="col-span-1" />
+                    <div className="col-span-3 text-xs text-yellow-600" suppressHydrationWarning>
+                      Exceeds max buildable ({selectedBuildSku?.maxBuildableUnits?.toLocaleString()})
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="build-channel" className="text-right">Sales Channel</Label>
+                  <Select
+                    value={buildFormData.salesChannel}
+                    onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, salesChannel: value }))}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select channel (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesChannels.map((channel) => (
+                        <SelectItem key={channel} value={channel}>
+                          {channel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="build-location" className="text-right">Location</Label>
+                  <Select
+                    value={buildFormData.locationId}
+                    onValueChange={(value) => setBuildFormData((prev) => ({ ...prev, locationId: value }))}
+                    disabled={isLoadingLocations}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder={isLoadingLocations ? 'Loading...' : 'Default location'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="build-notes" className="text-right pt-2">Notes</Label>
+                  <Textarea
+                    id="build-notes"
+                    className="col-span-3"
+                    placeholder="e.g., Order batch #123"
+                    value={buildFormData.notes}
+                    onChange={(e) => setBuildFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )
+          })()}
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
@@ -950,7 +1210,8 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
                   isLoading ||
                   (transactionType === 'inbound' && (!inboundFormData.componentId || !inboundFormData.quantity || !inboundFormData.supplier)) ||
                   (transactionType === 'outbound' && (!outboundFormData.skuId || !outboundFormData.quantity || !outboundFormData.salesChannel)) ||
-                  (transactionType === 'adjustment' && (!adjustmentFormData.componentId || !adjustmentFormData.quantity || !adjustmentFormData.reason))
+                  (transactionType === 'adjustment' && (!adjustmentFormData.componentId || !adjustmentFormData.quantity || !adjustmentFormData.reason)) ||
+                  (transactionType === 'build' && (!buildFormData.skuId || !buildFormData.unitsToBuild))
                 }
               >
                 {isLoading ? (saveAsDraft ? 'Saving...' : 'Recording...') : (saveAsDraft ? 'Save Draft' : 'Record Transaction')}

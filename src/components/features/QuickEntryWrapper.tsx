@@ -34,10 +34,17 @@ export function QuickEntryWrapper() {
 
       // Map parsed transaction to form initial values
       // Map 'receipt' to 'inbound' for UI consistency
-      const transactionType = parsed.transactionType.value === 'receipt' ? 'inbound' : parsed.transactionType.value
+      let transactionType: 'inbound' | 'outbound' | 'adjustment' | 'build'
+      if (parsed.transactionType.value === 'receipt') {
+        transactionType = 'inbound'
+      } else if (parsed.transactionType.value === 'build') {
+        transactionType = 'build'
+      } else {
+        transactionType = parsed.transactionType.value as 'outbound' | 'adjustment'
+      }
 
       const values: QuickEntryFormInitialValues = {
-        transactionType: transactionType as 'inbound' | 'outbound' | 'adjustment',
+        transactionType,
         quantity: parsed.quantity.value,
         date: toLocalDateString(parsed.date.value instanceof Date ? parsed.date.value : new Date(parsed.date.value)),
         notes: parsed.notes?.value || undefined,
@@ -47,6 +54,10 @@ export function QuickEntryWrapper() {
       if (parsed.transactionType.value === 'receipt') {
         values.componentId = parsed.itemId.value || undefined
         values.supplier = parsed.supplier?.value || undefined
+      } else if (parsed.transactionType.value === 'build') {
+        values.skuId = parsed.itemId.value || undefined
+        values.unitsToBuild = parsed.quantity.value
+        values.salesChannel = parsed.salesChannel?.value || undefined
       } else if (parsed.transactionType.value === 'outbound') {
         values.skuId = parsed.itemId.value || undefined
         values.salesChannel = parsed.salesChannel?.value || undefined
@@ -92,6 +103,16 @@ export function QuickEntryWrapper() {
           date,
           quantity: parsed.quantity.value,
           supplier: overrides?.supplier || parsed.supplier?.value || 'Unknown',
+          locationId: overrides?.locationId || undefined,
+          notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
+        }
+      } else if (transactionType === 'build') {
+        endpoint = '/api/transactions/build'
+        payload = {
+          skuId: parsed.itemId.value,
+          date,
+          unitsToBuild: parsed.quantity.value,
+          salesChannel: parsed.salesChannel?.value || undefined,
           locationId: overrides?.locationId || undefined,
           notes: parsed.notes?.value || `Parsed from: "${parsed.originalInput}"`,
         }
