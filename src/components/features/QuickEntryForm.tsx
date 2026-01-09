@@ -673,7 +673,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
 
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="receipt-location" className="text-right">
-                  Location
+                  Destination Location
                 </Label>
                 <Select
                   value={inboundFormData.locationId}
@@ -819,7 +819,7 @@ export function QuickEntryForm({ initialValues }: QuickEntryFormProps = {}) {
 
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="outbound-location" className="text-right">
-                  Location
+                  Source Location
                 </Label>
                 <Select
                   value={outboundFormData.locationId}

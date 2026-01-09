@@ -383,7 +383,13 @@ export function ParsedTransactionPreview({
 
         {/* Location - Now editable for all transaction types */}
         <EditablePreviewField
-          label="Location"
+          label={
+            parsed.transactionType.value === 'receipt'
+              ? 'Destination Location'
+              : parsed.transactionType.value === 'outbound'
+                ? 'Source Location'
+                : 'Location'
+          }
           icon={<MapPin className="h-4 w-4" />}
           value={locationId ? locationName : null}
           onChange={handleLocationChange}

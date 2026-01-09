@@ -850,7 +850,11 @@ export default function EditTransactionPage() {
             {transaction.type !== 'transfer' && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="locationId" className="text-right">
-                  Location
+                  {transaction.type === 'receipt'
+                    ? 'Destination Location'
+                    : transaction.type === 'outbound'
+                      ? 'Source Location'
+                      : 'Location'}
                 </Label>
                 <Select
                   value={formData.locationId as string}
