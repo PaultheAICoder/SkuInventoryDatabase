@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { toLocalDateString } from '@/lib/utils'
+import { toLocalDateString, parseFractionOrNumber } from '@/lib/utils'
 import { fetchBrandDefaultLocation } from '@/lib/brand-utils'
 
 interface ReceiptDialogProps {
@@ -130,7 +130,7 @@ export function ReceiptDialog({
           quantity: parseFloat(formData.quantity),
           supplier: formData.supplier,
           vendorId: formData.vendorId || undefined,
-          costPerUnit: formData.costPerUnit ? parseFloat(formData.costPerUnit) : undefined,
+          costPerUnit: formData.costPerUnit ? parseFractionOrNumber(formData.costPerUnit) ?? undefined : undefined,
           updateComponentCost: formData.updateComponentCost,
           notes: formData.notes || null,
           locationId: formData.locationId || undefined,
@@ -308,11 +308,9 @@ export function ReceiptDialog({
               </Label>
               <Input
                 id="costPerUnit"
-                type="number"
-                step="0.0001"
-                min="0"
+                type="text"
                 className="col-span-3"
-                placeholder="Leave blank to use current cost"
+                placeholder="e.g., 0.02, 1/45 (blank = N/A)"
                 value={formData.costPerUnit}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, costPerUnit: e.target.value }))
