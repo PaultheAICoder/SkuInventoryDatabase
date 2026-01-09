@@ -200,6 +200,7 @@ export default function AmazonPage() {
           organicPercentage: attr.summary.organicPercentage,
           totalSpend: 0, // Will be populated from keyword data
           overallAcos: 0,
+          overallTacos: 0, // Will be calculated from keyword data
           overallRoas: 0,
         })
 
@@ -241,6 +242,7 @@ export default function AmazonPage() {
           organicPercentage: data.summary.organicPercentage,
           totalSpend: 0,
           overallAcos: 0,
+          overallTacos: 0, // Will be calculated from keyword data
           overallRoas: 0,
         })
 
@@ -303,26 +305,37 @@ export default function AmazonPage() {
 
       setKeywordData(data.keywords)
 
-      // Update summary with keyword totals (ACOS/ROAS)
+      // Update summary with keyword totals (ACOS/TACOS/ROAS)
       setSummary((prev) => {
         if (!prev) return prev
+        // Calculate TACOS: Ad Spend / Total Sales * 100
+        const overallTacos = prev.totalSales > 0
+          ? (data.totals.totalSpend / prev.totalSales) * 100
+          : 0
         return {
           ...prev,
           totalSpend: data.totals.totalSpend,
           overallAcos: data.totals.overallAcos,
+          overallTacos: Math.round(overallTacos * 100) / 100,
           overallRoas: data.totals.overallRoas,
         }
       })
 
-      // Build ACOS/ROAS trend data from keywords aggregated by date
+      // Build ACOS/ROAS/TACOS trend data from keywords aggregated by date
       // Note: For now, we use the keyword totals; a more granular approach would need daily keyword data
       // We'll create a simple trend based on the date range
+      const dailySpend = data.totals.totalSpend / salesTrendData.length
       const acosRoasTrend: AcosRoasDataPoint[] = salesTrendData.map((d) => ({
         date: d.date,
         acos: data.totals.overallAcos,
         roas: data.totals.overallRoas,
-        spend: data.totals.totalSpend / salesTrendData.length,
+        spend: dailySpend,
         sales: d.adAttributedSales,
+        totalSales: d.totalSales,
+        // Calculate daily TACOS: daily spend / daily total sales
+        tacos: d.totalSales > 0
+          ? (dailySpend / d.totalSales) * 100
+          : 0,
       }))
       setAcosRoasData(acosRoasTrend)
     } catch (err) {
@@ -538,10 +551,10 @@ export default function AmazonPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         {isLoadingSales ? (
           <>
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <div className="h-4 w-24 animate-pulse rounded bg-muted" />
@@ -575,6 +588,13 @@ export default function AmazonPage() {
               subValue={`Spend: ${formatCurrency(summary.totalSpend)}`}
               icon={TrendingDown}
               trend={summary.overallAcos > 30 ? 'down' : 'up'}
+            />
+            <StatCard
+              title="TACOS"
+              value={`${summary.overallTacos.toFixed(1)}%`}
+              subValue="Total Ad Cost of Sale"
+              icon={TrendingDown}
+              trend={summary.overallTacos > 15 ? 'down' : 'up'}
             />
             <StatCard
               title="ROAS"

@@ -23,6 +23,7 @@ interface AcosRoasChartProps {
 // Color scheme
 const COLORS = {
   acos: '#ef4444', // red-500
+  tacos: '#3b82f6', // blue-500
   roas: '#22c55e', // green-500
 }
 
@@ -46,9 +47,10 @@ export function AcosRoasChart({ data, isLoading }: AcosRoasChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ACOS & ROAS Trends</CardTitle>
+        <CardTitle>ACOS, TACOS & ROAS Trends</CardTitle>
         <CardDescription>
-          Advertising Cost of Sales (ACOS) and Return on Ad Spend (ROAS) over time
+          Advertising Cost of Sales (ACOS), Total Advertising Cost of Sales (TACOS),
+          and Return on Ad Spend (ROAS) over time
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -58,7 +60,7 @@ export function AcosRoasChart({ data, isLoading }: AcosRoasChartProps) {
           </div>
         ) : data.length === 0 ? (
           <div className="flex h-80 items-center justify-center text-muted-foreground">
-            No ACOS/ROAS data available
+            No ACOS/TACOS/ROAS data available
           </div>
         ) : (
           <div className="h-80">
@@ -112,21 +114,31 @@ export function AcosRoasChart({ data, isLoading }: AcosRoasChartProps) {
                             {tooltipData.acos.toFixed(1)}%
                           </p>
                           <p className="text-xs text-muted-foreground ml-4">
-                            (Ad Cost / Sales)
+                            (Ad Cost / Ad Sales)
+                          </p>
+                          <p>
+                            <span style={{ color: COLORS.tacos }}>TACOS:</span>{' '}
+                            {tooltipData.tacos.toFixed(1)}%
+                          </p>
+                          <p className="text-xs text-muted-foreground ml-4">
+                            (Ad Cost / Total Sales)
                           </p>
                           <p>
                             <span style={{ color: COLORS.roas }}>ROAS:</span>{' '}
                             {tooltipData.roas.toFixed(2)}x
                           </p>
                           <p className="text-xs text-muted-foreground ml-4">
-                            (Sales / Ad Cost)
+                            (Ad Sales / Ad Cost)
                           </p>
                           <div className="mt-2 border-t pt-2">
                             <p className="text-muted-foreground">
                               Spend: {formatCurrency(tooltipData.spend)}
                             </p>
                             <p className="text-muted-foreground">
-                              Sales: {formatCurrency(tooltipData.sales)}
+                              Ad Sales: {formatCurrency(tooltipData.sales)}
+                            </p>
+                            <p className="text-muted-foreground">
+                              Total Sales: {formatCurrency(tooltipData.totalSales)}
                             </p>
                           </div>
                         </div>
@@ -143,6 +155,17 @@ export function AcosRoasChart({ data, isLoading }: AcosRoasChartProps) {
                   stroke={COLORS.acos}
                   strokeWidth={2}
                   dot={{ fill: COLORS.acos, strokeWidth: 2 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="tacos"
+                  name="TACOS (%)"
+                  stroke={COLORS.tacos}
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={{ fill: COLORS.tacos, strokeWidth: 2 }}
                   activeDot={{ r: 6 }}
                 />
                 <Line

@@ -14,13 +14,15 @@ export interface SalesTrendDataPoint {
   organicSales: number
 }
 
-// ACOS/ROAS trend data point
+// ACOS/ROAS/TACOS trend data point
 export interface AcosRoasDataPoint {
   date: string
-  acos: number // percentage
-  roas: number // ratio
+  acos: number // percentage - Advertising Cost of Sale (Ad Spend / Ad Sales)
+  roas: number // ratio - Return on Ad Spend (Ad Sales / Ad Spend)
+  tacos: number // percentage - Total Advertising Cost of Sale (Ad Spend / Total Sales)
   spend: number
-  sales: number
+  sales: number // ad-attributed sales
+  totalSales: number // total sales (organic + ad-attributed) for TACOS context
 }
 
 // Organic vs Ad breakdown for pie chart
@@ -93,6 +95,7 @@ export interface AmazonAnalyticsSummary {
   organicPercentage: number
   totalSpend: number
   overallAcos: number
+  overallTacos: number // Total Advertising Cost of Sale (Ad Spend / Total Sales)
   overallRoas: number
 }
 
@@ -105,10 +108,11 @@ export interface KeywordMetricsResponse {
   }
   totals: {
     totalSpend: number
-    totalSales: number
+    totalSales: number // ad-attributed sales
     totalImpressions: number
     totalClicks: number
     overallAcos: number
+    overallTacos: number // placeholder - frontend calculates from combined data
     overallRoas: number
   }
 }

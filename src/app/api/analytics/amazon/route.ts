@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
           totalImpressions: 0,
           totalClicks: 0,
           overallAcos: 0,
+          overallTacos: 0, // placeholder - frontend calculates from combined data
           overallRoas: 0,
         },
       }
@@ -165,6 +166,7 @@ export async function GET(request: NextRequest) {
         totalImpressions,
         totalClicks,
         overallAcos: Math.round(overallAcos * 100) / 100,
+        overallTacos: 0, // placeholder - frontend calculates from combined data (needs total sales)
         overallRoas: Math.round(overallRoas * 100) / 100,
       },
     }
