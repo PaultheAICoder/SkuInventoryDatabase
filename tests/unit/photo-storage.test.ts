@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { validateImageFile, generateS3Key, isS3Configured } from '@/services/photo-storage'
 
 describe('photo-storage service', () => {
@@ -96,25 +96,25 @@ describe('photo-storage service', () => {
     })
   })
 
-  describe('generateS3Key', () => {
-    it('generates correct main image key path', () => {
+  describe('generateS3Key (generateFilePath)', () => {
+    it('generates correct main image path', () => {
       const companyId = 'company-123'
       const transactionId = 'trans-456'
       const filename = 'photo.jpg'
 
       const key = generateS3Key(companyId, transactionId, filename, 'main')
 
-      expect(key).toMatch(/^photos\/company-123\/trans-456\/\d+_photo\.webp$/)
+      expect(key).toMatch(/^company-123\/trans-456\/\d+_photo\.webp$/)
     })
 
-    it('generates correct thumbnail key path', () => {
+    it('generates correct thumbnail path', () => {
       const companyId = 'company-123'
       const transactionId = 'trans-456'
       const filename = 'photo.jpg'
 
       const key = generateS3Key(companyId, transactionId, filename, 'thumbnail')
 
-      expect(key).toMatch(/^photos\/company-123\/trans-456\/thumb_\d+_photo\.webp$/)
+      expect(key).toMatch(/^company-123\/trans-456\/thumb_\d+_photo\.webp$/)
     })
 
     it('sanitizes filename with special characters', () => {
@@ -161,41 +161,9 @@ describe('photo-storage service', () => {
     })
   })
 
-  describe('isS3Configured', () => {
-    const originalEnv = process.env
-
-    beforeEach(() => {
-      vi.resetModules()
-      process.env = { ...originalEnv }
-    })
-
-    afterEach(() => {
-      process.env = originalEnv
-    })
-
-    it('returns false when AWS credentials are missing', () => {
-      delete process.env.AWS_ACCESS_KEY_ID
-      delete process.env.AWS_SECRET_ACCESS_KEY
-      delete process.env.PHOTO_S3_BUCKET
-
-      const result = isS3Configured()
-      expect(result).toBe(false)
-    })
-
-    it('returns false when bucket is missing', () => {
-      process.env.AWS_ACCESS_KEY_ID = 'test-key'
-      process.env.AWS_SECRET_ACCESS_KEY = 'test-secret'
-      delete process.env.PHOTO_S3_BUCKET
-
-      const result = isS3Configured()
-      expect(result).toBe(false)
-    })
-
-    it('returns true when all credentials are set', () => {
-      process.env.AWS_ACCESS_KEY_ID = 'test-key'
-      process.env.AWS_SECRET_ACCESS_KEY = 'test-secret'
-      process.env.PHOTO_S3_BUCKET = 'test-bucket'
-
+  describe('isS3Configured (isStorageConfigured)', () => {
+    it('always returns true for local storage', () => {
+      // Local storage is always available, unlike S3 which requires credentials
       const result = isS3Configured()
       expect(result).toBe(true)
     })

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions, getSelectedCompanyRole } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { error, unauthorized, notFound, success } from '@/lib/api-response'
-import { deleteFromS3, isS3Configured } from '@/services/photo-storage'
+import { deleteFromS3 } from '@/services/photo-storage'
 
 interface RouteParams {
   params: Promise<{ photoId: string }>
@@ -50,18 +50,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return notFound('Photo')
     }
 
-    // Delete from S3 if configured
-    if (isS3Configured()) {
-      try {
-        // Delete main image
-        await deleteFromS3(photo.s3Key)
-        // Delete thumbnail (derive key from main key)
-        const thumbKey = photo.s3Key.replace(/\/(\d+_)/, '/thumb_$1')
-        await deleteFromS3(thumbKey)
-      } catch (s3Error) {
-        console.error('S3 delete error:', s3Error)
-        // Continue with database deletion even if S3 fails
-      }
+    // Delete from local storage
+    try {
+      // Delete main image
+      await deleteFromS3(photo.s3Key)
+      // Delete thumbnail (derive key from main key)
+      const thumbKey = photo.s3Key.replace(/\/(\d+_)/, '/thumb_$1')
+      await deleteFromS3(thumbKey)
+    } catch (storageError) {
+      console.error('Storage delete error:', storageError)
+      // Continue with database deletion even if storage delete fails
     }
 
     // Delete from database

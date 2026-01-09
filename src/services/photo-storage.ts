@@ -1,48 +1,27 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { promises as fs } from 'fs'
+import path from 'path'
 import sharp from 'sharp'
 import { DEFAULT_PHOTO_CONFIG, type PhotoUploadConfig } from '@/types/photo'
 
-// Lazy initialization for S3 client to avoid errors when env vars are not set
-let _s3Client: S3Client | null = null
-
-function getS3Client(): S3Client {
-  if (!_s3Client) {
-    _s3Client = new S3Client({
-      region: process.env.PHOTO_S3_REGION || 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-      },
-    })
-  }
-  return _s3Client
-}
-
-const getBucket = () => process.env.PHOTO_S3_BUCKET || 'trevor-inventory-photos'
+// Storage directory - relative to project root, served by Next.js from public/
+const PHOTO_STORAGE_DIR = process.env.PHOTO_STORAGE_PATH || 'public/uploads/photos'
 
 export interface UploadResult {
-  s3Key: string
-  s3Bucket: string
+  filePath: string
+  storageType: string
   fileSize: number
   mimeType: string
 }
 
 /**
- * Check if S3 is properly configured
+ * Check if local storage is available (always true for local filesystem)
  */
-export function isS3Configured(): boolean {
-  return !!(
-    process.env.AWS_ACCESS_KEY_ID &&
-    process.env.AWS_SECRET_ACCESS_KEY &&
-    process.env.PHOTO_S3_BUCKET
-  )
+export function isStorageConfigured(): boolean {
+  return true
 }
+
+// Backward compatible alias
+export { isStorageConfigured as isS3Configured }
 
 /**
  * Validates image file
@@ -102,56 +81,56 @@ export async function processImage(
 }
 
 /**
- * Upload image to S3
+ * Save image to local filesystem
  */
-export async function uploadToS3(
+export async function saveToLocal(
   buffer: Buffer,
-  key: string,
-  mimeType: string
+  filePath: string
 ): Promise<void> {
-  const s3Client = getS3Client()
-  await s3Client.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: buffer,
-      ContentType: mimeType,
-    })
-  )
+  const fullPath = path.join(process.cwd(), PHOTO_STORAGE_DIR, filePath)
+  const dir = path.dirname(fullPath)
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(fullPath, buffer)
 }
 
-/**
- * Generate signed URL for private S3 object
- */
-export async function getSignedPhotoUrl(
-  s3Key: string,
-  expiresIn: number = 3600 // 1 hour default
-): Promise<string> {
-  const s3Client = getS3Client()
-  const command = new GetObjectCommand({
-    Bucket: getBucket(),
-    Key: s3Key,
-  })
-  return getSignedUrl(s3Client, command, { expiresIn })
-}
+// Backward compatible alias - API routes call uploadToS3
+export { saveToLocal as uploadToS3 }
 
 /**
- * Delete photo from S3
+ * Generate static URL for local photo
+ * Returns a path that Next.js can serve from public/
  */
-export async function deleteFromS3(s3Key: string): Promise<void> {
-  const s3Client = getS3Client()
-  await s3Client.send(
-    new DeleteObjectCommand({
-      Bucket: getBucket(),
-      Key: s3Key,
-    })
-  )
+export function getPhotoUrl(filePath: string): string {
+  // The filePath is relative to PHOTO_STORAGE_DIR (public/uploads/photos)
+  // We need to return a URL path starting with /uploads/photos
+  return `/uploads/photos/${filePath}`
 }
 
+// Backward compatible alias - API routes call getSignedPhotoUrl
+export { getPhotoUrl as getSignedPhotoUrl }
+
 /**
- * Generate S3 key path for transaction photo
+ * Delete photo from local filesystem
  */
-export function generateS3Key(
+export async function deleteLocal(filePath: string): Promise<void> {
+  try {
+    const fullPath = path.join(process.cwd(), PHOTO_STORAGE_DIR, filePath)
+    await fs.unlink(fullPath)
+  } catch (err) {
+    // Ignore errors if file doesn't exist (ENOENT)
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw err
+    }
+  }
+}
+
+// Backward compatible alias - API routes call deleteFromS3
+export { deleteLocal as deleteFromS3 }
+
+/**
+ * Generate file path for transaction photo
+ */
+export function generateFilePath(
   companyId: string,
   transactionId: string,
   filename: string,
@@ -162,7 +141,10 @@ export function generateS3Key(
   const baseName = sanitizedFilename.replace(/\.[^.]+$/, '')
 
   if (type === 'thumbnail') {
-    return `photos/${companyId}/${transactionId}/thumb_${timestamp}_${baseName}.webp`
+    return `${companyId}/${transactionId}/thumb_${timestamp}_${baseName}.webp`
   }
-  return `photos/${companyId}/${transactionId}/${timestamp}_${baseName}.webp`
+  return `${companyId}/${transactionId}/${timestamp}_${baseName}.webp`
 }
+
+// Backward compatible alias - API routes call generateS3Key
+export { generateFilePath as generateS3Key }

@@ -9,7 +9,6 @@ import {
   uploadToS3,
   generateS3Key,
   getSignedPhotoUrl,
-  isS3Configured,
 } from '@/services/photo-storage'
 import { DEFAULT_PHOTO_CONFIG } from '@/types/photo'
 
@@ -33,14 +32,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const selectedCompanyId = session.user.selectedCompanyId
     if (!selectedCompanyId) {
       return error('No company selected', 400)
-    }
-
-    // Check S3 configuration
-    if (!isS3Configured()) {
-      return error(
-        'Photo storage is not configured. Please contact your administrator to set up AWS S3.',
-        503
-      )
     }
 
     const { id: transactionId } = await params
@@ -88,10 +79,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const mainKey = generateS3Key(selectedCompanyId, transactionId, file.name, 'main')
     const thumbKey = generateS3Key(selectedCompanyId, transactionId, file.name, 'thumbnail')
 
-    // Upload to S3
+    // Save to local storage
     await Promise.all([
-      uploadToS3(processed.main, mainKey, processed.mimeType),
-      uploadToS3(processed.thumbnail, thumbKey, processed.mimeType),
+      uploadToS3(processed.main, mainKey),
+      uploadToS3(processed.thumbnail, thumbKey),
     ])
 
     // Get current max sort order
@@ -105,7 +96,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       data: {
         transactionId,
         s3Key: mainKey,
-        s3Bucket: process.env.PHOTO_S3_BUCKET!,
+        s3Bucket: 'local',
         filename: file.name,
         mimeType: processed.mimeType,
         fileSize: processed.main.length,
@@ -184,48 +175,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     })
 
-    // Generate signed URLs for all photos (if S3 configured)
-    if (!isS3Configured()) {
-      // Return photos without URLs if S3 not configured
-      return success({
-        data: photos.map((photo) => ({
-          id: photo.id,
-          transactionId: photo.transactionId,
-          filename: photo.filename,
-          mimeType: photo.mimeType,
-          fileSize: photo.fileSize,
-          caption: photo.caption,
-          sortOrder: photo.sortOrder,
-          uploadedAt: photo.uploadedAt.toISOString(),
-          uploadedBy: photo.uploadedBy,
-          url: '',
-          thumbnailUrl: '',
-        })),
-      })
-    }
-
-    const photosWithUrls = await Promise.all(
-      photos.map(async (photo) => {
-        const thumbKey = photo.s3Key.replace(/\/(\d+_)/, '/thumb_$1')
-        const [url, thumbnailUrl] = await Promise.all([
-          getSignedPhotoUrl(photo.s3Key),
-          getSignedPhotoUrl(thumbKey),
-        ])
-        return {
-          id: photo.id,
-          transactionId: photo.transactionId,
-          filename: photo.filename,
-          mimeType: photo.mimeType,
-          fileSize: photo.fileSize,
-          caption: photo.caption,
-          sortOrder: photo.sortOrder,
-          uploadedAt: photo.uploadedAt.toISOString(),
-          uploadedBy: photo.uploadedBy,
-          url,
-          thumbnailUrl,
-        }
-      })
-    )
+    // Generate URLs for all photos (local storage always available)
+    const photosWithUrls = photos.map((photo) => {
+      const thumbKey = photo.s3Key.replace(/\/(\d+_)/, '/thumb_$1')
+      return {
+        id: photo.id,
+        transactionId: photo.transactionId,
+        filename: photo.filename,
+        mimeType: photo.mimeType,
+        fileSize: photo.fileSize,
+        caption: photo.caption,
+        sortOrder: photo.sortOrder,
+        uploadedAt: photo.uploadedAt.toISOString(),
+        uploadedBy: photo.uploadedBy,
+        url: getSignedPhotoUrl(photo.s3Key),
+        thumbnailUrl: getSignedPhotoUrl(thumbKey),
+      }
+    })
 
     return success({ data: photosWithUrls })
   } catch (err) {
